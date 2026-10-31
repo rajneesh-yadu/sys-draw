@@ -4,15 +4,16 @@ Composition root: app shell layout, routing, theme, keyboard shortcuts.
 
 - **Depends on:** any module (composition root)
 - **Rules:** Wires modules together; contains no domain logic.
-- **Built in:** session S01 (canvas wired in S04)
+- **Built in:** session S01 (canvas wired in S04, workspace UI + saving S06)
 
 ## Public API (index.ts)
 
-- `AppShell` — the five-region layout; mounts `canvas` (`CanvasProvider`, `Palette`, `BoardCanvas`).
+- `AppShell({ autosave? })` — project sidebar, palette, board tabs + canvas, inspector, metrics drawer; save status + Ctrl/Cmd+S when `autosave` is given.
 
 ## Layout
 
-- main.tsx — browser entry (mounted by index.html)
+- main.tsx — browser entry: `openWorkspace` (IndexedDB, migrations) before first render, flush on hide
+- workspace/ — ProjectSidebar, BoardTabs, SnapshotsPanel, SaveStatus, Menu/InlineEdit, notices, file download/upload
 - index.css — Tailwind entry + global styles
 - layout/ — AppShell (top bar, palette, canvas, inspector, metrics drawer)
 

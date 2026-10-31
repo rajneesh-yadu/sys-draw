@@ -6,6 +6,7 @@ import { current, type Draft } from 'immer';
 import {
   EdgeConfigSchema,
   GROUP_KINDS,
+  GraphSchema,
   GroupSchema,
   NodeScalingSchema,
   NonEmptyStringSchema,
@@ -14,6 +15,7 @@ import {
   type Autoscale,
   type EdgeConfig,
   type EdgeInstance,
+  type Graph,
   type Group,
   type GroupKind,
   type IdKind,
@@ -101,7 +103,9 @@ export type BoardCommand =
   | { type: 'ungroup'; groupId: string }
   | { type: 'setGroupFrame'; groupId: string; frame: Rect }
   | { type: 'insert'; subgraph: Subgraph }
-  | { type: 'batch'; label: string; commands: BoardCommand[] };
+  | { type: 'batch'; label: string; commands: BoardCommand[] }
+  /** Replace the whole graph (snapshot restore). Undoable like any other command. */
+  | { type: 'replaceGraph'; graph: Graph; label?: string };
 
 export interface CommandContext {
   registry: Registry;
@@ -164,6 +168,8 @@ export function commandLabel(cmd: BoardCommand): string {
       return 'Paste';
     case 'batch':
       return cmd.label;
+    case 'replaceGraph':
+      return cmd.label ?? 'Replace board';
   }
 }
 
@@ -289,6 +295,7 @@ export function applyCommand(d: D, cmd: BoardCommand, ctx: CommandContext): void
       d.graph.nodes = d.graph.nodes.filter((n) => !nodes.has(n.id));
       d.graph.groups = d.graph.groups.filter((g) => !groups.has(g.id));
       for (const g of groups) delete d.layout.groupFrames[g];
+      pruneScenario(d);
       return;
     }
 
@@ -488,5 +495,39 @@ export function applyCommand(d: D, cmd: BoardCommand, ctx: CommandContext): void
       for (const c of cmd.commands) applyCommand(d, c, ctx);
       return;
     }
+
+    case 'replaceGraph': {
+      const res = safeParseReadable(GraphSchema, cmd.graph);
+      if (!res.ok) fail(`Invalid graph: ${res.errors[0] ?? 'unknown error'}`);
+      d.graph = structuredClone(cmd.graph) as Draft<Graph>;
+      const groupIds = new Set(cmd.graph.groups.map((g) => g.id));
+      for (const id of Object.keys(d.layout.groupFrames)) {
+        if (!groupIds.has(id)) delete d.layout.groupFrames[id];
+      }
+      pruneScenario(d);
+      return;
+    }
   }
+}
+
+/**
+ * Drop flow steps and chaos events that point at nodes, edges or groups no longer on the board,
+ * so a saved board always passes core's BoardSchema reference checks.
+ */
+function pruneScenario(d: D): void {
+  const nodeIds = new Set(d.graph.nodes.map((n) => n.id));
+  const edgeIds = new Set(d.graph.edges.map((e) => e.id));
+  const groupIds = new Set(d.graph.groups.map((g) => g.id));
+  for (const f of d.scenario.flows) {
+    if (f.path.some((s) => !nodeIds.has(s.nodeId))) {
+      f.path = f.path.filter((s) => nodeIds.has(s.nodeId));
+    }
+  }
+  const live = (ev: (typeof d.scenario.events)[number]) =>
+    !(
+      ('nodeId' in ev && ev.nodeId !== undefined && !nodeIds.has(ev.nodeId)) ||
+      ('edgeId' in ev && ev.edgeId !== undefined && !edgeIds.has(ev.edgeId)) ||
+      ('groupId' in ev && ev.groupId !== undefined && !groupIds.has(ev.groupId))
+    );
+  if (!d.scenario.events.every(live)) d.scenario.events = d.scenario.events.filter(live);
 }

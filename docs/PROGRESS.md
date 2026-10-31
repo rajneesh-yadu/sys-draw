@@ -162,3 +162,44 @@ Known gaps / follow-ups:
 - Tests ran on a Linux copy of the repo (macOS-native `node_modules`); `pnpm e2e` was not run (no Chromium available in this session). No new dependencies.
 
 Next suggested session: S06 — Workspace, tabs and persistence (persist `scenario` and group frames).
+
+---
+
+## S06 — Projects, board tabs, saving — 2026-10-31
+
+Status: done
+Changed: src/store/{workspace.ts, workspace-store.ts, WorkspaceStoreProvider.tsx, workspace.test.ts, workspace-store.test.ts, commands.ts, context.ts, index.ts, README.md}, src/persistence/{index.ts, README.md, adapter.ts, dexie-adapter.ts, save-file.ts, session.ts, test-utils.ts, save-file.test.ts, session.test.ts, dexie-adapter.test.ts}, src/app/{main.tsx, README.md, layout/AppShell.tsx, workspace/{index.ts, ProjectSidebar.tsx, BoardTabs.tsx, SnapshotsPanel.tsx, SaveStatus.tsx, Menu.tsx, notices.tsx, notice-context.ts, files.ts, Workspace.test.tsx}}, e2e/persistence.spec.ts (new), e2e/canvas.spec.ts (drop coordinates only), package.json + pnpm-lock.yaml (added `dexie` ^4.4.7, dev `fake-indexeddb` ^6.2.7), docs/PROGRESS.md
+Public APIs added/changed:
+
+- `store` (**additive; the store README already scheduled workspace/projects for S06**): `createWorkspaceStore`, `WorkspaceState`/`WorkspaceStore`/`WorkspaceResult`, `workspaceStore` (app instance, drives `boardStore`), `useWorkspaceStore`, `useWorkspaceStoreApi`, `WorkspaceStoreProvider`, `createAppStores()`; pure helpers `emptyWorkspaceData`, `normalizeWorkspace`, `graphDiff`, `uniqueName`, `newBoard`, `projectOfBoard`, `boardsOfProject`, `WorkspaceError`, constants, types `WorkspaceData`, `WorkspaceDeps`, `GraphDiff`, `ImportedBoards`, `ImportedProjects`; re-exports core `Board`, `Project`, `Snapshot`, `UserSettings` types; new `BoardCommand` `replaceGraph`. Behaviour change: `delete` (and `replaceGraph`) now drop scenario flow steps / chaos events that point at removed items, so a saved board always passes `BoardSchema`. Nothing existing changed signature.
+- `persistence` (new): see src/persistence/README.md — `SaveFile` format, `workspaceFile`/`projectFile`/`boardFile`, `serializeSaveFile`, `saveFileName`, `parseSaveFile` (migrate + validate, strict or lenient), `importSaveFile`, `openWorkspace`, `startAutosave`, `createDexieAdapter`, `createMemoryAdapter`, `StorageAdapter`, `toWorkspaceData`, `BoardLayoutSchema`.
+- `app`: `AppShell({ autosave? })`; `main.tsx` loads the workspace before the first render.
+  Registry entries added: none
+  Tests: 56 added (242 total), all passing; `pnpm build`, `pnpm lint`, `prettier --check src e2e` green. e2e: 4/4 pass (also 12/12 with `--repeat-each=3`).
+
+F9 acceptance: `e2e/persistence.spec.ts` — (1) create 2 boards (drag nodes onto each, rename one, snapshot), wait for "Saved", reload: both tabs, names, node ids/labels, the snapshot and the last open tab return exactly; (2) export a project as JSON, import it in a fresh browser context: same 2 boards and nodes. Unit level: `session.test.ts` checks the reloaded `WorkspaceData` deep-equals the original (boards, scenario, snapshots, group frames, order), v0 data upgrades on load, and exported JSON re-imports on a fresh profile with identical ids and content.
+
+Notes (decisions):
+
+- **Save format** (one shape for IndexedDB and files): a Workspace doc (`schemaVersion`, `settings`, `projects`) plus `boards[]` and `layouts{boardId → {groupFrames}}`, with `format: 'sysdraw'` and `kind: workspace|project|board`. Boards share the file's `schemaVersion`, so core's existing migration chain runs on the whole file (S02's open question). **Future migrations that change Board must also migrate `boards[]`** — please record this in DATA-MODEL.md in the next architecture session.
+- **Group frames are now saved** (S04's gap) without a core change: they travel as `layouts` next to each board (persistence-owned, validated by `BoardLayoutSchema`; an invalid layout is dropped with a warning, never the board). Snapshots hold only the graph (core `Snapshot`), so restoring a snapshot keeps frames for groups that still exist; others re-fit their contents.
+- **Scenario is saved** (S05's gap): `BoardDoc.scenario` ↔ `Board.scenario`.
+- Load is lenient, import is strict. On load, invalid boards are skipped and dangling refs repaired with warnings; anything migrated/repaired/unreadable is written to a `backups` table first, then the cleaned data is rewritten at the current version. Import rejects any invalid board with a readable reason and changes nothing.
+- Import keeps project/board ids when free (fresh profile = identical), re-mints on collision; board files go into the open project as new tabs, project/workspace files add projects; names are made unique ("Board 1 2").
+- Autosave: 600 ms debounce, writes only boards whose object changed (reference check — the store's immutable updates make this exact) plus the workspace row; deletes removed boards; honours `settings.autosave` (off → only Ctrl/Cmd+S or clicking the status saves); flushes on `visibilitychange: hidden`/`pagehide`. Status shown top-right (Saved / Unsaved changes / Saving… / Save failed). If IndexedDB is unavailable the app still runs, without saving.
+- Undo history is kept per board while the app runs (switching tabs no longer loses it); it is not persisted. Restoring a snapshot is one undoable step ("Restore "name"").
+- Rules: the only project can't be deleted; a project's only board can't be deleted (delete the project). Deleting the open tab opens its neighbour; opening a project reopens its last-used tab. Delete asks for a second click to confirm (in-menu, no browser dialog).
+- UI: project sidebar (left) and board tabs (above the canvas) both support create, rename (double-click, F2 on a tab, or menu), duplicate, reorder (drag-and-drop, menu, Alt+Shift+←/→ on a tab), delete, Export JSON; Import JSON in the sidebar header. Snapshots popover on the tab bar: save with a name, list with "N changes since (+added −removed ~changed)" diff counts, restore, delete.
+- e2e/canvas.spec.ts: the F1 drop points moved to two rows because the new sidebar narrows the canvas (the old x = 900 landed on the inspector). The F1 steps and assertions are unchanged.
+
+Known gaps / follow-ups:
+
+- **On the Mac run `pnpm install`** to pick up `dexie` and `fake-indexeddb`. Tests ran on a Linux copy of the repo (macOS-native `node_modules`); e2e ran in a separate Linux container against Playwright's Chromium.
+- No cross-tab sync: two browser tabs open on SysDraw overwrite each other's saves (last writer wins). A BroadcastChannel/Dexie liveQuery guard is a small follow-up.
+- No UI yet to browse or restore the `backups` table, nor to toggle `settings.autosave` (settings UI: S21).
+- Snapshot diff counts nodes/edges/groups only (not scenario changes); snapshots don't store group frames or scenario.
+- `lastResult` is saved as-is when present; no engine results exist yet.
+- Prettier flags `.claude/settings.json` and `CLAUDE.MD` (not touched in this session).
+- Leftovers from earlier sessions (`.gitkeep`s, `_tmp_*` files) are still there; nothing new was left behind.
+
+Next suggested session: S07 — Engine core. Later, problems (S12+) that load reference designs onto boards should go through `workspaceStore.importBoards` / `createBoard` rather than writing to IndexedDB directly.

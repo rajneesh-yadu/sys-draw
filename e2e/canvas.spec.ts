@@ -24,12 +24,13 @@ test('F1: six-node design by drag-and-drop, then undo/redo all steps', async ({ 
   await page.goto('/');
   const canvas = page.getByTestId('board-canvas');
   const place: [string, number, number][] = [
-    ['client.app', 110, 300],
-    ['network.cdn', 300, 300],
-    ['network.load-balancer', 490, 300],
-    ['compute.app-server', 690, 180],
-    ['compute.app-server', 690, 420],
-    ['database.sql', 900, 300],
+    // Two rows, so the design fits the canvas next to the project sidebar (S06).
+    ['client.app', 110, 100],
+    ['network.cdn', 360, 100],
+    ['network.load-balancer', 610, 100],
+    ['compute.app-server', 110, 330],
+    ['compute.app-server', 360, 330],
+    ['database.sql', 610, 330],
   ];
   for (const [defId, x, y] of place) {
     await page.locator(`[data-def-id="${defId}"]`).dragTo(canvas, { targetPosition: { x, y } });
