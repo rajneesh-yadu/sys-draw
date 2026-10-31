@@ -64,3 +64,33 @@ Known gaps / follow-ups:
 - The connected folder blocks deletes from Claude's shell, so empty `src/core/{schemas,migrations}/.gitkeep` files remain and a failed in-place `pnpm install` left six empty `_tmp_*` files at the repo root — safe to delete.
 
 Next suggested session: S03 — Registry and plugin API
+
+---
+
+## S03 — Registry and plugin API — 2026-10-31
+
+Status: done
+Changed: src/registry/{index.ts, define.ts, schemas.ts, discover.ts, catalog.ts, sources.ts, presets.ts, README.md, define.test.ts, registry.test.ts}, src/registry/components/{clients/client.ts, network/{dns,cdn,load-balancer,api-gateway}.ts, compute/{app-server,serverless-function}.ts, database/{sql,nosql}.ts, cache/cache.ts, messaging/message-queue.ts, storage/object-storage.ts}, src/registry/protocols/{tcp,tls13,http1,http2,grpc,websocket}.ts, src/registry/providers/generic.ts, src/registry/test-fixtures/{README.md, components/compute/dummy-worker.ts}, docs/PROGRESS.md
+Public APIs added/changed: `registry` → `registry: Registry` (`get(id, kind?)`, `require(id, kind)`, `has`, `kindOf`, `sourceOf`, `list(filter?)`, `size`); `defineComponent|Protocol|Provider|Problem|Rule|Lesson`; `RegistryEntryError`, `RegistryLoadError`, `registryKindOf`, `REGISTRY_KINDS`; `createRegistry(entries)`, `discoverEntries(sourceGroups)`; `isAvailableOn(def, provider)`, `componentDisplayName(def, provider)`, `findUnresolvedReferences(registry)`; schemas/types `ProviderDefinition(Schema)`, `ProviderRegion`, `RuleDefinition(Schema)`, `RuleContext`, `RuleCheck`, `RULE_CATEGORIES`, `LessonDefinition(Schema)`, `RegistryProblemSchema`/`RegistryProblemDefinition`; types `EntryByKind`, `EntryInputByKind`, `AnyRegistryEntry`, `ListFilter`, `SourceGroup`, `DiscoveredEntry`. No other module's API changed.
+Registry entries added: components `client.app`, `network.dns`, `network.cdn`, `network.load-balancer`, `network.api-gateway`, `compute.app-server`, `compute.serverless-function`, `database.sql`, `database.nosql`, `cache.in-memory`, `messaging.queue`, `storage.object`; protocols `tcp`, `tls13`, `http1`, `http2`, `grpc`, `websocket`; provider `generic`
+Tests: 63 added (110 total), all passing; `pnpm build` and `pnpm lint` green.
+
+Notes (decisions):
+
+- Id convention settled: protocols use bare ids (`http2`, matching DATA-MODEL and edge stacks); everything else is dotted `<kind-or-category>.<name>`. Ids are unique across all kinds, so `registry.get(id)` needs no kind.
+- Provider, rule and lesson schemas live in the registry (core had none); core's problem schema is reused with `docs` made required so every entry has `docs.summary`.
+- `list` filters: `category` matches component and rule categories; `tag` matches entries with `tags`; `provider` keeps components that are available there (generic → all; cloud → has `providerNames[p]` or no `providerNames` at all) and the matching provider entry; other kinds ignore it.
+- Discovery collects only objects created by a `define*` helper (WeakMap brand); a registry file must export at least one, of its folder's kind. Problems are discovered from `problems/*/index.ts` only.
+- Entries are deep-frozen except Zod schemas and functions. Config knobs use `.describe()` for help text and `.meta({ advanced: true })` for advanced fields, for the S05 inspector.
+- The "new file is picked up" check uses `test-fixtures/components/compute/dummy-worker.ts`, discovered with the same `discoverEntries` the app uses (the app globs don't match it). Writing a real file during a test was avoided: Vite resolves globs at transform time, and the connected folder blocks deletes.
+- Generic instance types are `small|medium|large|xlarge` and `mem-medium|mem-large|mem-xlarge` (rounded m/r-class prices). Serverless instance types are memory sizes priced per hour of continuous execution.
+
+Known gaps / follow-ups:
+
+- Core's fixture uses defIds `client.web` and `database.postgres`; the registry ships `client.app` (one client with `platform: web|mobile`) and `database.sql` (`engine: postgres|mysql`). `network.load-balancer` and `compute.app-server` match. Update the core fixture in a core session, or the engine compile step will not resolve those two nodes.
+- Port protocol lists reference ids not yet seeded: `ip` (in edge stacks), `udp`, `dns`, `http3`, `resp`, `postgres-wire`, `mysql-wire`, `cql`, `amqp`. `findUnresolvedReferences` reports them; tests only require `runsOn` to resolve. `tcp.runsOn` is `[]` until `ip` exists.
+- No rules, lessons, problems or cloud providers yet (S12, S17, S19). The empty folders are discovered without error.
+- `.gitkeep` files remain in the populated registry folders because the connected folder blocks deletes. They are safe to remove.
+- Tests in this session ran on a Linux copy of the repo: the checked-in `node_modules` holds macOS-native rolldown bindings that don't load in the Linux sandbox.
+
+Next suggested session: S04 — Canvas editor
