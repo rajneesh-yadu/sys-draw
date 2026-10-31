@@ -203,3 +203,43 @@ Known gaps / follow-ups:
 - Leftovers from earlier sessions (`.gitkeep`s, `_tmp_*` files) are still there; nothing new was left behind.
 
 Next suggested session: S07 — Engine core. Later, problems (S12+) that load reference designs onto boards should go through `workspaceStore.importBoards` / `createBoard` rather than writing to IndexedDB directly.
+
+---
+
+## S07 — Analytical simulation engine — 2026-10-31
+
+Status: done
+Changed: src/engine/{index.ts, README.md, simulate.ts, client.ts, worker.ts, worker-api.ts, test-fixtures.ts, simulate.test.ts, engine.test.ts, perf.test.ts}, src/engine/model/{types,compile,load,route,expr,latency,format,findings}.ts + latency.test.ts, src/engine/queueing/{mmc,node}.ts + mmc.test.ts, src/engine/behaviors/{index,types,loadBalancer,cache,queue}.ts, package.json + pnpm-lock.yaml (added `comlink` ^4.4.2), docs/PROGRESS.md
+Public APIs added/changed: `engine` (new; listed in src/engine/README.md) — `runSimulation(board: SimInput, options?): Promise<SimResult>`, `disposeSimulationWorker()`, `simulate(input, registry, options?): SimResult`, `compile(graph, registry): Model`, `generateLoad(scenario, flows?): FlowLoad[]`, `inferFlow(options): Flow`, `INFERRED_FLOW_ID = 'flow_inferred'`, `route(loads, model, options): RoutePlan`, `combineCalls`, `nodeQueueing`, `mmc`/`erlangB`/`erlangC`/`expQuantileFactor`, latency helpers (`stageDist`, `fixedDist`, `sumDist`, `mixDist`, `quantile`, `percentiles`, `distMean`), `BEHAVIORS`, `defineBehavior`, `DEFAULT_ENGINE_OPTIONS`, `BOTTLENECK_UTILIZATION`, types `SimInput`, `EngineOptions`, `Model`, `CompiledNode`, `CompiledEdge`, `NodeStats`, `Expr`, `Op`, `Dist`, `Branch`, `FlowLoad`, `RoutePlan`, `RoutedFlow`, `Behavior`, `ComponentSource`. No other module's API changed.
+Registry entries added: none
+Tests: 44 added (286 total), all passing; `pnpm build`, `pnpm lint`, `prettier --check src/engine` green.
+
+Done-when check (hand-computed values, all within 1%, in `simulate.test.ts` against a test registry with round-number perf models):
+
+- Single server: λ = 50, μ = 100 ⇒ ρ = 0.5, T = 20 ms, p50/p95/p99 = T·ln 2 / ln 20 / ln 100, Lq = 0.5; M/M/2 at λ = 150: C = 4.5/7, T = 22.857 ms.
+- 2 replicas behind LB (one node ×2, and two nodes): LB T = 1.190 ms, servers ρ = 0.8, T = 50 ms, Lq 6.4; flow p50/p95/p99 = 35.84 / 151.0 / 231.5 ms. One replica ⇒ ρ = 1.6 and listed as bottleneck.
+- Cache in front of DB (cache-aside, read-through and explicit path give the same numbers): h = 0.9 ⇒ DB gets 10 of 100 rps, ρ = 0.2; flow p50/p95/p99 = 2.54 / 20.49 / 60.76 ms. Without the cache the DB is at ρ = 2.
+- Expected values were computed independently in Python from the formulas; derivations are in the test comments.
+
+Notes (decisions):
+
+- **Queueing:** each replica is an M/M/c queue with c = `perf.maxConcurrencyPerInstance` and λ/replicas (so an LB splits across instances, and replicas without an LB are assumed evenly balanced). Reads and writes share the queue: μ = 1000/S̄ with S̄ weighted by the read/write rates; a read's response is Wq + S_read. Erlang C uses the stable Erlang B recursion with an early exit (c = 50 000 LBs stay cheap).
+- **Saturation (ρ ≥ rhoCap = 0.99):** the queue is evaluated at ρ = 0.99; then `queue` adds fluid backlog wait (λ − cμ)·D/(2cμ) over `scenario.durationSec`; `reject` sets error = 1 − capacity/λ and passes only served traffic downstream (fixed-point iteration over the flows); `degrade` keeps latency capped with no errors. `utilization` is reported raw (can exceed 1).
+- **Percentiles:** a node's response time is treated as exponential (exact for M/M/1). A path is a shifted exponential: θ = √ΣTᵢ², shift = ΣTᵢ − θ, which is exactly ENGINE.md's "sum of means + RSS of tail excess" and exact for one stage. LB splits and cache hit/miss form a mixture (≤ 32 branches, closest merged), percentiles by bisection on the mixture CDF.
+- **Routing:** a flow is an expression tree (visit / seq / choice / async). Explicit `path` steps run in order and behaviors transform the rest of the path (cache hit ends it unless `cacheable: false`; after a queue it is async). **A flow with an empty `path` follows the graph**; with no flows at all one read flow `flow_inferred` (share 1, 0.1 rps per user, from every client node, users split evenly) is created. With no client nodes, traffic starts at root nodes (info finding). Sync calls from a node run sequentially (latencies add). Async edges are fire-and-forget, except into a `queue`, whose enqueue is waited for while its consumers run async.
+- **Behaviors** are auto-discovered files (`import.meta.glob`) exporting `behavior = defineBehavior({...})` with hooks `routeOut` (graph walk), `routeRest` (explicit path), `cacheAsideHitRate`, `finish` (metrics). `loadBalancer`: one target, share ∝ target replicas for every algorithm. `cache`: fixed hit rate = `config.hitRate` if a number in [0, 1], else 0.8; cache-aside (caller → cache + caller → database/storage) guards only database/storage calls; read-through when the cache has out-edges; writes always go through. `queue`: consumers off the critical path; lag = (λ − Σ consumer capacity) × duration added to `queueDepth`.
+- Clients are traffic sources (no queueing, 0 ms). Unknown `defId`s are 0 ms pass-throughs with a warning finding; cycles in the graph walk are cut with a finding naming the edge. Engine findings use rule ids `engine.compile` / `engine.route`.
+- `runSimulation` sends only `{ graph, scenario, providerId }` to the worker; in jsdom (no `Worker`) it runs in-thread via a dynamic import. The worker chunk was checked with a throwaway Vite build using the engine as entry (registry + engine ≈ 175 kB); the app's `dist` has no worker yet because nothing imports the engine until S08.
+- Determinism: no randomness anywhere; `scenario.seed` is unused until a stochastic mode exists. 300 nodes run in ~12 ms (`perf.test.ts`, budget 1 s).
+
+Known gaps / follow-ups:
+
+- **On the Mac run `pnpm install`** to pick up `comlink`. Tests ran on a Linux copy of the repo again (macOS-native `node_modules`). The worker path has not been exercised in a real browser yet — S08 should confirm it in the e2e run.
+- Out of scope and returning 0 / ignored for now: network latency per edge (`perEdge.latencyMs`, `handshakeMs`; S10 geo + S14 protocols — `simulate` already composes a per-edge fixed latency hook that returns 0), cost (`costPerMonth`; S09), diurnal curves and region routing (S10), chaos events, retries/timeouts from `EdgeConfig`, autoscaling (S11). `regionId` is attached to compiled nodes but unused.
+- Vertical scaling is not modelled: instance type is resolved (unknown ones fall back to the first, info finding) but μ ignores vCPU/`scaleCurve` (S09). `single-writer` stores scale reads and writes alike for now.
+- The cache hit rate is fixed; `cache.in-memory`'s configSchema has no `hitRate` field, so in the app it is always 0.8 until the Zipf model (or a `hitRate` knob) arrives. `cdn` uses the `cache` behavior's hit rate; the `cdn`, `replicatedStore`, `shardedStore`, `rateLimiter`, `serverless` behaviors named in definitions are not implemented yet and are ignored.
+- Consumers behind a queue still receive the full arrival rate (they show ρ > 1 if too slow) while the queue reports the backlog; pull-based throttling is a later refinement.
+- Graph walks duplicate shared downstream subtrees per path (bounded by `maxVisits` = 20 000 with a finding); fine for 300 nodes, revisit if designs get very deep with heavy fan-in.
+- `core`'s sample board still uses `client.web` / `database.postgres` (S03 gap): the engine simulates those nodes as pass-throughs with warnings.
+
+Next suggested session: S08 — Metrics UI (call `runSimulation(boardDoc)` debounced 300 ms from the store/app; use `SimResult.explain` for the formula tooltips; `perFlow['flow_inferred']` is the flow to show when the scenario has none).

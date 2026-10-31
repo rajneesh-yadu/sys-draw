@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@xyflow/react": "^12.12.0",
+    "comlink": "^4.4.2",
     "dexie": "^4.4.7",
     "elkjs": "^0.12.1",
     "immer": "^11.2.9",
