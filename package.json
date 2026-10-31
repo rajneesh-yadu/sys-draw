@@ -21,9 +21,14 @@
     "e2e": "playwright test"
   },
   "dependencies": {
+    "@xyflow/react": "^12.12.0",
+    "elkjs": "^0.12.1",
+    "immer": "^11.2.9",
+    "lucide-react": "^1.66.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "zod": "^4.6.7"
+    "zod": "^4.6.7",
+    "zustand": "^5.0.16"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

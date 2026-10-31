@@ -4,11 +4,11 @@ Composition root: app shell layout, routing, theme, keyboard shortcuts.
 
 - **Depends on:** any module (composition root)
 - **Rules:** Wires modules together; contains no domain logic.
-- **Built in:** session S01
+- **Built in:** session S01 (canvas wired in S04)
 
 ## Public API (index.ts)
 
-- `AppShell` — the five-region layout.
+- `AppShell` — the five-region layout; mounts `canvas` (`CanvasProvider`, `Palette`, `BoardCanvas`).
 
 ## Layout
 

@@ -94,3 +94,37 @@ Known gaps / follow-ups:
 - Tests in this session ran on a Linux copy of the repo: the checked-in `node_modules` holds macOS-native rolldown bindings that don't load in the Linux sandbox.
 
 Next suggested session: S04 — Canvas editor
+
+---
+
+## S04 — Canvas editor — 2026-10-31
+
+Status: done
+Changed: src/store/{index.ts, README.md, types.ts, commands.ts, connections.ts, clipboard.ts, graph-utils.ts, board-store.ts, context.ts, BoardStoreProvider.tsx, board-store.test.ts}, src/canvas/{index.ts, README.md, CanvasProvider.tsx, BoardCanvas.tsx, Palette.tsx, actions.ts, context.ts, dnd.ts, geometry.ts, layout.ts, palette-model.ts, shortcuts.ts, to-flow.ts, nodes/{ComponentNode,GroupNode,RegistryIcon}.tsx, canvas-logic.test.ts, Canvas.test.tsx}, src/app/{layout/AppShell.tsx, README.md}, src/test/setup.ts (ResizeObserver/DOMMatrixReadOnly stubs for React Flow in jsdom), e2e/canvas.spec.ts, vite.config.ts (`chunkSizeWarningLimit: 1500` for the lazy ELK chunk), package.json + pnpm-lock.yaml (added `zustand`, `immer`, `@xyflow/react`, `elkjs`, `lucide-react`), docs/PROGRESS.md
+Public APIs added/changed: `store` — everything in src/store/README.md (`createBoardStore`, `BoardCommand`, `checkConnection`, `defaultProtocolStack`, `rankProtocols`, clipboard helpers, `boardStore`/`useBoardStore`/`useBoardStoreApi`/`BoardStoreProvider`, types `BoardDoc`, `BoardLayout`, `Rect`, `Subgraph`, plus re-exported core graph types). `canvas` — `CanvasProvider`, `Palette`, `BoardCanvas`, geometry/layout/shortcut helpers (src/canvas/README.md). `app` — `AppShell` now mounts the canvas. No other module's API changed.
+Registry entries added: none
+Tests: 43 added (153 total), all passing; `pnpm build` and `pnpm lint` green. e2e: `e2e/canvas.spec.ts` (F1) + shell spec pass.
+
+F1 acceptance: checked in headless Chromium on the production build — 6 components dragged from the palette and 6 connections drawn in ~2 s (scripted), edges labelled HTTP/2 and postgres-wire; group-as-subnet, copy/paste, auto-layout, then 22 undos back to an empty board and 22 redos; no console errors. Dropping a node into a VPC and dragging the VPC carries the node; undo restores it.
+
+Notes (decisions):
+
+- Undo/redo uses Immer `produceWithPatches`: each command stores patches + inverse patches, so commands need no hand-written inverse. `batch` makes several commands one undo step (move of a mixed selection, auto-layout, multi-ungroup). A command that throws `CommandError` changes nothing (including a half-applied batch).
+- The store keeps absolute positions; the canvas converts to React Flow's parent-relative positions. React Flow nodes are mirrored in local state during drags/resizes and committed with one command on drag/resize end.
+- Connections: source port must be `out|both`, target `in|both`, and they must share a protocol. The default protocol is the shared one with the highest OSI layer (unregistered wire protocols count as 7), then multiplexing; the stack follows `runsOn`, preferring encrypted layers (`http2` → `['tcp','tls13','http2']`). Edges into a `queue` component are `sync: false`.
+- Deleting a group deletes its contents (draw-tool convention); `ungroup` keeps them. Copy brings a group's contents; paste renumbers labels (`app-server-1` → `app-server-2`) and offsets 32 px per paste.
+- Node labels come from the component name slug (`client-1`, `app-server-1`, `sql-database-1`).
+- Icons: registry `icon` is a lucide name rendered with `lucide-react/dynamic` (unknown names fall back to `box`), so a new component's icon needs no UI change. This emits ~2,000 tiny lazy icon chunks in dist; only used icons are fetched.
+- `canvas` may not import `core`, so `store` re-exports the graph types and `GROUP_KINDS` the UI needs.
+
+Known gaps / follow-ups:
+
+- **Group position/size is not saved.** Core's `Group` has no frame field, so frames live in `BoardDoc.layout.groupFrames` (undoable, in memory only). Groups still render around their contents after a reload, but empty groups and manual resizes are lost. Needs a core change + migration (e.g. `Group.frame?: {x,y,width,height}`) before or in S06 (persistence). I did not change core's public API in this session.
+- No in-canvas rename, protocol switch or edge re-routing — inspector work (S05). The connection check shows a valid/invalid handle while dragging but not the reason text.
+- Shortcuts are a window listener in `canvas` (ignores text fields). Move them to `app` if a global shortcut registry is built.
+- The clipboard is in-app only (not the system clipboard, not shared between tabs).
+- Node size is fixed (184×64); 300-node 60 fps not yet measured.
+- Tests again ran on a Linux copy of the repo (the checked-in `node_modules` is macOS-native). **On the Mac run `pnpm install`** to pick up the five new dependencies.
+- e2e needs `pnpm exec playwright install chromium` once per machine (unchanged).
+
+Next suggested session: S05 — Inspector (schema-driven forms over `updateConfig`; add `updateNode`/`updateEdge` commands for label, scaling and protocol stack).

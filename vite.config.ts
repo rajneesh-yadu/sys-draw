@@ -9,6 +9,8 @@ export default defineConfig({
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
   worker: { format: 'es' },
+  // ELK (auto-layout, ~1.4 MB) is its own lazily loaded chunk; keep warnings for anything bigger.
+  build: { chunkSizeWarningLimit: 1500 },
   test: {
     environment: 'jsdom',
     globals: false,
