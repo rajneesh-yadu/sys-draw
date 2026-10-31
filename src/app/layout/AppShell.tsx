@@ -1,9 +1,10 @@
 import { useState, type ReactNode } from 'react';
 import { BoardCanvas, CanvasProvider, Palette } from '@/canvas';
+import { Inspector } from '@/inspector';
 
 /**
  * The five-region app shell. Palette and canvas are live (S04); the other regions are
- * placeholders until their sessions (inspector: S05, project tabs: S06, metrics drawer: S08).
+ * placeholders until their sessions (project tabs: S06, metrics drawer: S08). Inspector: S05.
  */
 export function AppShell() {
   const [drawerOpen, setDrawerOpen] = useState(true);
@@ -65,7 +66,7 @@ export function AppShell() {
             className="w-72 shrink-0 overflow-y-auto border-l border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
           >
             <PanelHeader title="Inspector" />
-            <Placeholder>Select a node or edge to configure it.</Placeholder>
+            <Inspector />
           </aside>
         </div>
       </div>

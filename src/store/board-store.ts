@@ -4,11 +4,23 @@
  */
 import { applyPatches, enablePatches, produceWithPatches, type Patch } from 'immer';
 import { createStore, type StoreApi } from 'zustand/vanilla';
-import { newId as coreNewId, type Graph, type IdKind, type ProviderId } from '@/core';
+import {
+  newId as coreNewId,
+  type Graph,
+  type IdKind,
+  type ProviderId,
+  type Scenario,
+} from '@/core';
 import type { Registry } from '@/registry';
 import { cloneSubgraph, extractSubgraph } from './clipboard';
 import { applyCommand, commandLabel, CommandError, type BoardCommand } from './commands';
-import { emptyBoardDoc, type BoardDoc, type BoardLayout, type Subgraph } from './types';
+import {
+  defaultScenario,
+  emptyBoardDoc,
+  type BoardDoc,
+  type BoardLayout,
+  type Subgraph,
+} from './types';
 
 enablePatches();
 
@@ -44,7 +56,12 @@ export interface BoardState {
   deleteSelection(): DispatchResult;
   clearError(): void;
   /** Replace the board (e.g. when switching boards). Clears history and selection. */
-  load(doc: { graph: Graph; providerId?: ProviderId; layout?: BoardLayout }): void;
+  load(doc: {
+    graph: Graph;
+    providerId?: ProviderId;
+    layout?: BoardLayout;
+    scenario?: Scenario;
+  }): void;
 }
 
 export type BoardStore = StoreApi<BoardState>;
@@ -183,6 +200,7 @@ export function createBoardStore(opts: BoardStoreOptions): BoardStore {
           providerId: doc.providerId ?? 'generic',
           graph: doc.graph,
           layout: doc.layout ?? { groupFrames: {} },
+          scenario: doc.scenario ?? defaultScenario(),
         },
         selection: [],
         past: [],

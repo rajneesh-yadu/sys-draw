@@ -8,19 +8,22 @@ Board state (Zustand + Immer), the command bus (every edit is an undoable comman
 ## Public API (index.ts)
 
 - `createBoardStore({ registry, newId?, historyLimit?, initial? })` → vanilla Zustand store of `BoardState`:
-  `doc` (`{ providerId, graph, layout: { groupFrames } }`), `selection`, `past`/`future`, `clipboard`, `lastError`;
+  `doc` (`{ providerId, graph, layout: { groupFrames }, scenario }`), `selection`, `past`/`future`, `clipboard`, `lastError`;
   `dispatch(cmd)` → `{ok} | {ok:false, reason}`, `undo`, `redo`, `setSelection`, `copy`, `cut`, `paste`, `deleteSelection`, `clearError`, `load(doc)`.
-- `BoardCommand` (plain data): `addNode`, `moveNodes` (+ `groupId` to re-parent, `null` to leave a group), `moveGroup` (dx/dy, carries contents), `connect`, `delete` (groups delete their contents), `updateConfig` (validated by the component's `configSchema`), `group` / `ungroup`, `setGroupFrame`, `insert` (paste), `batch` (one undo step).
+- `BoardCommand` (plain data): `updateNode` (label, scaling incl. `autoscale: null`), `updateEdge` (protocolStack, sync, config with `null` = clear), `updateGroup` (label, kind, regionId, security; `null` clears), `updateScenario` (shallow patch) — all S05 — plus `addNode`, `moveNodes` (+ `groupId` to re-parent, `null` to leave a group), `moveGroup` (dx/dy, carries contents), `connect`, `delete` (groups delete their contents), `updateConfig` (validated by the component's `configSchema`), `group` / `ungroup`, `setGroupFrame`, `insert` (paste), `batch` (one undo step).
 - `checkConnection(registry, graph, req)` — port-direction + shared-protocol check with a readable reason; `defaultProtocolStack`, `rankProtocols`.
+- Protocol stacks (S05): `protocolStackOptions(registry, protocol)`, `edgeSharedProtocols`, `edgeProtocolStackOptions(registry, graph, edge)`, `checkProtocolStack(...)` → reason | null.
+- `defaultScenario()`, `emptyBoardDoc()`.
 - `extractSubgraph`, `cloneSubgraph`, `descendantsOf`, `commandLabel`, `groupKindLabel`, `applyCommand`, `CommandError`.
 - React: `boardStore` (app instance), `useBoardStore(selector)`, `useBoardStoreApi()`, `<BoardStoreProvider store>`.
-- Re-exports core graph types for UI modules that may not import core: `Graph`, `NodeInstance`, `EdgeInstance`, `Group`, `GroupKind`, `GROUP_KINDS`, `Position`, `ProviderId`.
+- Re-exports core graph types for UI modules that may not import core: `Graph`, `NodeInstance`, `EdgeInstance`, `Group`, `GroupKind`, `GROUP_KINDS`, `Position`, `ProviderId`; and (S05, for inspector forms) `NodeScalingSchema`, `AutoscaleSchema`, `EdgeConfigSchema`, `GroupSchema`, `FirewallRuleSchema`, `ScenarioSchema` + their types.
 
 ## Notes
 
 - Undo/redo = Immer patches + inverse patches per command; history capped at 200. Selection is not in history.
 - All positions and group frames are absolute canvas coordinates.
 - `layout.groupFrames` is view state core has no field for yet, so it is not saved (see PROGRESS.md S04).
+- `doc.scenario` is the board's Scenario (core `Board.scenario`); `load()` defaults it with `defaultScenario()`.
 
 ## Extension points
 

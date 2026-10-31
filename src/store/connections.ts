@@ -1,5 +1,5 @@
 /** Connection validation by port protocols, and the default protocol stack for a new edge. */
-import type { Graph } from '@/core';
+import type { EdgeInstance, Graph } from '@/core';
 import type { EntryByKind, Registry } from '@/registry';
 
 type ComponentDef = EntryByKind['component'];
@@ -127,4 +127,102 @@ export function defaultProtocolStack(registry: Registry, protocol: string): stri
     cur = next;
   }
   return topDown.reverse();
+}
+
+/**
+ * Every bottom-up stack that can carry `protocol`, following `runsOn` to a protocol with no
+ * registered lower layer (http2 → [['tcp','http2'], ['tcp','tls13','http2']]). Unregistered ids
+ * (wire protocols a later session adds) stand alone. Sorted: encrypted first, then shorter.
+ */
+export function protocolStackOptions(registry: Registry, protocol: string): string[][] {
+  const out: string[][] = [];
+  const walk = (topDown: string[]) => {
+    const cur = registry.get(topDown[topDown.length - 1]!, 'protocol');
+    const lower = (cur?.runsOn ?? []).filter(
+      (id) => registry.kindOf(id) === 'protocol' && !topDown.includes(id),
+    );
+    if (lower.length === 0) {
+      out.push([...topDown].reverse());
+      return;
+    }
+    for (const id of lower) walk([...topDown, id]);
+  };
+  walk([protocol]);
+  const encrypted = (stack: string[]) =>
+    stack.some((id) => registry.get(id, 'protocol')?.encrypted === true);
+  return out
+    .map((stack, i) => ({ stack, i }))
+    .sort(
+      (a, b) =>
+        Number(encrypted(b.stack)) - Number(encrypted(a.stack)) ||
+        a.stack.length - b.stack.length ||
+        a.i - b.i,
+    )
+    .map((x) => x.stack);
+}
+
+/** Application protocols both ends of an existing edge can speak (its ports' shared set, best first). */
+export function edgeSharedProtocols(
+  registry: Registry,
+  graph: Graph,
+  edge: EdgeInstance,
+): string[] {
+  const src = graph.nodes.find((n) => n.id === edge.source);
+  const tgt = graph.nodes.find((n) => n.id === edge.target);
+  const srcDef = src && registry.get(src.defId, 'component');
+  const tgtDef = tgt && registry.get(tgt.defId, 'component');
+  if (!srcDef || !tgtDef) return [];
+  const outs = srcDef.ports.filter(
+    (p) => isOut(p) && (edge.sourcePortId === undefined || p.id === edge.sourcePortId),
+  );
+  const ins = tgtDef.ports.filter(
+    (p) => isIn(p) && (edge.targetPortId === undefined || p.id === edge.targetPortId),
+  );
+  const accepts = new Set(ins.flatMap((p) => p.protocols));
+  const shared = [...new Set(outs.flatMap((p) => p.protocols))].filter((p) => accepts.has(p));
+  return rankProtocols(registry, shared);
+}
+
+/** Every valid stack for an edge: one group per shared application protocol, best first. */
+export function edgeProtocolStackOptions(
+  registry: Registry,
+  graph: Graph,
+  edge: EdgeInstance,
+): string[][] {
+  return edgeSharedProtocols(registry, graph, edge).flatMap((p) =>
+    protocolStackOptions(registry, p),
+  );
+}
+
+/**
+ * Why `stack` cannot be used on `edge`, or `null` when it can. The top must be a protocol both
+ * ports speak; each registered layer must run on the layer below it (its `runsOn`).
+ */
+export function checkProtocolStack(
+  registry: Registry,
+  graph: Graph,
+  edge: EdgeInstance,
+  stack: readonly string[],
+): string | null {
+  const top = stack[stack.length - 1];
+  if (top === undefined) return 'A protocol stack needs at least one protocol';
+  if (new Set(stack).size !== stack.length) return 'A protocol appears twice in the stack';
+  const name = (id: string) => registry.get(id, 'protocol')?.name ?? id;
+  const shared = edgeSharedProtocols(registry, graph, edge);
+  if (!shared.includes(top)) {
+    return `${name(top)} is not spoken by both ends (they share: ${shared.map(name).join(', ') || 'nothing'})`;
+  }
+  for (let i = 0; i < stack.length; i++) {
+    const p = registry.get(stack[i]!, 'protocol');
+    if (!p) continue;
+    const below = stack[i - 1];
+    if (below === undefined) {
+      if (p.runsOn.some((id) => registry.kindOf(id) === 'protocol')) {
+        return `${p.name} must run on ${p.runsOn.map(name).join(' or ')}`;
+      }
+    } else if (!p.runsOn.includes(below)) {
+      return `${p.name} cannot run on ${name(below)} (it runs on ${p.runsOn.map(name).join(' or ') || 'nothing'})`;
+    }
+  }
+  return null;
 }

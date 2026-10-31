@@ -128,3 +128,37 @@ Known gaps / follow-ups:
 - e2e needs `pnpm exec playwright install chromium` once per machine (unchanged).
 
 Next suggested session: S05 — Inspector (schema-driven forms over `updateConfig`; add `updateNode`/`updateEdge` commands for label, scaling and protocol stack).
+
+---
+
+## S05 — Schema-driven inspector panel — 2026-10-31
+
+Status: done
+Changed: src/inspector/{index.ts, README.md, Inspector.tsx, Inspector.test.tsx, form/{model.ts, validate.ts, SchemaForm.tsx, model.test.ts}, panels/{NodePanel,EdgePanel,GroupPanel,ScenarioPanel,DocsView,common}.tsx, panels/use-dispatch.ts}, src/store/{index.ts, README.md, types.ts, board-store.ts, commands.ts, connections.ts, inspector-commands.test.ts}, src/app/layout/AppShell.tsx (mounts `<Inspector />`), docs/PROGRESS.md
+Public APIs added/changed:
+
+- `inspector` (new): `Inspector`, `SchemaForm`, `Field`, `buildFormModel`/`buildFields`/`buildField`, `defaultValueFor`, `inferUnit`, `humanize`, `issuesByPath`, `readableIssue`, `errorAt`, `setAtPath`, `getAtPath`, types `FieldModel`, `FieldKind`, `FieldMeta`, `FieldOverrides`, `SchemaFormProps`, `CommitResult`.
+- `store` (**additive change to another module's API, approved by the user at the start of the session**): commands `updateNode`, `updateEdge`, `updateGroup`, `updateScenario` (+ types `NodeScalingPatch`, `EdgeConfigPatch`); `BoardDoc.scenario` (required; `emptyBoardDoc()` and `load()` fill it from the new `defaultScenario()`); `protocolStackOptions`, `edgeSharedProtocols`, `edgeProtocolStackOptions`, `checkProtocolStack`; re-exports of core's `NodeScalingSchema`, `AutoscaleSchema`, `EdgeConfigSchema`, `GroupSchema`, `FirewallRuleSchema`, `ScenarioSchema` and their types (the inspector may not import core). Nothing existing changed signature.
+  Registry entries added: none
+  Tests: 33 added (186 total), all passing; `pnpm build` and `pnpm lint` green.
+
+F5 acceptance: every node config field comes from the component's Zod `configSchema` (Basic / Advanced split by `.meta({ advanced: true })`); each committed edit is one `dispatch` = one undo step (text/number commit on blur or Enter, Escape reverts; selects/switches/add/remove commit at once). Invalid values are validated against the whole schema before dispatch (so object-level refines such as autoscale `max ≥ min` and firewall `toPort ≥ fromPort` are caught), shown under the field with `role="alert"` + `aria-invalid`, and not sent; the store re-validates and its reason is shown too. Covered by `Inspector.test.tsx`.
+
+Notes (decisions):
+
+- Panels: Node (label; generated config; scaling = replicas, instance-type select built from the definition's `instanceTypes` with vCPU/GB/$ per hour, autoscale on/off with defaults min=replicas, max=4×, 60 %, 60 s; advanced config collapsed), Edge (stack picker lists every bottom-up stack for each protocol both ports share, following `runsOn`, encrypted first, plus handshake-RTT/encryption summary; sync switch; timeout, retries; backoff and pool size under Advanced; empty = clear), Group (label, kind, region select from the board provider's regions, security on/off with public flag and firewall-rule list), Board (nothing selected: users by region, peak multiplier, daily cycle, payload sizes, duration; seed under Advanced). Multi-selection shows a count only.
+- Docs tab: component docs (summary, how it works, trade-offs, interview tips, threats/controls, ports), each protocol in the edge stack (top first, with OSI layer, RTTs, overhead), provider docs for the board. Groups have no registry docs, so their tab lists member components with their summaries.
+- Labels/units come from the schema (`.describe`, `.meta({label, unit})`) or the key's unit suffix; panels annotate schemas they don't own (core scaling/edge/scenario) with `FieldOverrides` instead of editing core.
+- Zod default messages are rewritten for people ("Must be ≥ 1", "Must not be empty", "Choose one of: …", record keys: `Key "x": …`); custom schema messages pass through unchanged.
+- `updateGroup` validates the whole group with core's `GroupSchema`; `updateEdge` validates config with `EdgeConfigSchema.strict()` (unknown keys rejected); `updateScenario` validates the merged scenario with `ScenarioSchema`.
+
+Known gaps / follow-ups:
+
+- **Scenario is in the store but not saved yet** — S06 (persistence) should map `BoardDoc.scenario` ↔ core `Board.scenario`. The `defaultScenario()` values (1 000 users in `north-america`, 2× peak, 1 KB / 10 KB payloads, 60 s, seed 1) are placeholders for the scenario session to tune.
+- Flows and chaos events are not editable (the board panel shows their counts); unions/discriminated unions render as "not editable here yet".
+- Protocol stack picker only offers stacks for protocols the ports share; unregistered wire protocols (`postgres-wire`, `resp`) appear as single-layer stacks until S14 adds them.
+- Region ids in "Users by region" are free text checked only for shape (geo table comes with engine/geo).
+- The canvas edge label does not show the picked stack's name beyond what S04 already renders; no metrics (out of scope).
+- Tests ran on a Linux copy of the repo (macOS-native `node_modules`); `pnpm e2e` was not run (no Chromium available in this session). No new dependencies.
+
+Next suggested session: S06 — Workspace, tabs and persistence (persist `scenario` and group frames).

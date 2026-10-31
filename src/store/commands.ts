@@ -2,18 +2,27 @@
  * The command bus vocabulary. Every board edit is one of these plain-data commands; the store
  * applies it to an Immer draft and records the patches + inverse patches for undo/redo.
  */
-import type { Draft } from 'immer';
+import { current, type Draft } from 'immer';
 import {
+  EdgeConfigSchema,
   GROUP_KINDS,
+  GroupSchema,
+  NodeScalingSchema,
+  NonEmptyStringSchema,
+  ScenarioSchema,
   safeParseReadable,
+  type Autoscale,
+  type EdgeConfig,
   type EdgeInstance,
+  type Group,
   type GroupKind,
   type IdKind,
   type NodeInstance,
   type Position,
+  type Scenario,
 } from '@/core';
 import type { Registry } from '@/registry';
-import { checkConnection, defaultProtocolStack } from './connections';
+import { checkConnection, checkProtocolStack, defaultProtocolStack } from './connections';
 import { descendantsOf, labelBase, labelBaseFromName, nextLabel } from './graph-utils';
 import type { BoardDoc, Rect, Subgraph } from './types';
 
@@ -23,6 +32,16 @@ export interface NodeMove {
   /** New parent group; `null` moves the node out of any group; omit to keep it. */
   groupId?: string | null;
 }
+
+/** Scaling fields to change; `autoscale: null` turns autoscaling off. */
+export interface NodeScalingPatch {
+  replicas?: number;
+  instanceType?: string;
+  autoscale?: Autoscale | null;
+}
+
+/** Edge config fields to change; `null` removes a field (back to the engine default). */
+export type EdgeConfigPatch = { [K in keyof EdgeConfig]?: EdgeConfig[K] | null };
 
 export type BoardCommand =
   | {
@@ -47,6 +66,27 @@ export type BoardCommand =
     }
   | { type: 'delete'; ids: string[] }
   | { type: 'updateConfig'; nodeId: string; config: Record<string, unknown> }
+  /** Rename a node and/or change its scaling (validated; instance type must be the component's). */
+  | { type: 'updateNode'; nodeId: string; label?: string; scaling?: NodeScalingPatch }
+  /** Change an edge's protocol stack (checked against ports + runsOn), sync flag or config. */
+  | {
+      type: 'updateEdge';
+      edgeId: string;
+      protocolStack?: string[];
+      sync?: boolean;
+      config?: EdgeConfigPatch;
+    }
+  /** Rename/re-kind a group, set its region, or its security settings (`null` clears). */
+  | {
+      type: 'updateGroup';
+      groupId: string;
+      label?: string;
+      kind?: GroupKind;
+      regionId?: string | null;
+      security?: NonNullable<Group['security']> | null;
+    }
+  /** Shallow-merge top-level scenario fields; the result must satisfy ScenarioSchema. */
+  | { type: 'updateScenario'; patch: Partial<Scenario> }
   | {
       type: 'group';
       kind: GroupKind;
@@ -104,6 +144,16 @@ export function commandLabel(cmd: BoardCommand): string {
       return cmd.ids.length === 1 ? 'Delete' : `Delete ${cmd.ids.length} items`;
     case 'updateConfig':
       return 'Change config';
+    case 'updateNode':
+      return cmd.scaling === undefined ? 'Rename node' : 'Change scaling';
+    case 'updateEdge':
+      return cmd.protocolStack !== undefined ? 'Change protocol' : 'Change connection';
+    case 'updateGroup':
+      return cmd.label !== undefined && Object.keys(cmd).length === 3
+        ? 'Rename group'
+        : 'Change group';
+    case 'updateScenario':
+      return 'Change scenario';
     case 'group':
       return `Group as ${groupKindLabel(cmd.kind)}`;
     case 'ungroup':
@@ -251,6 +301,80 @@ export function applyCommand(d: D, cmd: BoardCommand, ctx: CommandContext): void
         if (!res.ok) fail(`Invalid config for ${n.label}: ${res.errors.join('; ')}`);
       }
       n.config = merged;
+      return;
+    }
+
+    case 'updateNode': {
+      const n = findNode(d, cmd.nodeId) ?? fail(`Unknown node "${cmd.nodeId}"`);
+      if (cmd.label !== undefined) {
+        const res = safeParseReadable(NonEmptyStringSchema, cmd.label);
+        if (!res.ok) fail(`Invalid label: ${res.errors.join('; ')}`);
+        n.label = cmd.label.trim();
+      }
+      if (cmd.scaling !== undefined) {
+        const { autoscale, ...rest } = cmd.scaling;
+        const merged: Record<string, unknown> = { ...current(n.scaling), ...rest };
+        if (autoscale === null) delete merged.autoscale;
+        else if (autoscale !== undefined) merged.autoscale = autoscale;
+        const res = safeParseReadable(NodeScalingSchema, merged);
+        if (!res.ok) fail(`Invalid scaling for ${n.label}: ${res.errors.join('; ')}`);
+        const def = ctx.registry.get(n.defId, 'component');
+        const instanceType = merged.instanceType as string;
+        if (def && !def.instanceTypes.some((t) => t.id === instanceType)) {
+          fail(`${def.name} has no instance type "${instanceType}"`);
+        }
+        n.scaling = merged as NodeInstance['scaling'];
+      }
+      return;
+    }
+
+    case 'updateEdge': {
+      const e =
+        d.graph.edges.find((x) => x.id === cmd.edgeId) ?? fail(`Unknown edge "${cmd.edgeId}"`);
+      if (cmd.protocolStack !== undefined) {
+        const reason = checkProtocolStack(
+          ctx.registry,
+          d.graph as BoardDoc['graph'],
+          e as EdgeInstance,
+          cmd.protocolStack,
+        );
+        if (reason !== null) fail(reason);
+        e.protocolStack = [...cmd.protocolStack];
+      }
+      if (cmd.sync !== undefined) e.sync = cmd.sync;
+      if (cmd.config !== undefined) {
+        const merged: Record<string, unknown> = { ...e.config };
+        for (const [k, v] of Object.entries(cmd.config)) {
+          if (v === null || v === undefined) delete merged[k];
+          else merged[k] = v;
+        }
+        const res = safeParseReadable(EdgeConfigSchema.strict(), merged);
+        if (!res.ok) fail(`Invalid connection settings: ${res.errors.join('; ')}`);
+        e.config = merged as EdgeConfig;
+      }
+      return;
+    }
+
+    case 'updateGroup': {
+      const g = requireGroup(d, cmd.groupId);
+      const next: Record<string, unknown> = { ...current(g) };
+      if (cmd.label !== undefined) next.label = cmd.label.trim();
+      if (cmd.kind !== undefined) next.kind = cmd.kind;
+      if (cmd.regionId === null) delete next.regionId;
+      else if (cmd.regionId !== undefined) next.regionId = cmd.regionId;
+      if (cmd.security === null) delete next.security;
+      else if (cmd.security !== undefined) next.security = cmd.security;
+      const res = safeParseReadable(GroupSchema, next);
+      if (!res.ok) return fail(`Invalid group: ${res.errors.join('; ')}`);
+      d.graph.groups[d.graph.groups.indexOf(g)] = res.value as Group;
+      return;
+    }
+
+    case 'updateScenario': {
+      const merged = { ...current(d.scenario), ...cmd.patch };
+      const res = safeParseReadable(ScenarioSchema, merged);
+      if (!res.ok) return fail(`Invalid scenario: ${res.errors.join('; ')}`);
+      d.scenario = res.value as Scenario;
       return;
     }
 
