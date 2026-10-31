@@ -1,17 +1,24 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect } from 'react';
 import { BoardCanvas, CanvasProvider, Palette } from '@/canvas';
 import { Inspector } from '@/inspector';
+import { MetricsDrawer } from '@/metrics-ui';
 import type { Autosave } from '@/persistence';
 import { projectOfBoard, useWorkspaceStore } from '@/store';
+import { useSimulationRunner } from '../simulation/useSimulationRunner';
 import { BoardTabs, NoticeProvider, ProjectSidebar, SaveStatus } from '../workspace';
 
 /**
  * The app shell: project sidebar, palette, board tabs over the canvas, inspector, metrics drawer.
  * Palette and canvas: S04. Inspector: S05. Projects, tabs, snapshots and saving: S06.
+ * Metrics drawer, canvas overlays and auto-simulation: S08.
  * `autosave` comes from persistence (main.tsx); without it nothing is saved (tests).
+ * `simulate` (default true) keeps the open board simulated (300 ms after each change, or on Run).
  */
-export function AppShell({ autosave }: { autosave?: Autosave } = {}) {
-  const [drawerOpen, setDrawerOpen] = useState(true);
+export function AppShell({
+  autosave,
+  simulate = true,
+}: { autosave?: Autosave; simulate?: boolean } = {}) {
+  useSimulationRunner(simulate);
 
   // Ctrl/Cmd+S saves now instead of opening the browser's "Save page" dialog.
   useEffect(() => {
@@ -66,27 +73,7 @@ export function AppShell({ autosave }: { autosave?: Autosave } = {}) {
                 data-testid="region-metrics"
                 className="shrink-0 border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
               >
-                <div className="flex items-center justify-between px-3 py-1.5">
-                  <h2 className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
-                    Metrics
-                  </h2>
-                  <button
-                    type="button"
-                    onClick={() => setDrawerOpen((o) => !o)}
-                    aria-expanded={drawerOpen}
-                    aria-controls="metrics-drawer-body"
-                    className="rounded px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none dark:text-slate-300 dark:hover:bg-slate-800"
-                  >
-                    {drawerOpen ? 'Hide' : 'Show'}
-                  </button>
-                </div>
-                {drawerOpen && (
-                  <div id="metrics-drawer-body" className="h-40 overflow-y-auto">
-                    <Placeholder>
-                      Latency, throughput, utilisation and cost appear here.
-                    </Placeholder>
-                  </div>
-                )}
+                <MetricsDrawer />
               </section>
             </div>
 
@@ -132,8 +119,4 @@ function PanelHeader({ title }: { title: string }) {
       {title}
     </h2>
   );
-}
-
-function Placeholder({ children }: { children: ReactNode }) {
-  return <p className="p-3 text-sm text-slate-400">{children}</p>;
 }

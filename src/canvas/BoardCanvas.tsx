@@ -24,6 +24,7 @@ import {
   groupKindLabel,
   useBoardStore,
   useBoardStoreApi,
+  useSimulationStore,
   type BoardCommand,
   type GroupKind,
   type NodeMove,
@@ -39,12 +40,14 @@ import {
   NODE_HEIGHT,
   NODE_WIDTH,
 } from './geometry';
+import { ProtocolEdge } from './edges/ProtocolEdge';
 import { ComponentNode } from './nodes/ComponentNode';
 import { GroupNode } from './nodes/GroupNode';
 import { isEditableTarget, SHORTCUT_HELP, shortcutFor } from './shortcuts';
 import { toFlowEdges, toFlowNodes, type FlowNode } from './to-flow';
 
 const nodeTypes = { component: ComponentNode, sdGroup: GroupNode };
+const edgeTypes = { sdEdge: ProtocolEdge };
 
 /** Keep React Flow's measurements when the store sends fresh node objects. */
 function mergeMeasured(next: FlowNode[], prev: FlowNode[]): FlowNode[] {
@@ -220,6 +223,14 @@ export function BoardCanvas() {
     [rf, actions],
   );
 
+  // Focus requests (e.g. a bottleneck clicked in the metrics drawer): centre and zoom to the node.
+  const focus = useSimulationStore((s) => s.focus);
+  useEffect(() => {
+    if (!focus) return;
+    if (!store.getState().doc.graph.nodes.some((n) => n.id === focus.nodeId)) return;
+    void rf.fitView({ nodes: [{ id: focus.nodeId }], padding: 0.6, maxZoom: 1.25, duration: 300 });
+  }, [focus, rf, store]);
+
   // Keyboard shortcuts.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -271,6 +282,7 @@ export function BoardCanvas() {
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeDragStop={onNodeDragStop}

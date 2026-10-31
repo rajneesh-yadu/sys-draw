@@ -2,7 +2,7 @@
 
 React Flow rendering of the board: palette, component and group nodes, edge drawing, shortcuts, auto-layout.
 
-- **Depends on:** `store`, `registry` · **Built in:** S04
+- **Depends on:** `store`, `registry` · **Built in:** S04 (overlays S08)
 - **Rules:** Renders store state; every edit goes through `store.dispatch`. Never computes metrics.
 
 ## Public API (index.ts)
@@ -10,6 +10,7 @@ React Flow rendering of the board: palette, component and group nodes, edge draw
 - `<CanvasProvider>` — wraps palette + canvas (shared React Flow instance, snap and group-kind settings).
 - `<Palette />` — registry components for the board's provider, by category, with search; drag to the canvas or Enter/click to add at the view centre. "Containers" adds Region/AZ/VPC/Subnet/Cluster (click wraps the selection).
 - `<BoardCanvas />` — nodes (icon, label, product name, replica badge, one handle per port), groups (drag by header, resize when selected), edges labelled with their top protocol (async edges animated), minimap, controls, toolbar, error banner.
+- Performance overlays (S08, read from `useSimulationStore`): node border + pill coloured by utilisation (green < 60 %, amber < 85 %, red with ⚠), rps and a p99 badge under each node; edges (`sdEdge` → `edges/ProtocolEdge.tsx`) get stroke width by rps (√ scale vs the busiest edge, `edgeStrokeWidth`) and a "protocol · latency" label; tooltips show `SimResult.explain`. A `focus` request zooms to that node.
 - Pure helpers: `computeGroupRects`, `findDropGroup`, `NODE_WIDTH`/`NODE_HEIGHT`/`GRID`, `computeAutoLayout` (ELK, lazy-loaded), `shortcutFor`, `SHORTCUT_HELP`.
 
 ## Behaviour
@@ -21,4 +22,4 @@ React Flow rendering of the board: palette, component and group nodes, edge draw
 
 ## Extension points
 
-- Overlays (heatmap, badges) will be extra node data + layers; node/edge types are registered in `BoardCanvas.tsx`.
+- Overlays read the simulation store inside the node/edge components (not node data, so a result arriving mid-drag never resets positions); node/edge types are registered in `BoardCanvas.tsx`.

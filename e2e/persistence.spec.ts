@@ -41,6 +41,8 @@ test('create 2 boards, reload, both intact', async ({ page }) => {
   await page.keyboard.press('Escape');
 
   await saved(page);
+  // Nodes also show simulation overlays (S08): compare once the run has finished.
+  await expect(page.getByTestId('sim-status')).toHaveAttribute('data-status', 'done');
   const before = await page
     .locator('.react-flow__node-component')
     .evaluateAll((els) => els.map((e) => [e.getAttribute('data-id'), e.textContent]));
@@ -51,6 +53,8 @@ test('create 2 boards, reload, both intact', async ({ page }) => {
   // The last open board reopens, with the same nodes.
   await expect(tabs(page).filter({ hasText: 'Servers' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.react-flow__node-component')).toHaveCount(3);
+  await expect(page.getByTestId('sim-status')).toHaveAttribute('data-status', 'done');
+  await expect(page.getByTestId('node-overlay')).toHaveCount(3);
   const after = await page
     .locator('.react-flow__node-component')
     .evaluateAll((els) => els.map((e) => [e.getAttribute('data-id'), e.textContent]));

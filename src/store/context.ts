@@ -4,6 +4,7 @@ import type { IdKind } from '@/core';
 import { useStore } from 'zustand';
 import { registry } from '@/registry';
 import { createBoardStore, type BoardState, type BoardStore } from './board-store';
+import { createSimulationStore, type SimulationState, type SimulationStore } from './simulation';
 import { createWorkspaceStore, type WorkspaceState, type WorkspaceStore } from './workspace-store';
 
 /**
@@ -28,7 +29,11 @@ export const boardStore: BoardStore = createBoardStore({ registry });
 /** The app-wide workspace store; it drives `boardStore` (opening a board loads it there). */
 export const workspaceStore: WorkspaceStore = createWorkspaceStore({ boardStore });
 
+/** The app-wide simulation result store (S08); the app's runner fills it. */
+export const simulationStore: SimulationStore = createSimulationStore();
+
 export const BoardStoreContext = createContext<BoardStore>(boardStore);
+export const SimulationStoreContext = createContext<SimulationStore>(simulationStore);
 export const WorkspaceStoreContext = createContext<WorkspaceStore>(workspaceStore);
 
 /** The store in context (the app store unless a BoardStoreProvider overrides it). */
@@ -49,4 +54,14 @@ export function useWorkspaceStoreApi(): WorkspaceStore {
 /** Subscribe to a slice of workspace state. Return stable references from the selector. */
 export function useWorkspaceStore<T>(selector: (s: WorkspaceState) => T): T {
   return useStore(useWorkspaceStoreApi(), selector);
+}
+
+/** The simulation store in context (the app store unless a SimulationStoreProvider overrides it). */
+export function useSimulationStoreApi(): SimulationStore {
+  return useContext(SimulationStoreContext);
+}
+
+/** Subscribe to a slice of simulation state. Return stable references from the selector. */
+export function useSimulationStore<T>(selector: (s: SimulationState) => T): T {
+  return useStore(useSimulationStoreApi(), selector);
 }

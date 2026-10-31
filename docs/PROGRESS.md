@@ -243,3 +243,40 @@ Known gaps / follow-ups:
 - `core`'s sample board still uses `client.web` / `database.postgres` (S03 gap): the engine simulates those nodes as pass-throughs with warnings.
 
 Next suggested session: S08 — Metrics UI (call `runSimulation(boardDoc)` debounced 300 ms from the store/app; use `SimResult.explain` for the formula tooltips; `perFlow['flow_inferred']` is the flow to show when the scenario has none).
+
+---
+
+## S08 — Performance view (metrics UI) — 2026-11-01
+
+Status: done
+Changed: src/store/{simulation.ts, simulation.test.ts, SimulationStoreProvider.tsx, context.ts, index.ts, README.md}, src/app/{simulation/{runner.ts, runner.test.ts, useSimulationRunner.ts}, layout/{AppShell.tsx, AppShell.test.tsx}, README.md}, src/canvas/{overlay.ts, overlay.test.tsx, edges/ProtocolEdge.tsx, nodes/ComponentNode.tsx, BoardCanvas.tsx, to-flow.ts, README.md}, src/metrics-ui/{index.ts, README.md, MetricsDrawer.tsx, NodeDetail.tsx, FormulaValue.tsx, formulas.ts, metrics-ui.test.tsx}, e2e/performance.spec.ts (new), e2e/persistence.spec.ts (waits for the simulation before comparing node text), package.json + pnpm-lock.yaml (added `recharts` ^3.10.1), docs/PROGRESS.md
+Public APIs added/changed:
+
+- `store` (**additive change to another module's API, approved by the user at the start of the session**): `createSimulationStore`, `simulationStore`, `useSimulationStore`, `useSimulationStoreApi`, `SimulationStoreProvider`, types `SimulationState`/`SimulationStore`/`SimulationStatus`/`FocusRequest`; view helpers `utilizationLevel`, `UTILIZATION_THRESHOLDS`, `UTILIZATION_LEVEL_LABEL`, `UtilizationLevel`, `formatRps`, `formatMs`, `formatPercent`, `formatUsd`; re-exports of core `SimResult`, `NodeMetrics`, `EdgeMetrics`, `FlowMetrics`, `Finding`, `FindingSeverity`. Nothing existing changed signature.
+- `metrics-ui` (new): `MetricsDrawer`, `NodeDetail`, `UtilizationMeter`, `LatencyChart`, `FormulaValue`, `nodeFormula`, `systemFormulas`, `flowFormula`, `flowName`, `bottleneckRows`, `INFERRED_FLOW_ID`, `INFERRED_FLOW_NAME`, types `FlowField`, `NodeField`, `SystemFormulas`.
+- `canvas`: no export changes (overlays are internal; edges now use the custom `sdEdge` type).
+- `app`: `AppShell({ autosave?, simulate? })` (`simulate` defaults to true).
+  Registry entries added: none
+  Tests: 33 added (319 total), all passing; `pnpm build`, `pnpm lint`, `prettier --check src e2e` green. e2e: 5/5 pass (new `performance.spec.ts`).
+
+F7 acceptance (`e2e/performance.spec.ts`, production build, real Web Worker, no console errors): client → LB → app server is simulated automatically; edges show thickness and "HTTP/2 · 0 ms"; the drawer shows throughput 200 rps and p99 for the flow. Setting `north-america` users to 400 000 (80k rps against 10k rps capacity) turns the server red (`data-level="hot"`, "Overloaded" pill with ⚠) and lists it as a bottleneck; clicking it selects and zooms to the node and opens its detail (meter + p50/p95/p99 chart). Formula tooltips show `SimResult.explain` (ρ = λ/(c·μ) …) and the flow p99 formula; every numeric value in the drawer (4 KPIs + 5 flow cells + 9 node values) is a "show formula" button. Run re-simulates.
+
+Notes (decisions):
+
+- **Who runs the engine:** the store may not import `engine`, so `app/simulation/runner.ts` (composition root) subscribes to the board store (graph, scenario, providerId by reference), debounces 300 ms, calls `runSimulation`, and writes to the simulation store. Opening another board clears the result and runs at once; "Run" (`requestRun`) runs at once; a debounced run whose inputs are identical to the last run is skipped; results of superseded runs are dropped (`runId`). Moving nodes re-runs too (positions are part of the graph; ~ms in the worker).
+- **Overlays read the simulation store inside `ComponentNode` / `ProtocolEdge`,** not React Flow node data, so a result arriving mid-drag never resets node positions. Node: 2 px border + pill in the utilisation colour (green < 60 %, amber < 85 %, red ≥ 85 % with an icon and "Overloaded" label — never colour alone), rps, p99 badge. Edge: width 1.5–8 px on a √ scale relative to the busiest edge; label "protocol · p50 latency"; clicking the label selects the edge.
+- The red threshold (0.85) equals the engine's `BOTTLENECK_UTILIZATION`, so red nodes and the bottleneck list agree (the list only has `service` nodes, as the engine decides).
+- The selected component (board selection) drives the detail panel. Results are kept in memory only; `Board.lastResult` is not written.
+- Charts: Recharts horizontal bar chart (single hue, hover tooltip, sr-only caption) for p50/p95/p99. No time-series chart: the engine produces no `timeline` yet.
+
+Known gaps / follow-ups:
+
+- **On the Mac run `pnpm install`** to pick up `recharts`. Tests and e2e ran on a Linux copy of the repo (macOS-native `node_modules`); e2e used a local Playwright config pointing at the sandbox's Chromium (not committed).
+- **Flow and system numbers have no `explain` in `SimResult`** (core schema), so their formulas are stated in `metrics-ui/formulas.ts` from the result's own numbers (e.g. availability = served/offered rps). The per-flow λ formula shows users and peak but not `rpsPerUser` for the inferred flow (engine default 0.1). Adding `explain` to `FlowMetrics` and `system` is a core + engine change for an architecture session.
+- Edge latency and all costs are 0 until S10/S14 (network) and S09 (cost); the labels and tooltips already say so via `explain`.
+- An idle node (0 rps) still shows its no-load p99 (the service time tail), e.g. "p99 92.1 ms" for an app server. Consider "idle" instead.
+- `metrics-ui` hard-codes the inferred flow id `flow_inferred` (it may not import `engine`); keep it in sync with `INFERRED_FLOW_ID`.
+- The overlay strip under a node can overlap an edge label that passes right below it.
+- A `.s08tmp/` folder (the source tarball used to copy the repo into the sandbox) is left at the repo root because the connected folder blocks deletes; safe to delete.
+
+Next suggested session: S09 — Scaling and cost (instance size → capacity, cost/month per node; the drawer's cost KPI and the node cost row will fill in automatically).

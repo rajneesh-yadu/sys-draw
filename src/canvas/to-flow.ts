@@ -106,6 +106,7 @@ export function toFlowEdges(
     const label = top === undefined ? '' : (registry.get(top, 'protocol')?.name ?? top);
     return {
       id: e.id,
+      type: 'sdEdge',
       source: e.source,
       target: e.target,
       ...(e.sourcePortId !== undefined ? { sourceHandle: e.sourcePortId } : {}),

@@ -54,6 +54,25 @@ export {
   useWorkspaceStoreApi,
 } from './context';
 export { BoardStoreProvider } from './BoardStoreProvider';
+
+// Simulation results for the open board (S08). The app runs the engine; UI modules read here.
+export {
+  createSimulationStore,
+  formatMs,
+  formatPercent,
+  formatRps,
+  formatUsd,
+  utilizationLevel,
+  UTILIZATION_LEVEL_LABEL,
+  UTILIZATION_THRESHOLDS,
+  type FocusRequest,
+  type SimulationState,
+  type SimulationStatus,
+  type SimulationStore,
+  type UtilizationLevel,
+} from './simulation';
+export { simulationStore, useSimulationStore, useSimulationStoreApi } from './context';
+export { SimulationStoreProvider } from './SimulationStoreProvider';
 export { WorkspaceStoreProvider } from './WorkspaceStoreProvider';
 
 // Workspace: projects, board tabs, snapshots (S06).
@@ -108,4 +127,10 @@ export {
   type Project,
   type Snapshot,
   type UserSettings,
+  type SimResult,
+  type NodeMetrics,
+  type EdgeMetrics,
+  type FlowMetrics,
+  type Finding,
+  type FindingSeverity,
 } from '@/core';
