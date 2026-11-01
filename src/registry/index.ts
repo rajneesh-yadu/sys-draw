@@ -24,8 +24,6 @@ export {
 } from './define';
 export {
   createRegistry,
-  isAvailableOn,
-  componentDisplayName,
   findUnresolvedReferences,
   type Registry,
   type ListFilter,
@@ -45,6 +43,16 @@ export {
   RegistryProblemSchema,
   type ProviderDefinition,
   type ProviderRegion,
+  ProviderServiceSchema,
+  ServiceLimitSchema,
+  LimitCheckSchema,
+  ProviderInstanceFamilySchema,
+  AsOfDateSchema,
+  type ProviderService,
+  type ServiceLimit,
+  type LimitCheck,
+  type ProviderInstanceFamily,
+  type ProviderInstanceSize,
   type RuleDefinition,
   type RuleCategory,
   type RuleContext,
@@ -52,6 +60,26 @@ export {
   type LessonDefinition,
   type RegistryProblemDefinition,
 } from './schemas';
+export {
+  PROVIDER_ONLY_TAG,
+  isProviderOnly,
+  isAvailableOn,
+  componentDisplayName,
+  componentIcon,
+  providerService,
+  instancePrice,
+  servicePricing,
+  serviceLimits,
+  mapRegion,
+  mapRegionId,
+  planProviderSwitch,
+  type RegionMapping,
+  type InstancePrice,
+  type ProviderSwitchPlan,
+  type SwitchRelabel,
+  type SwitchWarning,
+  type SwitchRegion,
+} from './provider-tools';
 export { USER_REGIONS, UserRegionSchema, userRegion, type UserRegion } from './geo/user-regions';
 
 /** The app's registry: every entry auto-discovered from src/registry/*, validated at import time. */

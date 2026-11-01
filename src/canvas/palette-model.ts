@@ -1,12 +1,13 @@
 /** Palette contents from the registry: provider-filtered components grouped by category. */
-import type { EntryByKind, Registry } from '@/registry';
+import { componentDisplayName, componentIcon, type EntryByKind, type Registry } from '@/registry';
 import type { ProviderId } from '@/store';
 
 export type ComponentDef = EntryByKind['component'];
 
 export interface PaletteSection {
   category: string;
-  items: { def: ComponentDef; name: string }[];
+  /** `name` and `icon` are the board provider's (S12: 'S3' with its icon on AWS). */
+  items: { def: ComponentDef; name: string; icon: string }[];
 }
 
 /** Section order for known categories; unknown ones follow alphabetically. */
@@ -29,12 +30,13 @@ export function paletteSections(
 ): PaletteSection[] {
   const q = query.trim().toLowerCase();
   const byCat = new Map<string, PaletteSection['items']>();
+  const providerEntry = registry.get(provider, 'provider');
   for (const def of registry.list({ kind: 'component', provider })) {
-    const name = def.providerNames?.[provider] ?? def.name;
+    const name = componentDisplayName(def, provider);
     const hay = [name, def.name, def.id, def.category, ...def.tags].join(' ').toLowerCase();
     if (q && !q.split(/\s+/).every((w) => hay.includes(w))) continue;
     const list = byCat.get(def.category) ?? [];
-    list.push({ def, name });
+    list.push({ def, name, icon: componentIcon(def, providerEntry) });
     byCat.set(def.category, list);
   }
   const rank = (c: string) => {

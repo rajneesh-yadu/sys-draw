@@ -218,3 +218,52 @@ describe('updateScenario', () => {
     expect(s().doc.scenario).toEqual(defaultScenario());
   });
 });
+
+describe('setProvider (S12)', () => {
+  it('switches the provider, moves regions to the same metro, and undoes in one step', () => {
+    const { group } = setup();
+    s().dispatch({ type: 'updateGroup', groupId: group, regionId: 'ap-south' });
+    const r = s().dispatch({
+      type: 'updateScenario',
+      patch: {
+        events: [
+          { id: 'evt_1', kind: 'regionOutage', regionId: 'ap-south', atSec: 0 },
+          {
+            id: 'evt_2',
+            kind: 'networkPartition',
+            regionA: 'us-east',
+            regionB: 'eu-west',
+            atSec: 0,
+          },
+        ],
+      },
+    });
+    expect(r).toEqual({ ok: true });
+    expect(s().dispatch({ type: 'setProvider', providerId: 'aws' })).toEqual({ ok: true });
+    expect(s().doc.providerId).toBe('aws');
+    expect(graph().groups[0]?.regionId).toBe('ap-south-1');
+    expect(s().doc.scenario.events).toMatchObject([
+      { regionId: 'ap-south-1' },
+      { regionA: 'us-east-1', regionB: 'eu-west-1' },
+    ]);
+    expect(s().past.at(-1)?.label).toBe('Switch provider to aws');
+
+    // aws → gcp: Ireland has no GCP region, so the nearest (London) is used
+    s().dispatch({ type: 'setProvider', providerId: 'gcp' });
+    expect(graph().groups[0]?.regionId).toBe('asia-south1');
+    expect(s().doc.scenario.events[1]).toMatchObject({ regionB: 'europe-west2' });
+
+    s().undo();
+    expect(s().doc.providerId).toBe('aws');
+    s().undo();
+    expect(s().doc.providerId).toBe('generic');
+    expect(graph().groups[0]?.regionId).toBe('ap-south');
+  });
+
+  it('rejects an unknown provider and is a no-op for the current one', () => {
+    expect(s().dispatch({ type: 'setProvider', providerId: 'oracle' as never }).ok).toBe(false);
+    const before = s().past.length;
+    expect(s().dispatch({ type: 'setProvider', providerId: 'generic' })).toEqual({ ok: true });
+    expect(s().past.length).toBe(before);
+  });
+});

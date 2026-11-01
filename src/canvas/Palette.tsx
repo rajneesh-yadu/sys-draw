@@ -49,7 +49,7 @@ export function Palette() {
             {sec.category}
           </h3>
           <ul>
-            {sec.items.map(({ def, name }) => (
+            {sec.items.map(({ def, name, icon }) => (
               <li key={def.id}>
                 <button
                   type="button"
@@ -60,10 +60,7 @@ export function Palette() {
                   className={itemClass}
                   data-def-id={def.id}
                 >
-                  <RegistryIcon
-                    name={def.icon}
-                    className="shrink-0 text-sky-600 dark:text-sky-400"
-                  />
+                  <RegistryIcon name={icon} className="shrink-0 text-sky-600 dark:text-sky-400" />
                   <span className="truncate">{name}</span>
                 </button>
               </li>

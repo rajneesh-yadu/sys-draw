@@ -17,28 +17,37 @@ const SEEDED_COMPONENTS = [
   'database.nosql',
   'cache.in-memory',
   'messaging.queue',
+  'messaging.topic',
+  'messaging.stream',
   'storage.object',
 ];
+/** Components that exist on one cloud only (S12). */
+const PROVIDER_ONLY_COMPONENTS = ['database.aurora', 'database.spanner'];
 const SEEDED_PROTOCOLS = ['tcp', 'tls13', 'http1', 'http2', 'grpc', 'websocket'];
 
 describe('seeded registry', () => {
   const all = registry.list();
 
-  it('loads the 12 generic components, 6 protocols and the generic provider', () => {
+  it('loads the 14 generic + 2 provider-only components, 6 protocols and 4 providers', () => {
     expect(
       registry
         .list({ kind: 'component' })
         .map((c) => c.id)
         .sort(),
-    ).toEqual([...SEEDED_COMPONENTS].sort());
+    ).toEqual([...SEEDED_COMPONENTS, ...PROVIDER_ONLY_COMPONENTS].sort());
     expect(
       registry
         .list({ kind: 'protocol' })
         .map((p) => p.id)
         .sort(),
     ).toEqual([...SEEDED_PROTOCOLS].sort());
-    expect(registry.list({ kind: 'provider' }).map((p) => p.id)).toEqual(['generic']);
-    expect(registry.size).toBe(19);
+    expect(registry.list({ kind: 'provider' }).map((p) => p.id)).toEqual([
+      'aws',
+      'azure',
+      'gcp',
+      'generic',
+    ]);
+    expect(registry.size).toBe(26);
   });
 
   it('has unique ids across all kinds', () => {
@@ -99,7 +108,9 @@ describe('registry API', () => {
 
   it('list filters by category', () => {
     expect(registry.list({ category: 'database' }).map((e) => e.id)).toEqual([
+      'database.aurora',
       'database.nosql',
+      'database.spanner',
       'database.sql',
     ]);
     expect(registry.list({ kind: 'component', category: 'network' })).toHaveLength(4);
@@ -116,8 +127,10 @@ describe('registry API', () => {
     const onAws = registry.list({ kind: 'component', provider: 'aws' }).map((c) => c.id);
     expect(onAws).toContain('storage.object');
     expect(onAws).toContain('client.app'); // provider-neutral
-    expect(registry.list({ kind: 'component', provider: 'generic' })).toHaveLength(12);
-    expect(registry.list({ kind: 'provider', provider: 'aws' })).toEqual([]);
+    expect(registry.list({ kind: 'component', provider: 'generic' })).toHaveLength(14);
+    expect(onAws).toContain('database.aurora');
+    expect(onAws).not.toContain('database.spanner');
+    expect(registry.list({ kind: 'provider', provider: 'aws' }).map((p) => p.id)).toEqual(['aws']);
     expect(registry.list({ kind: 'provider', provider: 'generic' })).toHaveLength(1);
   });
 
@@ -138,6 +151,13 @@ describe('registry API', () => {
     expect(isAvailableOn(def, 'azure')).toBe(true);
     expect(isAvailableOn({ ...def, providerNames: { aws: 'S3' } }, 'gcp')).toBe(false);
     expect(isAvailableOn({ ...def, providerNames: { aws: 'S3' } }, 'generic')).toBe(true);
+  });
+
+  it('isAvailableOn: provider-only components exist on their cloud only, never on generic', () => {
+    const spanner = registry.require('database.spanner', 'component');
+    expect(isAvailableOn(spanner, 'gcp')).toBe(true);
+    expect(isAvailableOn(spanner, 'aws')).toBe(false);
+    expect(isAvailableOn(spanner, 'generic')).toBe(false);
   });
 });
 

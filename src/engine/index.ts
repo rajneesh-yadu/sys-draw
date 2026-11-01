@@ -74,6 +74,7 @@ export {
   type NodeCost,
   type Pricing,
 } from './cost/cost';
+export { exceededLimits, providerLimitFindings, type LimitHit } from './model/limits';
 export {
   LB_ALGORITHMS,
   DEFAULT_VIRTUAL_NODES,

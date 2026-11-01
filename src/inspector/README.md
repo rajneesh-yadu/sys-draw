@@ -14,7 +14,7 @@ Schema-driven forms for the selected node, edge, group, or (nothing selected) th
 
 ## Scale quick actions (S09)
 
-Node panel → Scaling: +1 replica, Size up/down (same instance family, by vCPU), Add read replica, Shard ×2 — each one store command; fields found via registry `.meta({ scaling })` roles; unavailable actions are disabled with a reason (`panels/scale-actions.ts`).
+Node panel → "On <provider>" (S12, `panels/ProviderInfo.tsx`): product, price-table date, the provider's service limits ("Exceeded" when the run has an `engine.limits` finding for it) and a no-equivalent warning; instance type options show the provider's instance name and price. Node panel → Scaling: +1 replica, Size up/down (same instance family, by vCPU), Add read replica, Shard ×2 — each one store command; fields found via registry `.meta({ scaling })` roles; unavailable actions are disabled with a reason (`panels/scale-actions.ts`).
 
 ## Scenario editor (S10)
 

@@ -5,7 +5,13 @@ import { MetricsDrawer } from '@/metrics-ui';
 import type { Autosave } from '@/persistence';
 import { projectOfBoard, useWorkspaceStore } from '@/store';
 import { useSimulationRunner } from '../simulation/useSimulationRunner';
-import { BoardTabs, NoticeProvider, ProjectSidebar, SaveStatus } from '../workspace';
+import {
+  BoardTabs,
+  NoticeProvider,
+  ProjectSidebar,
+  ProviderSwitcher,
+  SaveStatus,
+} from '../workspace';
 
 /**
  * The app shell: project sidebar, palette, board tabs over the canvas, inspector, metrics drawer.
@@ -106,6 +112,7 @@ function TopBar({ autosave }: { autosave?: Autosave | undefined }) {
         {projectName} / <span className="text-slate-600 dark:text-slate-300">{boardName}</span>
       </span>
       <div className="ml-auto flex items-center gap-3 text-xs text-slate-400">
+        <ProviderSwitcher />
         {autosave && <SaveStatus autosave={autosave} />}
         <span className="capitalize">{mode}</span>
       </div>

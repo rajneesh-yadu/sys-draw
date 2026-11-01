@@ -1,6 +1,6 @@
 /** Map store state to React Flow nodes and edges (pure; React Flow positions are parent-relative). */
 import type { Edge, Node } from '@xyflow/react';
-import type { Registry } from '@/registry';
+import { componentDisplayName, componentIcon, isAvailableOn, type Registry } from '@/registry';
 import { groupKindLabel, type BoardDoc, type GroupKind, type Rect } from '@/store';
 import { groupDepths, NODE_HEIGHT, NODE_WIDTH } from './geometry';
 
@@ -19,6 +19,8 @@ export interface ComponentNodeData extends Record<string, unknown> {
   replicas: number;
   ports: readonly PortView[];
   known: boolean;
+  /** S12: provider short name ("AWS") when the component has no product on the board's provider. */
+  unavailableOn?: string;
 }
 
 export interface GroupNodeData extends Record<string, unknown> {
@@ -91,7 +93,8 @@ export function toFlowNodes(
 
   const nodes: ComponentFlowNode[] = graph.nodes.map((n) => {
     const def = registry.get(n.defId, 'component');
-    const name = def ? (def.providerNames?.[doc.providerId] ?? def.name) : n.defId;
+    const name = def ? componentDisplayName(def, doc.providerId) : n.defId;
+    const unavailable = def !== undefined && !isAvailableOn(def, doc.providerId);
     return {
       id: n.id,
       type: 'component',
@@ -104,10 +107,11 @@ export function toFlowNodes(
         label: n.label,
         defId: n.defId,
         name,
-        icon: def?.icon ?? 'box',
+        icon: def ? componentIcon(def, provider) : 'box',
         replicas: n.scaling.replicas,
         ports: def?.ports ?? [],
         known: def !== undefined,
+        ...(unavailable ? { unavailableOn: provider?.shortName ?? doc.providerId } : {}),
       },
     };
   });

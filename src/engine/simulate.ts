@@ -11,7 +11,7 @@ import type {
   RegionMetrics,
   SimResult,
 } from '@/core';
-import { userRegion } from '@/registry';
+import { instancePrice, servicePricing, userRegion, type ProviderDefinition } from '@/registry';
 import { behaviorsOf } from './behaviors';
 import { netBetween, type NetHop } from './geo/distance';
 import { buildGeoModel, type GeoModel } from './geo/places';
@@ -22,7 +22,13 @@ import { fmt } from './model/format';
 import { percentiles } from './model/latency';
 import { generateLoad, inferFlow } from './model/load';
 import { route } from './model/route';
-import { DEFAULT_ENGINE_OPTIONS, type EngineOptions, type SimInput } from './model/types';
+import {
+  DEFAULT_ENGINE_OPTIONS,
+  type CompiledNode,
+  type EngineOptions,
+  type SimInput,
+} from './model/types';
+import { providerLimitFindings } from './model/limits';
 import { evaluate, mixUnits } from './model/evaluate';
 import { runTimeline } from './chaos/timeline';
 import { expQuantileFactor } from './queueing/mmc';
@@ -142,7 +148,36 @@ function collectNet(
 /** The board provider's price table (falls back to generic list prices). */
 function pricingOf(registry: ComponentSource, providerId: string | undefined): Pricing {
   const p = registry.get(providerId ?? 'generic', 'provider');
-  return p ? { ...p.pricing } : { ...FALLBACK_PRICING };
+  return p
+    ? {
+        instancePriceMultiplier: p.pricing.instancePriceMultiplier,
+        egressUsdPerGb: p.pricing.egressUsdPerGb,
+        storageUsdPerGbMonth: p.pricing.storageUsdPerGbMonth,
+        requestsUsdPerMillion: p.pricing.requestsUsdPerMillion,
+      }
+    : { ...FALLBACK_PRICING };
+}
+
+/**
+ * One node's prices on the board's provider (S12): the provider's instance price for its size
+ * (family or service table) and per-service request / storage prices over the board defaults.
+ */
+function nodePricing(
+  base: Pricing,
+  provider: ProviderDefinition | undefined,
+  node: CompiledNode,
+): Pricing {
+  if (!provider || provider.id === 'generic') return base;
+  const svc = servicePricing(provider, node.defId);
+  const inst = node.instanceType
+    ? instancePrice(provider, node.defId, node.instanceType.id)
+    : undefined;
+  return {
+    ...base,
+    ...svc,
+    ...(inst ? { instance: inst } : {}),
+    source: `${provider.shortName} price table (${provider.pricing.region}, as of ${provider.pricing.asOf}, approximate)`,
+  };
 }
 
 export function simulate(
@@ -179,10 +214,16 @@ export function simulate(
   }
 
   const pricing = pricingOf(registry, input.providerId);
+  const provider = registry.get(input.providerId ?? 'generic', 'provider');
   let systemCost = 0;
   const perNode: Record<string, NodeMetrics> = {};
   for (const [id, s] of stats) {
-    const cost = nodeCost(s.node, s, pricing, scenario.peakMultiplier);
+    const cost = nodeCost(
+      s.node,
+      s,
+      nodePricing(pricing, provider, s.node),
+      scenario.peakMultiplier,
+    );
     s.costPerMonth = cost.costPerMonth;
     if (s.node.kind === 'service') s.explain.costPerMonth = cost.explain;
     systemCost += cost.costPerMonth;
@@ -377,6 +418,7 @@ export function simulate(
       ...plan.issues,
       ...geoFindings,
       ...(tl?.findings ?? []),
+      ...providerLimitFindings(model.nodes.values(), (id) => stats.get(id), provider),
     ],
   };
 }

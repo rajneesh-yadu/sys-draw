@@ -21,9 +21,10 @@ import {
   type IdKind,
   type NodeInstance,
   type Position,
+  type ProviderId,
   type Scenario,
 } from '@/core';
-import type { Registry } from '@/registry';
+import { mapRegion, type Registry } from '@/registry';
 import { checkConnection, checkProtocolStack, defaultProtocolStack } from './connections';
 import { descendantsOf, labelBase, labelBaseFromName, nextLabel } from './graph-utils';
 import type { BoardDoc, Rect, Subgraph } from './types';
@@ -105,7 +106,13 @@ export type BoardCommand =
   | { type: 'insert'; subgraph: Subgraph }
   | { type: 'batch'; label: string; commands: BoardCommand[] }
   /** Replace the whole graph (snapshot restore). Undoable like any other command. */
-  | { type: 'replaceGraph'; graph: Graph; label?: string };
+  | { type: 'replaceGraph'; graph: Graph; label?: string }
+  /**
+   * Switch the board's cloud provider (S12). Names, icons, prices and limits follow from
+   * `providerId`; this also moves Region groups and region chaos events to the same metro on the
+   * new provider (nearest region when it has none there; see registry `mapRegion`).
+   */
+  | { type: 'setProvider'; providerId: ProviderId };
 
 export interface CommandContext {
   registry: Registry;
@@ -170,6 +177,8 @@ export function commandLabel(cmd: BoardCommand): string {
       return cmd.label;
     case 'replaceGraph':
       return cmd.label ?? 'Replace board';
+    case 'setProvider':
+      return `Switch provider to ${cmd.providerId}`;
   }
 }
 
@@ -505,6 +514,26 @@ export function applyCommand(d: D, cmd: BoardCommand, ctx: CommandContext): void
         if (!groupIds.has(id)) delete d.layout.groupFrames[id];
       }
       pruneScenario(d);
+      return;
+    }
+
+    case 'setProvider': {
+      const to =
+        ctx.registry.get(cmd.providerId, 'provider') ??
+        fail(`Unknown provider "${cmd.providerId}"`);
+      if (d.providerId === cmd.providerId) return;
+      const from = ctx.registry.get(d.providerId, 'provider');
+      const generic = ctx.registry.get('generic', 'provider');
+      const map = (id: string) => mapRegion(from, to, id, generic)?.id ?? id;
+      for (const g of d.graph.groups) if (g.regionId !== undefined) g.regionId = map(g.regionId);
+      for (const e of d.scenario.events) {
+        if (e.kind === 'regionOutage') e.regionId = map(e.regionId);
+        if (e.kind === 'networkPartition') {
+          e.regionA = map(e.regionA);
+          e.regionB = map(e.regionB);
+        }
+      }
+      d.providerId = cmd.providerId;
       return;
     }
   }

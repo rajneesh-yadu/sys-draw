@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { iconNames } from 'lucide-react/dynamic';
 import { registry } from '@/registry';
 import { createBoardStore, emptyBoardDoc, type BoardDoc, type Graph } from '@/store';
 import { decodePaletteItem, encodePaletteItem } from './dnd';
@@ -90,7 +91,8 @@ describe('toFlowNodes / toFlowEdges', () => {
     expect(a.parentId).toBe('grp_vpc');
     expect(a.position).toEqual({ x: 100 - vpc.x, y: 100 - vpc.y });
     expect(a.selected).toBe(true);
-    expect(a.data).toMatchObject({ label: 'node_a', icon: 'server', replicas: 1, known: true });
+    expect(a.data).toMatchObject({ label: 'node_a', icon: 'server-cog', replicas: 1, known: true });
+    expect(a.data.unavailableOn).toBeUndefined();
     expect(nodes.find((n) => n.id === 'node_b')!.parentId).toBeUndefined();
   });
 
@@ -132,6 +134,49 @@ describe('toFlowNodes / toFlowEdges', () => {
       registry,
     ).find((n) => n.id === 'node_lb')!;
     expect(lb.data.name).toBe('Elastic Load Balancing (ALB)');
+  });
+
+  it('S12: swaps name and icon per provider and flags components with no equivalent', () => {
+    const graph: Graph = {
+      ...nested,
+      groups: [],
+      nodes: [
+        {
+          ...node('node_s3', 0, 0),
+          defId: 'storage.object',
+          scaling: { replicas: 1, instanceType: 'managed' },
+        },
+        {
+          ...node('node_sp', 0, 0),
+          defId: 'database.spanner',
+          scaling: { replicas: 1, instanceType: 'node' },
+        },
+      ],
+    };
+    const view = (p: 'generic' | 'aws' | 'gcp' | 'azure') =>
+      toFlowNodes({ ...emptyBoardDoc(p), graph }, new Map(), new Set(), registry).map(
+        (n) => n.data,
+      );
+    expect(view('generic')[0]).toMatchObject({ name: 'Object Storage', icon: 'archive' });
+    expect(view('aws')[0]).toMatchObject({ name: 'S3', icon: 'package' });
+    expect(view('gcp')[0]).toMatchObject({ name: 'Cloud Storage' });
+    expect(view('azure')[0]).toMatchObject({ name: 'Blob Storage', icon: 'hard-drive' });
+    expect(view('gcp')[1]).toMatchObject({ name: 'Spanner' });
+    expect(view('gcp')[1]!.unavailableOn).toBeUndefined();
+    expect(view('aws')[1]).toMatchObject({ unavailableOn: 'AWS' });
+    expect(view('generic')[1]).toMatchObject({ unavailableOn: 'Generic' });
+  });
+
+  it('S12: every component and provider icon is a real lucide icon', () => {
+    const names = new Set<string>(iconNames);
+    const icons = [
+      ...registry.list({ kind: 'component' }).map((c) => c.icon),
+      ...registry
+        .list({ kind: 'provider' })
+        .flatMap((p) => Object.values(p.services).map((s) => s.icon))
+        .filter((i): i is string => i !== undefined),
+    ];
+    expect(icons.filter((i) => !names.has(i))).toEqual([]);
   });
 
   it('labels edges with the top protocol and animates async ones', () => {
@@ -241,7 +286,17 @@ describe('palette model and drag payload', () => {
   it('groups registry components by category and searches names, tags and provider names', () => {
     const all = paletteSections(registry, 'generic', '');
     expect(all[0]!.category).toBe('clients');
-    expect(all.flatMap((s) => s.items).length).toBe(registry.list({ kind: 'component' }).length);
+    expect(all.flatMap((s) => s.items).length).toBe(
+      registry.list({ kind: 'component', provider: 'generic' }).length,
+    );
+    // provider-only components appear only on their cloud, with its icon
+    const ids = (p: 'generic' | 'aws' | 'gcp') =>
+      paletteSections(registry, p, '').flatMap((s) => s.items.map((i) => i.def.id));
+    expect(ids('generic')).not.toContain('database.spanner');
+    expect(ids('gcp')).toContain('database.spanner');
+    expect(ids('aws')).toContain('database.aurora');
+    const s3 = paletteSections(registry, 'aws', 'S3').flatMap((s) => s.items)[0];
+    expect(s3).toMatchObject({ name: 'S3', icon: 'package' });
     const hits = paletteSections(registry, 'aws', 'elastic load');
     expect(hits.flatMap((s) => s.items.map((i) => i.def.id))).toEqual(['network.load-balancer']);
     expect(paletteSections(registry, 'generic', 'zzz-nothing')).toEqual([]);

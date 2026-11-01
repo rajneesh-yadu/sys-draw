@@ -35,6 +35,9 @@ export default defineProvider({
   ],
   defaultRegionId: 'us-east',
   pricing: {
+    // Averages of the big three's list prices for their US East regions.
+    asOf: '2026-10-01',
+    region: 'us-east',
     instancePriceMultiplier: 1,
     egressUsdPerGb: 0.09,
     storageUsdPerGbMonth: 0.023,

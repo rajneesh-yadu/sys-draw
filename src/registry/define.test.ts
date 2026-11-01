@@ -104,6 +104,8 @@ describe('defineProvider', () => {
     regions: [{ id: 'us-east-1', name: 'N. Virginia', lat: 38.9, lon: -77.4 }],
     defaultRegionId: 'us-east-1',
     pricing: {
+      asOf: '2026-10-01',
+      region: 'us-east-1',
       instancePriceMultiplier: 1,
       egressUsdPerGb: 0.09,
       storageUsdPerGbMonth: 0.023,
@@ -119,6 +121,28 @@ describe('defineProvider', () => {
     expect(e.errors.join()).toMatch(
       /defaultRegionId "eu-west-1" is not one of the provider's regions/,
     );
+  });
+  it('requires an "as of" date on the price table', () => {
+    const e = errorOf(() =>
+      defineProvider({ ...provider, pricing: { ...provider.pricing, asOf: 'Oct 2026' } }),
+    );
+    expect(e.errors.join()).toMatch(/"as of" date/);
+  });
+  it('requires the pricing region to be one of its regions', () => {
+    const e = errorOf(() =>
+      defineProvider({ ...provider, pricing: { ...provider.pricing, region: 'eu-west-1' } }),
+    );
+    expect(e.errors.join()).toMatch(/pricing.region "eu-west-1"/);
+  });
+  it('rejects a generic size mapped twice', () => {
+    const size = { size: 'small', name: 'm7i.large', vCpu: 2, memGb: 8, costUsdPerHour: 0.1 };
+    const e = errorOf(() =>
+      defineProvider({
+        ...provider,
+        instanceFamilies: [{ id: 'general', name: 'General', sizes: [size, size] }],
+      }),
+    );
+    expect(e.errors.join()).toMatch(/Generic size "small" is mapped twice/);
   });
   it('only accepts known provider ids', () => {
     expect(() => defineProvider({ ...provider, id: 'oracle' as never })).toThrow(

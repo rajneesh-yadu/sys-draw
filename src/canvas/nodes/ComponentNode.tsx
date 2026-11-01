@@ -184,6 +184,16 @@ export const ComponentNode = memo(function ComponentNode({
       >
         ×{replicas}
       </span>
+      {data.unavailableOn && (
+        <span
+          data-testid="no-equivalent"
+          className="absolute -top-2 -left-2 flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] leading-none font-semibold text-amber-900 dark:bg-amber-900 dark:text-amber-100"
+          title={`${data.name} is not available on ${data.unavailableOn}; it keeps its own model and prices.`}
+        >
+          <TriangleAlert size={10} aria-hidden />
+          No {data.unavailableOn} equivalent
+        </span>
+      )}
       {view && <MetricsOverlay v={view} />}
     </div>
   );

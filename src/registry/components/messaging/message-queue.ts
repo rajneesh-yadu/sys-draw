@@ -7,7 +7,7 @@ export default defineComponent({
   category: 'messaging',
   tags: ['queue', 'messaging', 'async', 'decoupling', 'managed'],
   icon: 'inbox',
-  providerNames: { aws: 'SQS', gcp: 'Pub/Sub', azure: 'Service Bus' },
+  providerNames: { aws: 'SQS', gcp: 'Pub/Sub (pull subscription)', azure: 'Service Bus' },
   ports: [
     { id: 'producers', direction: 'in', protocols: ['http1', 'http2', 'amqp'] },
     { id: 'consumers', direction: 'out', protocols: ['http1', 'http2', 'amqp'] },

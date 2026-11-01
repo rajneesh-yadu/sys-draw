@@ -20,6 +20,13 @@ export interface Pricing {
   egressUsdPerGb: number;
   storageUsdPerGbMonth: number;
   requestsUsdPerMillion: number;
+  /**
+   * The provider's own price for this node's instance type (S12: family size or service price,
+   * e.g. 'db.m6i.large' at $0.171/h). Replaces the component price × multiplier when present.
+   */
+  instance?: { name: string; costUsdPerHour: number; source: string } | undefined;
+  /** Where the request/storage prices come from, appended to the explain (S12). */
+  source?: string | undefined;
 }
 
 /** Used when the board's provider is not in the registry (matches the generic provider). */
@@ -58,7 +65,14 @@ export function nodeCost(
 
   const spec = node.scale;
   const type = node.instanceType;
-  const pricePerHour = type.costUsdPerHour * pricing.instancePriceMultiplier;
+  const own = pricing.instance;
+  const pricePerHour = own
+    ? own.costUsdPerHour
+    : type.costUsdPerHour * pricing.instancePriceMultiplier;
+  const typeLabel = own
+    ? `${own.name} at ${usd(own.costUsdPerHour)}/h, ${own.source}`
+    : `${type.id} at ${usd(type.costUsdPerHour)}/h` +
+      `${pricing.instancePriceMultiplier !== 1 ? ` × ${fmt(pricing.instancePriceMultiplier)}` : ''}`;
   const avgRps = stats.servedRps / Math.max(1, peakMultiplier);
   const lines: string[] = [];
   let compute: number;
@@ -70,7 +84,7 @@ export function nodeCost(
     compute = billed * pricePerHour * HOURS_PER_MONTH;
     lines.push(
       `compute = max(busy, provisioned) × $/h × 730 = max(${fmt(busy)}, ${fmt(spec.platform.minInstances)}) × ${usd(pricePerHour)} × 730 = ${usd(compute)}` +
-        ` (busy instances L = λ_avg × S̄ = ${fmt(avgRps)} × ${fmt(stats.meanServiceMs)} ms)`,
+        ` (busy instances L = λ_avg × S̄ = ${fmt(avgRps)} × ${fmt(stats.meanServiceMs)} ms; ${typeLabel})`,
     );
   } else if (pricePerHour > 0) {
     const serving = servingInstances(spec, stats.replicas);
@@ -82,8 +96,7 @@ export function nodeCost(
       : `${spec.shards > 1 ? `${spec.shards} shards × ` : ''}${stats.replicas} replicas`;
     lines.push(
       `compute = instances × $/h × 730 = ${fmt(billed)} × ${usd(pricePerHour)} × 730 = ${usd(compute)}` +
-        ` (${shape}${standbys > 0 ? ` + ${standbys} standby` : ''}; ${type.id} at ${usd(type.costUsdPerHour)}/h` +
-        `${pricing.instancePriceMultiplier !== 1 ? ` × ${fmt(pricing.instancePriceMultiplier)}` : ''})`,
+        ` (${shape}${standbys > 0 ? ` + ${standbys} standby` : ''}; ${typeLabel})`,
     );
   } else {
     const requests = avgRps * SECONDS_PER_MONTH;
@@ -111,6 +124,8 @@ export function nodeCost(
       `λ_avg = peak λ ÷ peakMultiplier = ${fmt(stats.servedRps)} ÷ ${fmt(peakMultiplier)}`,
     );
   }
+  if (pricing.source && (!own || spec.storageGb > 0 || !(pricePerHour > 0)))
+    lines.push(`prices: ${pricing.source}`);
   return {
     computePerMonth: compute,
     storagePerMonth: storage,

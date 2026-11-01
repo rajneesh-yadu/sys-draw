@@ -1,12 +1,13 @@
 /** Node panel: label, generated component config (Basic / Advanced) and scaling (+ quick actions). */
 import { useMemo } from 'react';
 import { z } from 'zod';
-import { componentDisplayName, registry } from '@/registry';
+import { componentDisplayName, instancePrice, registry } from '@/registry';
 import { NodeScalingSchema, type NodeInstance, type ProviderId } from '@/store';
 import type { FieldOverrides } from '../form/model';
 import { SchemaForm } from '../form/SchemaForm';
 import { ComponentDocs } from './DocsView';
 import { PanelTitle, Section, Tabs } from './common';
+import { ProviderInfo } from './ProviderInfo';
 import { ScaleActions } from './ScaleActions';
 import { useDispatch } from './use-dispatch';
 
@@ -24,10 +25,16 @@ export function NodePanel({ node, providerId }: { node: NodeInstance; providerId
       instanceType: {
         label: 'Instance type',
         help: 'Size of each instance (scale up)',
-        options: (def?.instanceTypes ?? []).map((t) => ({
-          value: t.id,
-          label: `${t.id} — ${t.vCpu} vCPU · ${t.memGb} GB · $${t.costUsdPerHour}/h`,
-        })),
+        options: (def?.instanceTypes ?? []).map((t) => {
+          // S12: the board provider's product and price for this size, when it has one.
+          const p = instancePrice(registry.get(providerId, 'provider'), def?.id ?? '', t.id);
+          return {
+            value: t.id,
+            label: p
+              ? `${t.id} — ${p.name} · ${t.vCpu} vCPU · ${t.memGb} GB · $${+p.costUsdPerHour.toFixed(4)}/h`
+              : `${t.id} — ${t.vCpu} vCPU · ${t.memGb} GB · $${t.costUsdPerHour}/h`,
+          };
+        }),
       },
       autoscale: {
         label: 'Autoscale',
@@ -49,7 +56,7 @@ export function NodePanel({ node, providerId }: { node: NodeInstance; providerId
       },
       'autoscale.warmupSec': { label: 'Warm-up', help: 'Time before a new replica takes traffic' },
     }),
-    [def, node.scaling.replicas],
+    [def, node.scaling.replicas, providerId],
   );
 
   if (!def) {
@@ -62,6 +69,7 @@ export function NodePanel({ node, providerId }: { node: NodeInstance; providerId
 
   const settings = (
     <>
+      <ProviderInfo def={def} node={node} providerId={providerId} />
       <Section title="Basic">
         <SchemaForm
           label="Node name"

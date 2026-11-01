@@ -1,5 +1,6 @@
 /** The registry object: lookup by id and filtered listing over discovered entries. */
 import type { ComponentDefinition, ProviderId } from '@/core';
+import { isAvailableOn } from './provider-tools';
 import {
   REGISTRY_KINDS,
   type AnyRegistryEntry,
@@ -35,23 +36,6 @@ export interface Registry {
   list<K extends RegistryKind>(filter: ListFilter<K> & { kind: K }): EntryByKind[K][];
   list(filter?: ListFilter): AnyRegistryEntry[];
   readonly size: number;
-}
-
-/**
- * A component is available on `generic` always; on a cloud provider when it names a product there
- * (`providerNames[provider]`) or declares no `providerNames` at all (provider-neutral, e.g. clients).
- */
-export function isAvailableOn(def: ComponentDefinition, provider: ProviderId): boolean {
-  return (
-    provider === 'generic' ||
-    def.providerNames === undefined ||
-    def.providerNames[provider] !== undefined
-  );
-}
-
-/** Name to show for a component on a board: the provider's product name if any, else the generic name. */
-export function componentDisplayName(def: ComponentDefinition, provider: ProviderId): string {
-  return def.providerNames?.[provider] ?? def.name;
 }
 
 function matches(kind: RegistryKind, entry: AnyRegistryEntry, f: ListFilter): boolean {

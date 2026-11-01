@@ -2,7 +2,7 @@
 
 Analytical simulation: compile → load → route → M/M/c queueing → latency composition → `SimResult` with explain strings. Pure TS, no React, deterministic; runs in a Web Worker (Comlink).
 
-- **Depends on:** `core`, `registry` · **Built in:** S07 (scaling + cost: S09, geo: S10, failures over time: S11)
+- **Depends on:** `core`, `registry` · **Built in:** S07 (scaling + cost: S09, geo: S10, failures over time: S11, provider prices/limits: S12)
 
 ## Public API (index.ts)
 
@@ -10,7 +10,7 @@ Analytical simulation: compile → load → route → M/M/c queueing → latency
 - `simulate(input, registry, options?) → SimResult` — the same run, synchronous. `SimInput = { graph, scenario, providerId? }`; `EngineOptions` / `DEFAULT_ENGINE_OPTIONS` (defaultRpsPerUser 0.1, defaultCacheHitRate 0.8, rhoCap 0.99, maxBranches 32, maxVisits 20 000).
 - Stages: `compile(graph, registry) → Model`; `generateLoad(scenario, flows?) → FlowLoad[]`; `inferFlow(options)` / `INFERRED_FLOW_ID`; `route(loads, model, options) → RoutePlan`; `combineCalls`; `nodeQueueing`.
 - Math: `mmc`, `erlangB`, `erlangC`, `expQuantileFactor`; latency `stageDist`, `fixedDist`, `sumDist`, `mixDist`, `quantile`, `percentiles`, `distMean`. Behaviors: `BEHAVIORS`, `defineBehavior`, type `Behavior`; LB `LB_ALGORITHMS`, `lbAlgorithm`, `targetWeight`. Types: `Model`, `CompiledNode`, `CompiledEdge`, `NodeStats`, `Expr`, `Op`, `Dist`.
-- Scaling (S09): `verticalSpeedup`/`verticalScale` (Amdahl p = 0.9), `scaleSpecOf`, `buildPools`, `capacityForMix`, `poolUtilization`, `consistentHashImbalance`, `servingInstances`, `readersPerShard`, `SCALING_ROLES`/`scalingFields`/`roleValue`, `desiredReplicas`, `steadyStateReplicas`, `autoscaleTimeline` (for S11 ticks). Cost: `nodeCost`, `FALLBACK_PRICING`, `HOURS_PER_MONTH`. Geo (S10): `haversineKm`, `propagationRttMs`, `netBetween`, `MEASURED_RTT_MS`, `diurnalFactor`/`diurnalPeak`/`DIURNAL_CURVE`, `buildGeoModel`, `findCloudRegion`, `userPlace`, `placeOf`, `selectCalls`, `INTER_REGION_PRICE_FACTOR`; `route(…, geo?)`; `FlowLoad.byRegion`; `SimResult.perRegion`.
+- Scaling (S09): `verticalSpeedup`/`verticalScale` (Amdahl p = 0.9), `scaleSpecOf`, `buildPools`, `capacityForMix`, `poolUtilization`, `consistentHashImbalance`, `servingInstances`, `readersPerShard`, `SCALING_ROLES`/`scalingFields`/`roleValue`, `desiredReplicas`, `steadyStateReplicas`, `autoscaleTimeline` (for S11 ticks). Cost: `nodeCost`, `FALLBACK_PRICING`, `HOURS_PER_MONTH`; `Pricing.instance?` / `source?` (S12: the board provider's instance price per size and per-service request/storage prices, from registry `instancePrice` / `servicePricing`). Limits (S12): `exceededLimits`, `providerLimitFindings` → `engine.limits` warnings (config > limit, or λ per node / hottest shard / replica > limit; components with no equivalent on the board's provider). Geo (S10): `haversineKm`, `propagationRttMs`, `netBetween`, `MEASURED_RTT_MS`, `diurnalFactor`/`diurnalPeak`/`DIURNAL_CURVE`, `buildGeoModel`, `findCloudRegion`, `userPlace`, `placeOf`, `selectCalls`, `INTER_REGION_PRICE_FACTOR`; `route(…, geo?)`; `FlowLoad.byRegion`; `SimResult.perRegion`.
 
 ## Model
 
