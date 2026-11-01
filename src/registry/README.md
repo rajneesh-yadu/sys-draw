@@ -18,6 +18,8 @@ Loads, validates and looks up every registry entry (components, protocols, provi
 
 - Security (S16, `security-tools.ts`): zone/exposure/encryption/security-group helpers used by rules, the engine and `security` (see src/security/README.md). 7 security components (`security.*`: WAF, DDoS shield, secrets manager, KMS, IAM, bastion/VPN, auth server) and 8 security rules (`rules/`); `RuleDefinition.fix?` returns a `FixPlan`; `RuleContext.protocols?`. Controls are `control:<id>` tags (API gateway: rate-limit + auth; service mesh: mtls).
 
+- Problems (S17): 10 entries in `problems/<id>/index.ts` (rate limiter, URL shortener, pastebin, notification service, chat, news feed, Instagram, YouTube, Uber, payment system), authored with `problems/kit.ts` (`design()` graph builder, `STACK`, `scenario()`, `company()`; not an entry). Company styles are `company:<id>` tags.
+
 ## Layout
 
 - components/<category>/<name>.ts — one entry per file; id = `<category>.<name>` (`clients` → `client.`)

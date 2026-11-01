@@ -11,6 +11,7 @@ import {
 import { Inspector } from '@/inspector';
 import { MetricsDrawer } from '@/metrics-ui';
 import type { Autosave } from '@/persistence';
+import { ProblemBriefButton, ProblemsButton } from '@/problems';
 import { projectOfBoard, useWorkspaceStore } from '@/store';
 import { useSimulationRunner } from '../simulation/useSimulationRunner';
 import { useTraceRunner } from '../trace/useTraceRunner';
@@ -22,6 +23,7 @@ import {
   ProviderSwitcher,
   SaveStatus,
 } from '../workspace';
+import { useNotice } from '../workspace/notice-context';
 
 /**
  * The app shell: project sidebar, palette, board tabs over the canvas, inspector, metrics drawer.
@@ -29,6 +31,7 @@ import {
  * Metrics drawer, canvas overlays and auto-simulation: S08.
  * `autosave` comes from persistence (main.tsx); without it nothing is saved (tests).
  * `simulate` (default true) keeps the open board simulated (300 ms after each change, or on Run).
+ * S17: "Problems" (browser + start) and, on a problem board, "Brief" in the top bar.
  */
 export function AppShell({
   autosave,
@@ -122,6 +125,7 @@ function TopBar({ autosave }: { autosave?: Autosave | undefined }) {
   const projectName = useWorkspaceStore((s) => projectOfBoard(s.data, s.activeBoardId)?.name);
   const boardName = useWorkspaceStore((s) => s.data.boards[s.activeBoardId]?.name);
   const mode = useWorkspaceStore((s) => s.data.boards[s.activeBoardId]?.mode ?? 'sandbox');
+  const { show } = useNotice();
   return (
     <header
       data-testid="region-topbar"
@@ -131,10 +135,16 @@ function TopBar({ autosave }: { autosave?: Autosave | undefined }) {
       <span className="truncate text-sm text-slate-400" data-testid="board-title">
         {projectName} / <span className="text-slate-600 dark:text-slate-300">{boardName}</span>
       </span>
+      <div className="flex items-center gap-2">
+        <ProblemsButton onNotice={show} />
+        <ProblemBriefButton onNotice={show} />
+      </div>
       <div className="ml-auto flex items-center gap-3 text-xs text-slate-400">
         <ProviderSwitcher />
         {autosave && <SaveStatus autosave={autosave} />}
-        <span className="capitalize">{mode}</span>
+        <span className="capitalize" data-testid="board-mode">
+          {mode}
+        </span>
       </div>
     </header>
   );

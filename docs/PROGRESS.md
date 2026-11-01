@@ -629,3 +629,45 @@ Known gaps / follow-ups:
 - A `.s16tmp/` folder (staging copies and a source tarball) is left at the repo root because deletes are blocked; it is git-ignored and safe to delete, as are `.s10tmp`–`.s15tmp`.
 
 Next suggested session: S17 — Problem library (problems can now ship security expectations: rubric rule ids such as `rule.db-internet-reachable`). Small S16 follow-ups: trace marks zone crossings / TLS termination; S19 merges `reviewSecurity` into findings.
+
+---
+
+## S17 — Practice problems — 2026-11-01
+
+Status: done
+Changed: src/registry/problems/{kit.ts, problems.test.ts} (new), src/registry/problems/{rate-limiter, url-shortener, pastebin, notification-service, chat, news-feed, instagram, youtube, uber, payment-system}/index.ts (new), src/registry/{registry.test.ts (registry size 83 → 93), README.md}; src/problems/{library.ts, Dialog.tsx, ProblemDetails.tsx, ProblemBrowser.tsx, ProblemBrief.tsx, useActiveProblem.ts, library.test.ts, ProblemBrowser.test.tsx} (new), src/problems/{index.ts, README.md}; src/app/problems/references.test.ts (new), src/app/layout/AppShell.tsx (top-bar buttons); e2e/problems.spec.ts (new); docs/PROGRESS.md
+
+**Public APIs — additive only; no other module's API changed, no saved-format change, no migration** (boards already had `mode` and `problemId`; problems are created through the existing `workspaceStore.importBoards`, references loaded with the existing `batch` / `replaceGraph` / `updateScenario` commands):
+
+- `problems` (new content): see src/problems/README.md — `listProblems`, `findProblem`, `filterProblems`, `matchesFilter`, `problemFacets`, `companyStyles`, `topicTags`, `companyLabel`, `LEVEL_LABELS`, format helpers, `presetPeakRps`, `rubricLines`, `modeOptions`, `START_LABELS`, `hintsAllowed`, `blankScenario`, `problemBoard`, `startProblem`, `referenceCommand`, `loadReferenceSolution`; UI `ProblemsButton`, `ProblemBriefButton`, `ProblemBrowser`, `ProblemBrief`, `ProblemDetails`, `useActiveProblem`; types `Problem`, `ProblemFilter`, `ProblemFacets`, `ModeId`, `ModeOption`, `StartFrom`, `StartOptions`, `ProblemBoardPlan`, `ProblemNotice`.
+- `registry`: 10 problem entries; `problems/kit.ts` authoring helpers (internal to the registry folder, not exported from index.ts).
+
+Tests: 96 added (842 total), all passing; `tsc -b`, `pnpm lint`, prettier green; `pnpm build` green with the pre-existing chunk-size warning. e2e: 14/14 pass (new `problems.spec.ts`).
+
+Done-when — **F3 ("10 problems ship; each has requirements, scale numbers, hints and at least one reference design that loads onto a board")**:
+
+- `app/problems/references.test.ts`, per problem: requirements, scale, hints present; "Start problem" with the reference creates a board that passes `BoardSchema` with `problemId`; every reference edge passes `checkConnection` + `checkProtocolStack`; simulating the preset gives every node utilisation < 0.85, flow error < 0.1 %, and **every rubric SLO holds**; the rubric's review rules (security rules) report nothing on the reference.
+- `registry/problems/problems.test.ts`: the 10 ids, levels 1–5, component/instance-type/config validity (configs parsed with each component's schema — caught 4 real typos), flow paths visit reference nodes, shares sum to 1, rubric rule/flow ids resolve.
+- e2e (production build): Problems → company "Meta" + level 4 → Instagram → Guided → new board "Instagram · Guided", mode `guided`, empty canvas; Brief → first hint → Load reference → 11 nodes incl. "Feed cache (Redis)"; Undo clears it in one step; Uber in Interview → hints hidden.
+
+Reference results on the presets (peak, generic provider, us-east): rate limiter 6k rps p99 166 ms; URL shortener 30.6k rps p99 156 ms; pastebin 6.8k rps read p99 232 ms; notifications 12.8k rps send p99 201 ms; chat 90k rps send p99 199 ms; news feed 200k rps timeline p99 144 ms; Instagram 780k rps feed p99 158 ms; YouTube 666k rps segments p99 167 ms; Uber 338k rps request p99 187 ms; payments 10.5k rps status p99 140 ms. SLO targets were set from these with margin, and requirement texts quote the same numbers.
+
+Notes (decisions):
+
+- **Company style = `company:<id>` tags** (the core `ProblemDefinition` is strict and has no such field; tags keep it data-only). Topic filter excludes them; labels in `COMPANY_NAMES` (fallback: capitalised id).
+- **Modes offered when starting:** Guided, Interview, Sandbox, Debug, Chaos (Learn is for lessons). Starts: blank (default for Guided/Interview/Sandbox), reference (default for Chaos), debug variant (Debug only). Interview is blank-only and hides hints + reference in the brief. Debug is disabled with a reason because no problem ships `debugVariants` yet. The mode is only stored on the board; mode controllers are S18.
+- **Blank start keeps the scenario but clears flow paths** (`blankScenario`): a board must not reference nodes it lacks (`BoardSchema` refinement), and an empty path makes the engine follow the user's graph from the clients. Consequence: on a blank board every flow is routed as reads until the user sets paths. Node/edge/group-targeted chaos events would be dropped (presets have none).
+- **New boards are `generic`** (references use generic component and region ids); the provider switcher maps them. Boards go into the active project; names are made unique ("Rate limiter · Guided 2").
+- **Reference flows use explicit paths** (realistic write paths, async after queues/streams); a path hop with no edge between consecutive nodes (e.g. Redis → backend API) adds network latency by place but has no edge metrics. Cache steps that continue past their backing store are `cacheable: false` (a hit would end the path).
+- Rubric rule ids can only be the 8 S16 security rules (the only registry rules); engine findings (SPOF etc.) are not registry rules yet.
+
+Known gaps / follow-ups:
+
+- **No `debugVariants`** — S18 Debug mode needs broken graphs (e.g. remove the URL cache, single DB without replicas, plaintext DB edge) with `fixedWhenRulesPass`.
+- **No scoring yet:** the rubric is shown ("How it is judged") and checked in tests; S19's evaluator should score boards with the same SLO lookup used in `references.test.ts` (consider moving `sloValue` there) and `reviewSecurity`.
+- Every reference is single-region us-east except payments (us-west standby); `rule.single-region-data` warns on the others (not in their rubrics). Instagram/YouTube monthly cost is $15M / $43M, almost all CDN/internet egress at 150 kB / 500 kB per response — honest at that scale but the payload is one value per scenario, so small API responses are over-counted. Per-flow payloads would fix it.
+- `messaging.kafka` cannot feed `compute.app-server` (no shared consumer protocol), so references use the generic event stream (`messaging.stream`, labelled "Kafka"). Postgres has no out port, so the payments standby is written by the reconciliation consumers rather than a DB → DB replication edge.
+- Progress per problem (scores, attempts, time — MODES.md) is not stored yet. DATA-MODEL.md could mention `company:` tags.
+- Tests, build and e2e ran on a Linux copy (macOS-native `node_modules`); e2e used a local Playwright config pointing at the sandbox's Chromium (not committed). No new dependencies. A `.s17tmp/` folder (source tarball) is left at the repo root because deletes are blocked; git-ignored and safe to delete, as are `.s10tmp`–`.s16tmp`.
+
+Next suggested session: S18 — Modes (ModeController per mode; Guided steps and Interview timer driven by the problem entry; add `debugVariants` to a few problems for Debug mode).

@@ -73,7 +73,7 @@ const S16_RULES = [
 describe('seeded registry', () => {
   const all = registry.list();
 
-  it('loads the 14 generic + 15 S13 + 7 S16 security + 2 provider-only components, 33 protocols, 4 providers and 8 rules', () => {
+  it('loads the 14 generic + 15 S13 + 7 S16 security + 2 provider-only components, 33 protocols, 4 providers, 8 rules and 10 problems', () => {
     expect(
       registry
         .list({ kind: 'component' })
@@ -105,7 +105,8 @@ describe('seeded registry', () => {
       'gcp',
       'generic',
     ]);
-    expect(registry.size).toBe(83);
+    expect(registry.list({ kind: 'problem' })).toHaveLength(10); // S17
+    expect(registry.size).toBe(93);
   });
 
   it('has unique ids across all kinds', () => {
