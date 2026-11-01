@@ -97,7 +97,7 @@ export function SchemaForm({
         {sections.includes('basic') && model.basic.map((f) => <Field key={f.key} field={f} />)}
         {sections.includes('advanced') && model.advanced.length > 0 && (
           <details className="group rounded border border-slate-200 dark:border-slate-700">
-            <summary className="cursor-pointer px-2 py-1.5 text-xs font-semibold tracking-wide text-slate-500 uppercase select-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none">
+            <summary className="cursor-pointer px-2 py-1.5 text-xs font-semibold tracking-wide text-slate-500 dark:text-slate-400 uppercase select-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none">
               Advanced ({model.advanced.length})
             </summary>
             <div className="space-y-3 px-2 pt-1 pb-2">
@@ -167,7 +167,7 @@ export function Field({ field }: { field: FieldModel }) {
       return <RecordField field={field} />;
     case 'unsupported':
       return (
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           {field.label}: not editable here yet ({field.typeName}).
         </p>
       );
@@ -189,8 +189,12 @@ function FieldLabel({
       className="mb-0.5 block text-xs font-medium text-slate-700 dark:text-slate-300"
     >
       {field.label}
-      {unit !== undefined && <span className="ml-1 font-normal text-slate-400">({unit})</span>}
-      {field.optional && <span className="ml-1 font-normal text-slate-400">optional</span>}
+      {unit !== undefined && (
+        <span className="ml-1 font-normal text-slate-500 dark:text-slate-400">({unit})</span>
+      )}
+      {field.optional && (
+        <span className="ml-1 font-normal text-slate-500 dark:text-slate-400">optional</span>
+      )}
     </label>
   );
 }
@@ -425,7 +429,8 @@ function ArrayField({ field }: { field: Extract<FieldModel, { kind: 'array' }> }
   return (
     <fieldset className="rounded border border-slate-200 px-2 pt-1 pb-2 dark:border-slate-700">
       <legend className="px-1 text-xs font-medium text-slate-700 dark:text-slate-300">
-        {field.label} <span className="font-normal text-slate-400">({items.length})</span>
+        {field.label}{' '}
+        <span className="font-normal text-slate-500 dark:text-slate-400">({items.length})</span>
       </legend>
       <Help field={field} id={helpId} />
       <ul className="space-y-2">

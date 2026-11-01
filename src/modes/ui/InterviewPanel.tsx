@@ -28,7 +28,7 @@ export function InterviewPanel({
   return (
     <div className="space-y-3" data-testid="interview-panel">
       <div className="flex items-center gap-2">
-        <Clock className="h-4 w-4 text-slate-500" aria-hidden />
+        <Clock className="h-4 w-4 text-slate-500 dark:text-slate-400" aria-hidden />
         <span
           className={`font-mono text-2xl tabular-nums ${left < 5 * 60_000 && !state.finished ? 'text-red-600' : ''}`}
           data-testid="interview-clock"
@@ -36,7 +36,7 @@ export function InterviewPanel({
         >
           {formatClock(left)}
         </span>
-        <span className="text-xs text-slate-500">left</span>
+        <span className="text-xs text-slate-500 dark:text-slate-400">left</span>
         {!state.finished && state.startedAtMs !== undefined && (
           <button
             type="button"
@@ -48,7 +48,7 @@ export function InterviewPanel({
         )}
       </div>
       {!state.finished && (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           Hints and the reference stay hidden until you finish. The interviewer asks follow-ups as
           the clock runs.
         </p>
@@ -57,7 +57,7 @@ export function InterviewPanel({
       <section aria-label="Interviewer" className="space-y-1">
         <h3 className={sectionTitle}>Interviewer</h3>
         {asked.length === 0 ? (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             First question at {INTERVIEW_PROMPTS[0]?.atMin} min.
           </p>
         ) : (
@@ -69,7 +69,7 @@ export function InterviewPanel({
               >
                 <MessageSquare className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
                 <span>
-                  <span className="text-slate-500">{p.atMin}:00 · </span>
+                  <span className="text-slate-500 dark:text-slate-400">{p.atMin}:00 · </span>
                   {p.text}
                 </span>
               </li>
@@ -119,9 +119,9 @@ function ScorecardView({
         <span className="text-2xl tabular-nums" data-testid="score-total">
           {card.total}
         </span>
-        <span className="text-xs font-normal text-slate-500">/ 100</span>
+        <span className="text-xs font-normal text-slate-500 dark:text-slate-400">/ 100</span>
       </h3>
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-slate-500 dark:text-slate-400">
         {card.endedBy === 'timer' ? 'Time is up' : 'Finished'} after{' '}
         {formatDuration(card.elapsedMs)}.
       </p>
@@ -136,7 +136,9 @@ function ScorecardView({
           }))}
         />
       ) : (
-        <p className="text-xs text-slate-500">No problem rubric on this board.</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          No problem rubric on this board.
+        </p>
       )}
       <h4 className={sectionTitle}>Cost (weight 15 %)</h4>
       <p className="text-xs" data-testid="score-cost">

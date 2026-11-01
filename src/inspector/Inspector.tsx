@@ -11,7 +11,7 @@ export function Inspector() {
 
   if (selection.length > 1) {
     return (
-      <p className="p-3 text-sm text-slate-500">
+      <p className="p-3 text-sm text-slate-500 dark:text-slate-400">
         {selection.length} items selected. Select one to configure it.
       </p>
     );

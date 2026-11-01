@@ -10,7 +10,7 @@ export function ModeSwitcher() {
   const list = modes.list();
   const current = list.find((m) => m.id === mode);
   return (
-    <label className="flex items-center gap-1.5 text-xs text-slate-500">
+    <label className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
       Mode
       <select
         data-testid="board-mode"

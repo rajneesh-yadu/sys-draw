@@ -121,7 +121,7 @@ export function UsersMap({
             );
           })}
       </svg>
-      <p className="text-[11px] text-slate-500">
+      <p className="text-[11px] text-slate-500 dark:text-slate-400">
         Concurrent users at each region’s local peak. Total {total.toLocaleString('en-US')}.
         {placed.length === 0 && ' Put servers in a Region group to simulate distance.'}
       </p>
@@ -191,7 +191,7 @@ function UserRowInput({
           {row.name}
           {!row.known && <span className="text-amber-700 dark:text-amber-300"> (unknown)</span>}
         </label>
-        <span className="w-9 text-right text-[10px] text-slate-500 tabular-nums">
+        <span className="w-9 text-right text-[10px] text-slate-500 dark:text-slate-400 tabular-nums">
           {row.users > 0 ? `${Math.round(row.share * 100)}%` : ''}
         </span>
         <input

@@ -4,11 +4,11 @@ Composition root: app shell layout, routing, theme, keyboard shortcuts.
 
 - **Depends on:** any module (composition root)
 - **Rules:** Wires modules together; contains no domain logic.
-- **Built in:** session S01 (canvas wired in S04, workspace UI + saving S06, simulation + metrics S08, provider switcher S12)
+- **Built in:** session S01 (canvas wired in S04, workspace UI + saving S06, simulation + metrics S08, provider switcher S12, UX polish S21)
 
 ## Public API (index.ts)
 
-- `AppShell({ autosave?, simulate? })` — project sidebar, palette, board tabs + canvas, inspector, metrics drawer; save status + Ctrl/Cmd+S when `autosave` is given; `simulate` (default true) keeps the open board simulated.
+- `AppShell({ autosave?, simulate?, uiStore? })` — project sidebar, palette, board tabs + canvas, inspector, metrics drawer; save status + Ctrl/Cmd+S when `autosave` is given; `simulate` (default true) keeps the open board simulated; `uiStore` (tests) = S21 UI prefs.
 
 ## Layout
 
@@ -20,7 +20,10 @@ Composition root: app shell layout, routing, theme, keyboard shortcuts.
 - estimator/ — S20: `EstimatorTopBarButton` (estimator `EstimatorButton` fed the open board's scenario; push = `pushEstimateToBoard` → one `updateScenario` undo step + a notice); mounted in the top bar
 - simulation/ — `startSimulationRunner` (engine ↔ store: debounced 300 ms on graph/scenario/provider change, immediate on board switch or Run, stale runs dropped) + `useSimulationRunner`
 - index.css — Tailwind entry + global styles
-- layout/ — AppShell (top bar, palette, canvas, inspector, metrics drawer)
+- layout/ — AppShell (top bar, palette, canvas, inspector, metrics drawer); S21: `ErrorBoundary` around every region (reset on board switch), Projects/Palette collapse into a left rail (Ctrl/⌘+B)
+- ui/ — S21: `createUiStore` (localStorage `sysdraw.ui`, schemaVersion 1: theme, collapsed panels, metrics size; palette/sheet open state), theme (`dark` class on <html>, set pre-paint in index.html)
+- commands/ — S21: `buildCommands` (data: actions + one "Add <component>" per registry entry + "Go to <board>") → `CommandPalette` (Ctrl/⌘+K, `rankCommands`); `shortcutSheet()` + `ShortcutSheet` ("?"); `appShortcutFor`
+- perf/ — S21: 300-node fixture (`perfFixtureCommand`, `loadPerfFixture`; `?fixture=perf-300`)
 
 ## Extension points
 

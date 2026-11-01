@@ -15,7 +15,7 @@ export function ScaleActions({ def, node }: { def: EntryByKind['component']; nod
 
   return (
     <div className="space-y-2" role="group" aria-label="Scale quick actions">
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-slate-500 dark:text-slate-400">
         {node.scaling.autoscale ? 'Autoscaling' : `${node.scaling.replicas} ×`}{' '}
         {type
           ? `${type.id} · ${type.vCpu} vCPU · ${type.memGb} GB · $${type.costUsdPerHour}/h each`

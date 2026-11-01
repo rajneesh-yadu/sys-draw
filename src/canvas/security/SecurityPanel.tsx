@@ -38,7 +38,7 @@ export function SecurityPanel() {
       <header className="flex items-center gap-2 border-b border-slate-200 px-3 py-2 dark:border-slate-800">
         <ShieldAlert aria-hidden className="h-4 w-4 text-red-600" />
         <h2 className="font-semibold">Security review</h2>
-        <span className="text-xs text-slate-500" data-testid="security-counts">
+        <span className="text-xs text-slate-500 dark:text-slate-400" data-testid="security-counts">
           {SEVERITY_ORDER.filter((s) => counts[s] > 0)
             .map((s) => `${counts[s]} ${s}`)
             .join(' · ') || 'no findings'}
@@ -63,7 +63,7 @@ export function SecurityPanel() {
           </p>
         )}
         {findings.length === 0 ? (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             No threats found. Put components in zoned groups (subnet → Security → zone) to check
             exposure and security-group rules.
           </p>

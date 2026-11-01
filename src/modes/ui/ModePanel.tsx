@@ -62,12 +62,12 @@ export function ModePanel({ onNotice }: { onNotice?: (n: ModeNotice) => void } =
         <h2 className="flex items-center gap-1.5 font-semibold">
           <Target className="h-4 w-4 text-indigo-600" aria-hidden /> {c.label} mode
           {ctx.problem && c.id !== 'learn' && (
-            <span className="truncate text-xs font-normal text-slate-500">
+            <span className="truncate text-xs font-normal text-slate-500 dark:text-slate-400">
               · {ctx.problem.title}
             </span>
           )}
         </h2>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           <span className="font-medium">Help:</span> {c.help}.{' '}
           <span className="font-medium">Success:</span> {c.success}.
         </p>

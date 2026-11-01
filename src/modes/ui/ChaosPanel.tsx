@@ -51,7 +51,7 @@ export function ChaosPanel({
             </button>
           ))}
         </div>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           {v.events} failure{v.events === 1 ? '' : 's'} scheduled. Edit or remove them in the
           Metrics drawer’s Failures tab; replay the timeline there.
         </p>
@@ -99,7 +99,8 @@ export function ChaosPanel({
           >
             {v.markers.slice(0, 8).map((m, k) => (
               <li key={`${m.tSec}-${k}`}>
-                <span className="tabular-nums text-slate-500">{m.tSec}s</span> · {m.label}
+                <span className="tabular-nums text-slate-500 dark:text-slate-400">{m.tSec}s</span> ·{' '}
+                {m.label}
               </li>
             ))}
           </ul>

@@ -4,7 +4,9 @@ import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'rea
 export function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="space-y-2">
-      <h3 className="text-xs font-semibold tracking-wide text-slate-500 uppercase">{title}</h3>
+      <h3 className="text-xs font-semibold tracking-wide text-slate-500 dark:text-slate-400 uppercase">
+        {title}
+      </h3>
       {children}
     </section>
   );
@@ -14,7 +16,9 @@ export function PanelTitle({ title, subtitle }: { title: string; subtitle?: stri
   return (
     <div className="mb-3">
       <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</p>
-      {subtitle !== undefined && <p className="text-xs text-slate-500">{subtitle}</p>}
+      {subtitle !== undefined && (
+        <p className="text-xs text-slate-500 dark:text-slate-400">{subtitle}</p>
+      )}
     </div>
   );
 }
@@ -55,7 +59,7 @@ export function Tabs({ tabs }: { tabs: { id: string; label: string; content: Rea
               className={`-mb-px border-b-2 px-3 py-1.5 text-xs font-medium focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none ${
                 selected
                   ? 'border-sky-600 text-sky-700 dark:text-sky-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
               }`}
             >
               {t.label}

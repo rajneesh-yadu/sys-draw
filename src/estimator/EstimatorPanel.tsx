@@ -69,7 +69,7 @@ function Field({
       {(error || hint) && (
         <span
           id={msgId}
-          className={`text-[11px] ${error ? 'text-red-600 dark:text-red-400' : 'text-slate-400'}`}
+          className={`text-[11px] ${error ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`}
         >
           {error ?? hint}
         </span>
@@ -117,7 +117,7 @@ export function EstimateResults({ result }: { result: Estimate }) {
     <div className="flex flex-col gap-3" data-testid="estimate-results">
       {SECTIONS.map((section) => (
         <section key={section} aria-label={ESTIMATE_SECTION_LABEL[section]}>
-          <h3 className="mb-1 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+          <h3 className="mb-1 text-xs font-semibold tracking-wide text-slate-500 dark:text-slate-400 uppercase">
             {ESTIMATE_SECTION_LABEL[section]}
           </h3>
           <dl className="flex flex-col divide-y divide-slate-100 rounded border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
@@ -134,9 +134,15 @@ export function EstimateResults({ result }: { result: Estimate }) {
                       {l.display}
                     </dd>
                   </div>
-                  <dd className="font-mono text-[11px] text-slate-500">{l.formula}</dd>
-                  <dd className="font-mono text-[11px] text-slate-500">= {l.substituted}</dd>
-                  {l.note && <dd className="text-[11px] text-slate-400">{l.note}</dd>}
+                  <dd className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                    {l.formula}
+                  </dd>
+                  <dd className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                    = {l.substituted}
+                  </dd>
+                  {l.note && (
+                    <dd className="text-[11px] text-slate-500 dark:text-slate-400">{l.note}</dd>
+                  )}
                 </div>
               ))}
           </dl>
@@ -318,7 +324,7 @@ export function EstimatorPanel({
               </button>
               {push ? (
                 <ul
-                  className="list-disc pl-4 text-[11px] text-slate-500"
+                  className="list-disc pl-4 text-[11px] text-slate-500 dark:text-slate-400"
                   aria-label="What the push changes"
                 >
                   <li>
@@ -330,7 +336,7 @@ export function EstimatorPanel({
                   ))}
                 </ul>
               ) : (
-                <span className="text-[11px] text-slate-400">
+                <span className="text-[11px] text-slate-500 dark:text-slate-400">
                   {scenario ? 'Fix the inputs to push.' : 'Open a board to push.'}
                 </span>
               )}

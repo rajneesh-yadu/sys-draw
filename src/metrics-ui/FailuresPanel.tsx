@@ -65,7 +65,7 @@ export function FailuresPanel() {
       data-testid="failures-panel"
       className="space-y-3 border-t border-slate-100 p-3 dark:border-slate-800"
     >
-      <h3 className="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
+      <h3 className="text-[10px] font-semibold tracking-wide text-slate-500 dark:text-slate-400 uppercase">
         Failures over time
       </h3>
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)] gap-4">
@@ -73,7 +73,7 @@ export function FailuresPanel() {
         {result?.timeline && result.timeline.length > 0 ? (
           <Timeline result={result} timeline={result.timeline} />
         ) : (
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             Add a chaos event to replay the run second by second: outages, spikes and slowdowns, how
             health checks, retries, circuit breakers and autoscaling react, and when the system
             recovers.
@@ -145,14 +145,14 @@ function ChaosEditor({ events, graph }: { events: readonly ChaosEvent[]; graph: 
   return (
     <div className="space-y-2">
       {events.length === 0 ? (
-        <p className="text-xs text-slate-400">No chaos events yet.</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">No chaos events yet.</p>
       ) : (
         <ul className="space-y-0.5" data-testid="chaos-events">
           {events.map((ev) => (
             <li key={ev.id} className="flex items-center gap-2 text-xs">
               <span className="min-w-0 flex-1 truncate" title={CHAOS_KIND_META[ev.kind].help}>
                 <span className="font-medium">{chaosEventLabel(ev, graph)}</span>{' '}
-                <span className="text-slate-500">{chaosWhen(ev)}</span>
+                <span className="text-slate-500 dark:text-slate-400">{chaosWhen(ev)}</span>
               </span>
               <button
                 type="button"
@@ -183,7 +183,7 @@ function ChaosEditor({ events, graph }: { events: readonly ChaosEvent[]; graph: 
             add();
           }}
         >
-          <label className="col-span-2 text-[10px] text-slate-500">
+          <label className="col-span-2 text-[10px] text-slate-500 dark:text-slate-400">
             Event
             <select
               className={input}
@@ -200,11 +200,14 @@ function ChaosEditor({ events, graph }: { events: readonly ChaosEvent[]; graph: 
               ))}
             </select>
           </label>
-          <p id={`${id}-help`} className="col-span-2 text-[10px] text-slate-500">
+          <p
+            id={`${id}-help`}
+            className="col-span-2 text-[10px] text-slate-500 dark:text-slate-400"
+          >
             {meta.help}
           </p>
           {meta.target !== 'none' && (
-            <label className="col-span-2 text-[10px] text-slate-500">
+            <label className="col-span-2 text-[10px] text-slate-500 dark:text-slate-400">
               {meta.target === 'region-pair' ? 'Region A' : 'Target'}
               <select
                 className={input}
@@ -222,7 +225,7 @@ function ChaosEditor({ events, graph }: { events: readonly ChaosEvent[]; graph: 
             </label>
           )}
           {meta.target === 'region-pair' && (
-            <label className="col-span-2 text-[10px] text-slate-500">
+            <label className="col-span-2 text-[10px] text-slate-500 dark:text-slate-400">
               Region B
               <select
                 className={input}
@@ -238,7 +241,7 @@ function ChaosEditor({ events, graph }: { events: readonly ChaosEvent[]; graph: 
               </select>
             </label>
           )}
-          <label className="text-[10px] text-slate-500">
+          <label className="text-[10px] text-slate-500 dark:text-slate-400">
             Starts at (s)
             <input
               className={input}
@@ -248,7 +251,7 @@ function ChaosEditor({ events, graph }: { events: readonly ChaosEvent[]; graph: 
               onChange={(e) => setDraft({ ...draft, atSec: e.target.value })}
             />
           </label>
-          <label className="text-[10px] text-slate-500">
+          <label className="text-[10px] text-slate-500 dark:text-slate-400">
             Lasts (s, empty = to the end)
             <input
               className={input}
@@ -259,7 +262,7 @@ function ChaosEditor({ events, graph }: { events: readonly ChaosEvent[]; graph: 
             />
           </label>
           {meta.params.map((p) => (
-            <label key={p.key} className="text-[10px] text-slate-500">
+            <label key={p.key} className="text-[10px] text-slate-500 dark:text-slate-400">
               {p.label}
               {p.optional ? ' (optional)' : ''}
               <input
@@ -331,7 +334,7 @@ function Timeline({ result, timeline }: { result: SimResult; timeline: readonly 
   const minAvail = Math.min(...timeline.map((p) => p.availability));
 
   const chart = (key: 'availability' | 'p99', title: string, fmt: (v: number) => string) => (
-    <figure aria-label={title} className="text-slate-500">
+    <figure aria-label={title} className="text-slate-500 dark:text-slate-400">
       <figcaption className="text-[10px] font-medium text-slate-600 dark:text-slate-300">
         {title}
       </figcaption>
@@ -423,7 +426,9 @@ function Timeline({ result, timeline }: { result: SimResult; timeline: readonly 
                 className="w-full rounded px-1 text-left hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none dark:hover:bg-slate-800"
                 onClick={() => sim.getState().setTick(indexOfT(m.tSec))}
               >
-                <span className="inline-block w-12 tabular-nums text-slate-500">{m.tSec} s</span>
+                <span className="inline-block w-12 tabular-nums text-slate-500 dark:text-slate-400">
+                  {m.tSec} s
+                </span>
                 {m.label}
               </button>
             </li>
@@ -431,7 +436,9 @@ function Timeline({ result, timeline }: { result: SimResult; timeline: readonly 
         </ol>
       )}
       <details className="text-xs">
-        <summary className="cursor-pointer text-slate-500">Show as table</summary>
+        <summary className="cursor-pointer text-slate-500 dark:text-slate-400">
+          Show as table
+        </summary>
         <TimelineTable timeline={timeline} />
       </details>
     </div>
@@ -500,14 +507,14 @@ function Scrubber({ timeline }: { timeline: readonly TimePoint[] }) {
             </span>{' '}
             · p99 {formatMs(p.p99Ms)}
             {active.length > 0 && (
-              <span className="text-slate-500">
+              <span className="text-slate-500 dark:text-slate-400">
                 {' '}
                 · {active.map((e) => chaosEventLabel(e, graph)).join(', ')}
               </span>
             )}
           </>
         ) : (
-          <span className="text-slate-500">
+          <span className="text-slate-500 dark:text-slate-400">
             Canvas shows the steady state. Drag the slider or press Play to replay the run.
           </span>
         )}
@@ -521,7 +528,7 @@ function TimelineTable({ timeline }: { timeline: readonly TimePoint[] }) {
     <table className="mt-1 w-full text-xs tabular-nums">
       <caption className="sr-only">Availability and latency per second</caption>
       <thead>
-        <tr className="text-left text-[10px] tracking-wide text-slate-500 uppercase">
+        <tr className="text-left text-[10px] tracking-wide text-slate-500 dark:text-slate-400 uppercase">
           <th scope="col">t</th>
           <th scope="col" className="text-right">
             rps

@@ -66,7 +66,7 @@ export function ProblemBrowser({
               className={selectClass}
             />
             <div className="grid grid-cols-3 gap-2">
-              <label className="text-[11px] text-slate-500">
+              <label className="text-[11px] text-slate-500 dark:text-slate-400">
                 Level
                 <select
                   className={selectClass}
@@ -83,7 +83,7 @@ export function ProblemBrowser({
                   ))}
                 </select>
               </label>
-              <label className="text-[11px] text-slate-500">
+              <label className="text-[11px] text-slate-500 dark:text-slate-400">
                 Tag
                 <select
                   className={selectClass}
@@ -98,7 +98,7 @@ export function ProblemBrowser({
                   ))}
                 </select>
               </label>
-              <label className="text-[11px] text-slate-500">
+              <label className="text-[11px] text-slate-500 dark:text-slate-400">
                 Company style
                 <select
                   className={selectClass}
@@ -115,7 +115,7 @@ export function ProblemBrowser({
               </label>
             </div>
             <p
-              className="text-[11px] text-slate-500"
+              className="text-[11px] text-slate-500 dark:text-slate-400"
               aria-live="polite"
               data-testid="problem-count"
             >
@@ -138,12 +138,16 @@ export function ProblemBrowser({
                       <LevelBadge level={p.level} />
                     </span>
                   </div>
-                  <p className="line-clamp-2 text-xs text-slate-500">{p.docs.summary}</p>
+                  <p className="line-clamp-2 text-xs text-slate-500 dark:text-slate-400">
+                    {p.docs.summary}
+                  </p>
                 </button>
               </li>
             ))}
             {shown.length === 0 && (
-              <li className="p-3 text-xs text-slate-500">No problem matches these filters.</li>
+              <li className="p-3 text-xs text-slate-500 dark:text-slate-400">
+                No problem matches these filters.
+              </li>
             )}
           </ul>
         </div>
@@ -167,7 +171,7 @@ export function ProblemBrowser({
               }}
             />
           ) : (
-            <p className="text-sm text-slate-500">Choose a problem.</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Choose a problem.</p>
           )}
         </div>
       </div>
@@ -193,7 +197,7 @@ function ProblemPane({
     <div className="space-y-4" data-testid="problem-pane">
       <div className="space-y-1">
         <div className="flex items-center gap-2">
-          <BookOpen size={16} aria-hidden className="text-slate-400" />
+          <BookOpen size={16} aria-hidden className="text-slate-500 dark:text-slate-400" />
           <h3 className="text-base font-semibold">{problem.title}</h3>
           <LevelBadge level={problem.level} />
         </div>
@@ -209,13 +213,13 @@ function ProblemPane({
         }}
       >
         <fieldset className="space-y-1">
-          <legend className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+          <legend className="text-xs font-semibold tracking-wide text-slate-500 dark:text-slate-400 uppercase">
             Mode
           </legend>
           {modes.map((m) => (
             <label
               key={m.id}
-              className={`flex items-start gap-2 text-xs ${m.disabledReason ? 'text-slate-400' : ''}`}
+              className={`flex items-start gap-2 text-xs ${m.disabledReason ? 'text-slate-500 dark:text-slate-400' : ''}`}
             >
               <input
                 type="radio"
@@ -237,7 +241,9 @@ function ProblemPane({
           ))}
         </fieldset>
         <label className="block text-xs">
-          <span className="font-semibold tracking-wide text-slate-500 uppercase">Start from</span>
+          <span className="font-semibold tracking-wide text-slate-500 dark:text-slate-400 uppercase">
+            Start from
+          </span>
           <select
             className={selectClass}
             value={effectiveStart}
@@ -251,7 +257,7 @@ function ProblemPane({
             ))}
           </select>
         </label>
-        <p className="text-[11px] text-slate-500">
+        <p className="text-[11px] text-slate-500 dark:text-slate-400">
           The new board gets this problem’s traffic scenario
           {effectiveStart === 'blank' ? ' (flows follow your design from the clients)' : ''}. It is
           added to the current project.

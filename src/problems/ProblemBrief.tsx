@@ -50,7 +50,9 @@ export function ProblemBrief({
       title={
         <span className="flex items-center gap-2">
           {problem.title} <LevelBadge level={problem.level} />
-          <span className="text-xs font-normal text-slate-500">{modeLabel} mode</span>
+          <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
+            {modeLabel} mode
+          </span>
         </span>
       }
       onClose={onClose}
@@ -61,11 +63,11 @@ export function ProblemBrief({
         <ProblemDetails problem={problem} />
 
         <section className="space-y-2" aria-label="Hints">
-          <h3 className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+          <h3 className="text-xs font-semibold tracking-wide text-slate-500 dark:text-slate-400 uppercase">
             Hints ({problem.hints.length})
           </h3>
           {!allowed ? (
-            <p className="text-xs text-slate-500" data-testid="hints-hidden">
+            <p className="text-xs text-slate-500 dark:text-slate-400" data-testid="hints-hidden">
               Hints and the reference solution are hidden in Interview mode.
             </p>
           ) : (
@@ -91,7 +93,7 @@ export function ProblemBrief({
 
         {allowed && (
           <section className="space-y-2 border-t border-slate-200 pt-3 dark:border-slate-800">
-            <h3 className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+            <h3 className="text-xs font-semibold tracking-wide text-slate-500 dark:text-slate-400 uppercase">
               Reference solution
             </h3>
             {confirming ? (

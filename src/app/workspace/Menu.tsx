@@ -1,6 +1,7 @@
 /** A small accessible popover menu: ⋯ button, arrow-key navigation, Escape/outside click closes. */
 import { MoreHorizontal } from 'lucide-react';
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useEffectEvent, useId, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 export interface MenuItem {
   label: string;
@@ -11,16 +12,32 @@ export interface MenuItem {
   confirm?: string;
 }
 
+/**
+ * `owner` (S21): the menu belongs to another control (a board tab) that opens it itself, via
+ * `open`/`onOpenChange`. The ⋯ is then a pointer-only affordance (not a second focusable button;
+ * a tablist may contain only tabs), and focus returns to `owner()` on close.
+ */
 export function Menu({
   label,
   items,
   className = '',
+  open: controlledOpen,
+  onOpenChange,
+  owner,
 }: {
   label: string;
   items: MenuItem[];
   className?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  owner?: () => HTMLElement | null;
 }) {
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = controlledOpen ?? ownOpen;
+  const setOpen = (o: boolean) => {
+    if (controlledOpen === undefined) setOwnOpen(o);
+    onOpenChange?.(o);
+  };
   const [confirming, setConfirming] = useState<MenuItem | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -29,16 +46,22 @@ export function Menu({
   const close = (focusButton = true) => {
     setOpen(false);
     setConfirming(null);
-    if (focusButton) button.current?.focus();
+    if (focusButton) (owner?.() ?? button.current)?.focus();
   };
 
+  // Outside click closes (latest `close`, without re-subscribing on every render).
+  const popup = useRef<HTMLDivElement>(null);
+  const onOutside = useEffectEvent((e: PointerEvent) => {
+    const t = e.target as Node;
+    if (!root.current?.contains(t) && !popup.current?.contains(t)) close(false);
+  });
   useEffect(() => {
     if (!open) return;
-    const onDown = (e: PointerEvent) => {
-      if (!root.current?.contains(e.target as Node)) close(false);
-    };
+    const onDown = (e: PointerEvent) => onOutside(e);
     document.addEventListener('pointerdown', onDown);
-    root.current?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled])')?.focus();
+    (popup.current ?? root.current)
+      ?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled])')
+      ?.focus();
     return () => document.removeEventListener('pointerdown', onDown);
   }, [open, confirming]);
 
@@ -51,7 +74,9 @@ export function Menu({
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
     e.preventDefault();
     const els = [
-      ...(root.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])') ?? []),
+      ...((popup.current ?? root.current)?.querySelectorAll<HTMLElement>(
+        '[role="menuitem"]:not([disabled])',
+      ) ?? []),
     ];
     const i = els.indexOf(document.activeElement as HTMLElement);
     const next = e.key === 'ArrowDown' ? (i + 1) % els.length : (i - 1 + els.length) % els.length;
@@ -72,79 +97,111 @@ export function Menu({
       danger ? 'text-red-600 dark:text-red-400' : ''
     }`;
 
-  return (
-    <div ref={root} className={`relative ${className}`} onKeyDown={onKeyDown}>
-      <button
-        ref={button}
-        type="button"
-        aria-label={label}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? id : undefined}
-        onClick={(e) => {
-          e.stopPropagation();
-          if (open) close();
-          else setOpen(true);
-        }}
-        className="rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none dark:hover:bg-slate-700 dark:hover:text-slate-200"
-      >
-        <MoreHorizontal size={14} aria-hidden />
-      </button>
-      {open && (
-        <div
-          id={id}
-          role="menu"
-          aria-label={label}
-          className="absolute top-full right-0 z-50 mt-1 min-w-40 rounded-md border border-slate-200 bg-white py-1 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-800"
-        >
-          {confirming ? (
-            <>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const item = confirming;
-                  close();
-                  item.onSelect();
-                }}
-                className={itemClass(confirming.danger)}
-              >
-                {confirming.confirm ?? confirming.label}
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setConfirming(null);
-                }}
-                className={itemClass()}
-              >
-                Cancel
-              </button>
-            </>
-          ) : (
-            items.map((item) => (
-              <button
-                key={item.label}
-                type="button"
-                role="menuitem"
-                disabled={item.disabled}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  run(item);
-                }}
-                className={itemClass(item.danger)}
-              >
-                {item.label}
-              </button>
-            ))
-          )}
-        </div>
+  const popupEl = (
+    <div
+      ref={popup}
+      id={id}
+      role="menu"
+      aria-label={label}
+      onKeyDown={owner ? onKeyDown : undefined}
+      style={owner ? ownerPosition(owner()) : undefined}
+      className="absolute top-full right-0 z-50 mt-1 min-w-40 rounded-md border border-slate-200 bg-white py-1 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-800"
+    >
+      {confirming ? (
+        <>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={(e) => {
+              e.stopPropagation();
+              const item = confirming;
+              close();
+              item.onSelect();
+            }}
+            className={itemClass(confirming.danger)}
+          >
+            {confirming.confirm ?? confirming.label}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={(e) => {
+              e.stopPropagation();
+              setConfirming(null);
+            }}
+            className={itemClass()}
+          >
+            Cancel
+          </button>
+        </>
+      ) : (
+        items.map((item) => (
+          <button
+            key={item.label}
+            type="button"
+            role="menuitem"
+            disabled={item.disabled}
+            onClick={(e) => {
+              e.stopPropagation();
+              run(item);
+            }}
+            className={itemClass(item.danger)}
+          >
+            {item.label}
+          </button>
+        ))
       )}
     </div>
   );
+
+  return (
+    <div ref={root} className={`relative ${className}`} onKeyDown={onKeyDown}>
+      {owner ? (
+        <span
+          aria-hidden="true"
+          data-menu-trigger={label}
+          title={label}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (open) close();
+            else setOpen(true);
+          }}
+          className="block cursor-pointer rounded p-0.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+        >
+          <MoreHorizontal size={14} aria-hidden />
+        </span>
+      ) : (
+        <button
+          ref={button}
+          type="button"
+          aria-label={label}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-controls={open ? id : undefined}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (open) close();
+            else setOpen(true);
+          }}
+          className="inline-flex h-6 w-6 items-center justify-center rounded text-slate-500 hover:bg-slate-200 hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+        >
+          <MoreHorizontal size={14} aria-hidden />
+        </button>
+      )}
+      {open &&
+        (owner
+          ? // S21: a tab-owned menu renders outside the tablist (only tabs may live there).
+            createPortal(popupEl, document.body)
+          : popupEl)}
+    </div>
+  );
+}
+
+/** Fixed position under the owner's right edge (portalled menus). */
+function ownerPosition(el: HTMLElement | null): React.CSSProperties | undefined {
+  if (!el) return undefined;
+  const r = el.getBoundingClientRect();
+  return { position: 'fixed', top: r.bottom + 4, left: r.left, right: 'auto' };
 }
 
 /** Text input that commits on Enter/blur and cancels on Escape. */
@@ -201,7 +258,7 @@ export function IconButton({
       aria-label={label}
       title={label}
       onClick={onClick}
-      className="rounded p-1 text-slate-500 hover:bg-slate-200 hover:text-slate-800 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none dark:hover:bg-slate-700 dark:hover:text-slate-100"
+      className="inline-flex h-6 w-6 items-center justify-center rounded text-slate-600 hover:bg-slate-200 hover:text-slate-800 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none dark:hover:bg-slate-700 dark:hover:text-slate-100"
     >
       {children}
     </button>

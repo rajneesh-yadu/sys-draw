@@ -79,7 +79,7 @@ export function EdgeNetwork({
     <div className="space-y-4">
       <Section title="Summary">
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-          <dt className="text-slate-500">Encryption</dt>
+          <dt className="text-slate-500 dark:text-slate-400">Encryption</dt>
           <dd
             data-testid="edge-encryption"
             className={
@@ -91,13 +91,13 @@ export function EdgeNetwork({
             {enc.encrypted ? '🔒 ' : '⚠ '}
             {enc.summary}
           </dd>
-          <dt className="text-slate-500">Ports</dt>
+          <dt className="text-slate-500 dark:text-slate-400">Ports</dt>
           <dd>
             {ports
               ? `${ports.transport} ${ports.ports.join(', ')} (${ports.name}${ports.secure ? ' over TLS' : ''})`
               : 'Application-defined'}
           </dd>
-          <dt className="text-slate-500">Headers</dt>
+          <dt className="text-slate-500 dark:text-slate-400">Headers</dt>
           <dd title={overhead.explain}>
             +{Math.round(overhead.overheadBytes)} B per request + response
             {overhead.perLayer.length > 0 &&
@@ -109,7 +109,7 @@ export function EdgeNetwork({
       <Section title="Request latency">
         <table className="w-full text-xs" aria-label="Request latency by connection state">
           <thead>
-            <tr className="text-left text-slate-500">
+            <tr className="text-left text-slate-500 dark:text-slate-400">
               <th className="font-medium">Connection</th>
               <th className="font-medium">Round trips</th>
               <th className="text-right font-medium">Time</th>
@@ -130,7 +130,7 @@ export function EdgeNetwork({
             })}
           </tbody>
         </table>
-        <p className="text-[11px] text-slate-500">
+        <p className="text-[11px] text-slate-500 dark:text-slate-400">
           {rtt !== undefined
             ? `RTT ${formatMs(rtt)} between the two ends (from the last run). One request = 1 RTT; a new connection first pays the handshakes.`
             : 'Run the simulation to turn round trips into milliseconds (place components in Region groups).'}
@@ -144,7 +144,7 @@ export function EdgeNetwork({
         >
           {osiView(registry, stack).map((row) => (
             <li key={row.layer} className="flex gap-2 px-2 py-1">
-              <span className="w-28 shrink-0 text-slate-500">
+              <span className="w-28 shrink-0 text-slate-500 dark:text-slate-400">
                 {row.layer} {row.name}
               </span>
               <span className="text-slate-800 dark:text-slate-200">
@@ -156,7 +156,7 @@ export function EdgeNetwork({
                     )
                     .join(' · ')
                 ) : (
-                  <span className="text-slate-400">{row.note ?? '—'}</span>
+                  <span className="text-slate-500 dark:text-slate-400">{row.note ?? '—'}</span>
                 )}
               </span>
             </li>
@@ -191,7 +191,7 @@ export function EdgeNetwork({
           ))}
         </div>
         {sequence.length === 0 ? (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             No handshake: the request goes out at once (1 RTT for request and response).
           </p>
         ) : (
@@ -211,7 +211,7 @@ export function EdgeNetwork({
                       </span>{' '}
                       {m.message}
                       {m.detail !== undefined && (
-                        <span className="text-slate-400"> ({m.detail})</span>
+                        <span className="text-slate-500 dark:text-slate-400"> ({m.detail})</span>
                       )}
                     </li>
                   ))}

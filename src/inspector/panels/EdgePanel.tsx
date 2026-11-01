@@ -117,7 +117,7 @@ export function EdgePanel({
               </option>
             ))}
           </select>
-          <p id={`${pickerId}-sum`} className="mt-0.5 text-xs text-slate-500">
+          <p id={`${pickerId}-sum`} className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
             {handshakeRtts} handshake RTT{handshakeRtts === 1 ? '' : 's'} on a new connection ·{' '}
             {encrypted ? 'encrypted in transit' : 'plaintext — add TLS for anything sensitive'}
           </p>
@@ -168,7 +168,7 @@ export function EdgePanel({
         return p ? (
           <ProtocolDocs key={id} def={p} />
         ) : (
-          <p key={id} className="text-xs text-slate-500">
+          <p key={id} className="text-xs text-slate-500 dark:text-slate-400">
             {id}: no docs yet (protocol not in the registry).
           </p>
         );

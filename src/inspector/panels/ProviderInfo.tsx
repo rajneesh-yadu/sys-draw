@@ -56,7 +56,7 @@ export function ProviderInfo({
             {svc?.note ? ` — ${svc.note}` : ''}
           </p>
         )}
-        <p className="text-slate-400">
+        <p className="text-slate-500 dark:text-slate-400">
           Prices: {provider.shortName} list prices in {provider.pricing.region}, as of{' '}
           {provider.pricing.asOf} (approximate).
         </p>
@@ -81,7 +81,7 @@ export function ProviderInfo({
                       {l.value.toLocaleString('en-US')} {l.unit}
                     </span>
                   </div>
-                  <div className="text-slate-400">
+                  <div className="text-slate-500 dark:text-slate-400">
                     {l.adjustable ? 'Default quota (can be raised)' : 'Hard limit'}
                     {over && (
                       <span className="ml-1 font-semibold text-amber-800 dark:text-amber-200">
@@ -89,7 +89,7 @@ export function ProviderInfo({
                       </span>
                     )}
                   </div>
-                  {l.note && <div className="text-slate-500">{l.note}</div>}
+                  {l.note && <div className="text-slate-500 dark:text-slate-400">{l.note}</div>}
                 </li>
               );
             })}

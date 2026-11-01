@@ -37,7 +37,7 @@ export function FindingsPanel() {
       <header className="flex items-center gap-2 border-b border-slate-200 px-3 py-2 dark:border-slate-800">
         <ClipboardCheck aria-hidden className="h-4 w-4 text-sky-600" />
         <h2 className="font-semibold">Design review</h2>
-        <span className="text-xs text-slate-500" data-testid="review-counts">
+        <span className="text-xs text-slate-500 dark:text-slate-400" data-testid="review-counts">
           {SEVERITY_ORDER.filter((s) => counts[s] > 0)
             .map((s) => `${counts[s]} ${s}`)
             .join(' · ') || 'no findings'}
@@ -82,12 +82,12 @@ export function FindingsPanel() {
           </p>
         )}
         {view && !view.hasResult && (
-          <p className="text-xs text-slate-500" data-testid="review-no-result">
+          <p className="text-xs text-slate-500 dark:text-slate-400" data-testid="review-no-result">
             Waiting for a simulation: rules that read latency and utilisation run once it finishes.
           </p>
         )}
         {findings.length === 0 ? (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             {all.length === 0
               ? 'No findings: every rule that applies to this board passes.'
               : 'No findings in this category.'}
@@ -100,7 +100,7 @@ export function FindingsPanel() {
           </ul>
         )}
         {view && (
-          <details className="text-[11px] text-slate-500">
+          <details className="text-[11px] text-slate-500 dark:text-slate-400">
             <summary className="cursor-pointer" data-testid="review-coverage">
               {view.checked} rules checked · {view.skipped.length} not applicable
             </summary>
@@ -144,7 +144,7 @@ function FindingItem({ f }: { f: ReviewViewFinding }) {
         </span>
         <div className="min-w-0 flex-1">
           <p className="font-medium">{f.title}</p>
-          <p className="text-[11px] text-slate-500">
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">
             {REVIEW_CATEGORY_LABEL[f.category]} · {f.ruleTitle}
           </p>
         </div>

@@ -86,7 +86,7 @@ export function FormulaValue({
             style={pos ? { left: pos.left, bottom: pos.bottom } : { visibility: 'hidden' }}
             className="fixed z-50 w-72 rounded-md border border-slate-200 bg-white p-2 text-left text-xs leading-snug font-normal whitespace-normal text-slate-700 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
           >
-            <span className="mb-0.5 block text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
+            <span className="mb-0.5 block text-[10px] font-semibold tracking-wide text-slate-500 dark:text-slate-400 uppercase">
               Formula · {label}
             </span>
             <span className="font-mono text-[11px] break-words">{formula}</span>

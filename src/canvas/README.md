@@ -26,6 +26,7 @@ React Flow rendering of the board: palette, component and group nodes, edge draw
 - Dropping a node/group inside a group sets `groupId`/`parentId`; dropping outside clears it.
 - Groups are drawn at their stored frame grown to fit their contents.
 - Shortcuts: Ctrl/⌘+Z, Ctrl/⌘+Shift+Z (Ctrl+Y), C/X/V, A, G (group as toolbar kind), Shift+G (ungroup), Delete, Esc. Shift-drag = box select.
+- S21 performance (300 nodes): unchanged node/edge objects are reused across derivations (`reuse.ts`), React Flow props are constants, `onlyRenderVisibleElements` from 150 nodes, low detail below 0.5× on ≥ 100 nodes (`lod.ts`), viewport layer promoted while drag-panning (`canvas.css`); colour mode follows the `dark` class on <html>.
 
 ## Extension points
 

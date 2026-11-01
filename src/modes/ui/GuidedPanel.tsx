@@ -40,7 +40,7 @@ export function GuidedPanel({
                   ? 'border-indigo-600 bg-indigo-600 text-white'
                   : s.passed
                     ? 'border-emerald-500 text-emerald-700 dark:text-emerald-400'
-                    : 'border-slate-300 text-slate-500 dark:border-slate-700'
+                    : 'border-slate-300 text-slate-500 dark:text-slate-400 dark:border-slate-700'
               }`}
             >
               {s.passed && k !== i ? '✓' : k + 1}
@@ -58,7 +58,7 @@ export function GuidedPanel({
           {i + 1}. {step.title}
         </h3>
         <p className="text-xs text-slate-700 dark:text-slate-300">{step.prompt}</p>
-        <details className="text-xs text-slate-500">
+        <details className="text-xs text-slate-500 dark:text-slate-400">
           <summary className="cursor-pointer">Why this step</summary>
           <p className="mt-1">{step.why}</p>
         </details>
@@ -186,7 +186,7 @@ function StepInputs({
               })
             }
           />
-          <span className="text-slate-500">{suffix}</span>
+          <span className="text-slate-500 dark:text-slate-400">{suffix}</span>
         </label>
       );
       return (
@@ -194,7 +194,7 @@ function StepInputs({
           {num('peakRps', 'Peak requests/s', 1, 'rps')}
           {ctx.problem && num('storageBytes', 'Data stored', 1e9, 'GB')}
           {ctx.problem && (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               Given: {formatCompact(ctx.problem.scale.dau)} daily users,{' '}
               {ctx.problem.scale.readWriteRatio}:1 reads to writes.
             </p>
@@ -215,7 +215,7 @@ function StepInputs({
       );
     default:
       return (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           Build on the canvas — these checks update with every simulation.
         </p>
       );

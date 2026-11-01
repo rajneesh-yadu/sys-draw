@@ -1,0 +1,18 @@
+/*
+ * S21 performance: while the view is dragged (panned), the viewport gets its own compositor layer, so
+ * each frame moves an already-painted layer instead of repainting 300 nodes and 800+ edges.
+ * Only during the drag: a permanently promoted layer would keep text rasterised at the old zoom
+ * (blurry) after zooming; wheel zoom is left alone (BoardCanvas) because it starts and ends a
+ * move on every tick.
+ */
+.sd-moving .react-flow__viewport {
+  will-change: transform;
+}
+
+/* S21 accessibility: React Flow's attribution link at AA contrast in both themes. */
+.react-flow__attribution a {
+  color: #45556c;
+}
+.dark .react-flow__attribution a {
+  color: #cad5e2;
+}

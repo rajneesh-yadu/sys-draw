@@ -14,10 +14,17 @@ export function edgeStrokeWidth(rps: number, maxRps: number): number {
 }
 
 /** The busiest edge's rps (0 when there is no result). */
+// S21: every edge asks for the max on each render; results are immutable, so compute it once
+// per `perEdge` object (O(E) per result instead of O(E²) per store update on big boards).
+const maxRpsCache = new WeakMap<object, number>();
+
 export function maxEdgeRps(perEdge: Readonly<Record<string, { rps: number }>> | undefined): number {
   if (!perEdge) return 0;
+  const hit = maxRpsCache.get(perEdge);
+  if (hit !== undefined) return hit;
   let max = 0;
   for (const m of Object.values(perEdge)) if (m.rps > max) max = m.rps;
+  maxRpsCache.set(perEdge, max);
   return max;
 }
 

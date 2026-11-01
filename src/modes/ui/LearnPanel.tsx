@@ -35,9 +35,13 @@ export function LearnPanel({
               >
                 <span className="flex items-center gap-1.5 text-sm font-medium">
                   <BookOpen className="h-3.5 w-3.5" aria-hidden /> {l.title}
-                  <span className="ml-auto text-[10px] text-slate-500">L{l.level}</span>
+                  <span className="ml-auto text-[10px] text-slate-500 dark:text-slate-400">
+                    L{l.level}
+                  </span>
                 </span>
-                <span className="block text-xs text-slate-500">{l.docs.summary}</span>
+                <span className="block text-xs text-slate-500 dark:text-slate-400">
+                  {l.docs.summary}
+                </span>
               </button>
             </li>
           ))}
@@ -92,7 +96,7 @@ export function LessonPlayer({
           </button>
         </div>
       )}
-      <p className="text-xs text-slate-500" aria-live="polite">
+      <p className="text-xs text-slate-500 dark:text-slate-400" aria-live="polite">
         {inQuiz ? 'Quiz' : `Step ${step + 1} of ${n}`}
       </p>
       {!inQuiz && current ? (

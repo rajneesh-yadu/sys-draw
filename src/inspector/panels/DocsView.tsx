@@ -66,7 +66,7 @@ export function ProtocolDocs({ def }: { def: ProtocolDef }) {
       className="space-y-2 border-t border-slate-200 pt-2 first:border-0 first:pt-0 dark:border-slate-800"
     >
       <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">{def.name}</h4>
-      <p className="text-[11px] text-slate-500">{facts.join(' · ')}</p>
+      <p className="text-[11px] text-slate-500 dark:text-slate-400">{facts.join(' · ')}</p>
       <Para>{def.docs.summary}</Para>
       <List title="Handshake" items={def.docs.handshakeSteps} />
       <List title="Header fields" items={def.docs.headerFields} />

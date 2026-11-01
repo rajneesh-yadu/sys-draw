@@ -99,7 +99,7 @@ export function SnapshotsPanel() {
         </button>
       </form>
       {!snapshots || snapshots.length === 0 ? (
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           No snapshots yet. A snapshot keeps this board&apos;s design so you can come back to it.
         </p>
       ) : (
@@ -118,12 +118,15 @@ export function SnapshotsPanel() {
               >
                 <div className="flex items-baseline gap-2">
                   <span className="min-w-0 flex-1 truncate font-medium">{s.label}</span>
-                  <time className="text-[11px] text-slate-400" dateTime={s.at}>
+                  <time className="text-[11px] text-slate-500 dark:text-slate-400" dateTime={s.at}>
                     {formatWhen(s.at)}
                   </time>
                 </div>
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="flex-1 text-slate-500" data-testid="snapshot-diff">
+                  <span
+                    className="flex-1 text-slate-500 dark:text-slate-400"
+                    data-testid="snapshot-diff"
+                  >
                     {summary}
                   </span>
                   <button
@@ -148,7 +151,7 @@ export function SnapshotsPanel() {
                       const r = api.getState().deleteSnapshot(s.id);
                       if (!r.ok) show({ kind: 'error', text: r.reason });
                     }}
-                    className="rounded px-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"
+                    className="rounded px-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
                   >
                     Delete
                   </button>

@@ -36,6 +36,9 @@ function setup() {
 
 const tabs = () => screen.getAllByRole('tab').map((t) => t.textContent);
 const openMenu = (name: RegExp) => fireEvent.click(screen.getByRole('button', { name }));
+/** S21: a board's actions menu opens from its tab (right-click / Shift+F10), not a second button. */
+const openBoardMenu = (tab: string) =>
+  fireEvent.contextMenu(screen.getByRole('tab', { name: tab }));
 const pick = (name: string | RegExp) => fireEvent.click(screen.getByRole('menuitem', { name }));
 
 beforeEach(() => {
@@ -58,15 +61,18 @@ describe('board tabs', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(tabs()).toEqual(['Board 1', 'Read path']);
 
-    openMenu(/Board Board 1 actions/);
+    openBoardMenu('Board 1');
     pick('Duplicate');
     expect(tabs()).toEqual(['Board 1', 'Board 1 copy', 'Read path']);
 
-    openMenu(/Board Read path actions/);
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Read path' }), {
+      key: 'F10',
+      shiftKey: true,
+    });
     pick('Move left');
     expect(tabs()).toEqual(['Board 1', 'Read path', 'Board 1 copy']);
 
-    openMenu(/Board Board 1 copy actions/);
+    openBoardMenu('Board 1 copy');
     pick('Delete');
     // Two-step confirm.
     expect(tabs()).toHaveLength(3);
@@ -85,7 +91,7 @@ describe('board tabs', () => {
 
   it('the only tab cannot be deleted', () => {
     setup();
-    openMenu(/Board Board 1 actions/);
+    openBoardMenu('Board 1');
     expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeDisabled();
   });
 });

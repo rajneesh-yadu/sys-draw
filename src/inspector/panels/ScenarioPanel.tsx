@@ -67,7 +67,7 @@ export function ScenarioPanel({
             dispatch({ type: 'updateScenario', patch: patch as Partial<Scenario> })
           }
         />
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           {scenario.flows.length} flow{scenario.flows.length === 1 ? '' : 's'} and{' '}
           {scenario.events.length} chaos event{scenario.events.length === 1 ? '' : 's'} — edited in
           the scenario editor (later session).

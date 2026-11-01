@@ -4,6 +4,16 @@
  * See ./README.md. Implemented in S08.
  */
 export { MetricsDrawer } from './MetricsDrawer';
+// S21 — resizable / maximisable drawer
+export {
+  clampDrawerHeight,
+  drawerBodyHeight,
+  resizeByKey,
+  DRAWER_DEFAULT_HEIGHT,
+  DRAWER_MAX_HEIGHT,
+  DRAWER_MIN_HEIGHT,
+  type DrawerSize,
+} from './drawer-size';
 export { NodeDetail, LatencyChart, UtilizationMeter } from './NodeDetail';
 export { FormulaValue } from './FormulaValue';
 // S11 — failures over time

@@ -37,20 +37,20 @@ export function ProgressPage({ onClose }: { onClose: () => void }) {
     <Dialog title="Your progress" onClose={onClose} testId="progress-page">
       <div className="space-y-4 p-4 text-sm">
         {warning && <p className="text-xs text-amber-700">{warning}</p>}
-        <p className="text-xs text-slate-500" data-testid="progress-totals">
+        <p className="text-xs text-slate-500 dark:text-slate-400" data-testid="progress-totals">
           {attempts.length} attempt{attempts.length === 1 ? '' : 's'} ·{' '}
           {attempts.filter((a) => a.completed).length} completed · {formatDuration(totalMs)}{' '}
           practised. Stored in this browser only.
         </p>
         {rows.length === 0 ? (
-          <p className="text-slate-500">
+          <p className="text-slate-500 dark:text-slate-400">
             No attempts yet. Start a problem in Guided, Interview or Debug mode, or pass a lesson
             quiz in Learn mode.
           </p>
         ) : (
           <table className="w-full text-left text-xs" data-testid="progress-table">
             <caption className="sr-only">Attempts, scores and time per problem and lesson</caption>
-            <thead className="border-b border-slate-200 text-slate-500 dark:border-slate-800">
+            <thead className="border-b border-slate-200 text-slate-500 dark:text-slate-400 dark:border-slate-800">
               <tr>
                 <th className="py-1 font-medium">Problem / lesson</th>
                 <th className="font-medium">Attempts</th>
@@ -70,7 +70,7 @@ export function ProgressPage({ onClose }: { onClose: () => void }) {
                 >
                   <td className="py-1.5">
                     {r.title}
-                    <span className="ml-1 text-slate-400">
+                    <span className="ml-1 text-slate-500 dark:text-slate-400">
                       {r.subjectKind === 'lesson' ? 'lesson' : ''}
                     </span>
                   </td>
@@ -94,7 +94,9 @@ export function ProgressPage({ onClose }: { onClose: () => void }) {
         )}
         {recent.length > 0 && (
           <section aria-label="Recent attempts" className="space-y-1">
-            <h3 className="text-xs font-semibold tracking-wide text-slate-500 uppercase">Recent</h3>
+            <h3 className="text-xs font-semibold tracking-wide text-slate-500 dark:text-slate-400 uppercase">
+              Recent
+            </h3>
             <ul className="space-y-0.5 text-xs">
               {recent.map((a) => (
                 <li key={a.id}>

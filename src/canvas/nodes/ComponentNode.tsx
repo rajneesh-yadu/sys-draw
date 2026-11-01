@@ -18,6 +18,7 @@ import { useTraceStore } from '../trace/context';
 import { currentTraceStep } from '../trace/trace-store';
 import { useSecurityStore } from '../security/context';
 import { EXPOSURE_STYLE } from '../security/security-store';
+import { useLowDetail } from '../lod';
 
 function portTop(i: number, n: number) {
   return `${((i + 1) / (n + 1)) * 100}%`;
@@ -26,7 +27,10 @@ function portTop(i: number, n: number) {
 const handleClass =
   '!h-2.5 !w-2.5 !border-2 !border-white !bg-sky-500 dark:!border-slate-900 hover:!bg-sky-400';
 
-function PortHandles({ ports }: { ports: readonly PortView[] }) {
+function PortHandles({ ports, hidden = false }: { ports: readonly PortView[]; hidden?: boolean }) {
+  // S21: in low detail the handles stay in the layout (React Flow keeps their measured anchors)
+  // but are not painted.
+  const cls = hidden ? `${handleClass} !invisible` : handleClass;
   const inputs = ports.filter((p) => p.direction !== 'out');
   const outputs = ports.filter((p) => p.direction !== 'in');
   return (
@@ -38,7 +42,7 @@ function PortHandles({ ports }: { ports: readonly PortView[] }) {
           type="target"
           position={Position.Left}
           style={{ top: portTop(i, inputs.length) }}
-          className={handleClass}
+          className={cls}
           title={`${p.id} (in): ${p.protocols.join(', ')}`}
         />
       ))}
@@ -49,7 +53,7 @@ function PortHandles({ ports }: { ports: readonly PortView[] }) {
           type="source"
           position={Position.Right}
           style={{ top: portTop(i, outputs.length) }}
-          className={handleClass}
+          className={cls}
           title={`${p.id} (out): ${p.protocols.join(', ')}`}
         />
       ))}
@@ -171,6 +175,24 @@ export const ComponentNode = memo(function ComponentNode({
     if (st.from === id && st.to === id) return st.kind;
     return st.to === id ? 'arriving' : undefined;
   });
+  // S21: zoomed out on a large board — border colour + label only (see lod.ts).
+  const lowDetail = useLowDetail() && !selected && !traceHere && !sec;
+  if (lowDetail) {
+    return (
+      <div
+        data-testid="component-node"
+        data-lod="low"
+        data-level={level}
+        data-state={tick?.state}
+        className={`relative flex h-full w-full items-center rounded-lg border bg-white px-3 dark:bg-slate-900 ${border}`}
+      >
+        <PortHandles ports={data.ports} hidden />
+        <div className="truncate text-lg font-semibold text-slate-900 dark:text-slate-100">
+          {data.label}
+        </div>
+      </div>
+    );
+  }
   return (
     <div
       data-testid="component-node"

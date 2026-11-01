@@ -66,11 +66,11 @@ function DebugCaseView({
       )}
       <h4 className={sectionTitle}>Symptoms</h4>
       {state.stale && !fixed ? (
-        <p className="text-xs text-slate-500" role="status">
+        <p className="text-xs text-slate-500 dark:text-slate-400" role="status">
           Simulating…
         </p>
       ) : st.symptoms.length === 0 ? (
-        <p className="text-xs text-slate-500">No symptoms.</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">No symptoms.</p>
       ) : (
         <ul className="space-y-1" data-testid="debug-symptoms">
           {st.symptoms.map((s) => (
@@ -124,7 +124,7 @@ function CasePicker({
     >
       <h4 className={sectionTitle}>{current ? 'Try another' : 'Load a broken design'}</h4>
       {!current && (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           It replaces this board’s design and scenario (one undo step).
         </p>
       )}

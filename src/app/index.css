@@ -1,5 +1,8 @@
 @import 'tailwindcss';
 
+/* S21: the theme is a class on <html> (app/ui/theme.ts), not only the OS setting. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 html,
 body,
 #root {
@@ -31,15 +34,14 @@ body {
   --trace-service: #6250d6;
   --trace-db: #e34948;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --trace-dns: #3987e5;
-    --trace-tcp: #d95926;
-    --trace-tls: #199e70;
-    --trace-handshake: #c98500;
-    --trace-network: #d55181;
-    --trace-queue: #008300;
-    --trace-service: #9085e9;
-    --trace-db: #e66767;
-  }
+/* Dark steps follow the app theme (S21: class on <html>, was the OS media query). */
+:root.dark {
+  --trace-dns: #3987e5;
+  --trace-tcp: #d95926;
+  --trace-tls: #199e70;
+  --trace-handshake: #c98500;
+  --trace-network: #d55181;
+  --trace-queue: #008300;
+  --trace-service: #9085e9;
+  --trace-db: #e66767;
 }

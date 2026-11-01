@@ -1,5 +1,6 @@
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from '@xyflow/react';
 import { memo, useEffect, useRef } from 'react';
+import { useLowDetail } from '../lod';
 import {
   formatMs,
   formatPercent,
@@ -66,6 +67,8 @@ export const ProtocolEdge = memo(function ProtocolEdge({
       ? edgeStrokeWidth(metrics.rps, maxRps)
       : 1.5;
   const text = typeof label === 'string' ? label : '';
+  // S21: zoomed out on a large board the label is unreadable; skip it unless it matters now.
+  const lowDetail = useLowDetail() && !selected && !packet && !sec && !tickStyle?.badge;
   const title = metrics
     ? [
         `${text} — ${formatRps(metrics.rps)}, latency p50 ${formatMs(metrics.latencyMs.p50)}`,
@@ -97,7 +100,7 @@ export const ProtocolEdge = memo(function ProtocolEdge({
         }}
       />
       {packet && <TracePacket key={packet.index} edgeId={id} path={path} step={packet} />}
-      {(text || metrics || sec) && (
+      {!lowDetail && (text || metrics || sec) && (
         <EdgeLabelRenderer>
           <div
             data-testid="edge-label"

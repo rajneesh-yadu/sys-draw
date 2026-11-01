@@ -17,6 +17,7 @@ export function BoardTabs() {
   const boards = useWorkspaceStore((s) => s.data.boards);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
   const list = useRef<HTMLDivElement>(null);
   const { show } = useNotice();
 
@@ -67,7 +68,7 @@ export function BoardTabs() {
               className={`group flex max-w-52 items-center gap-1 rounded-t-md border border-b-0 px-2 py-1 text-sm ${
                 selected
                   ? 'border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100'
-                  : 'border-transparent text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800'
+                  : 'border-transparent text-slate-600 hover:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-800'
               } ${dropIndex === i ? 'ring-2 ring-sky-400' : ''}`}
             >
               {renaming === id ? (
@@ -84,7 +85,14 @@ export function BoardTabs() {
                 <button
                   type="button"
                   role="tab"
+                  id={`board-tab-${id}`}
                   aria-selected={selected}
+                  aria-haspopup="menu"
+                  aria-keyshortcuts="Shift+F10"
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setMenuFor(id);
+                  }}
                   aria-controls="board-canvas-region"
                   tabIndex={selected ? 0 : -1}
                   className="min-w-0 truncate focus-visible:underline focus-visible:outline-none"
@@ -103,15 +111,22 @@ export function BoardTabs() {
                     } else if (e.key === 'F2') {
                       e.preventDefault();
                       setRenaming(id);
+                    } else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+                      // S21: the board's actions menu opens from the tab itself.
+                      e.preventDefault();
+                      setMenuFor(id);
                     }
                   }}
-                  title={`${b.name} (double-click or F2 to rename)`}
+                  title={`${b.name} (double-click or F2 to rename; right-click or Shift+F10 for actions)`}
                 >
                   {b.name}
                 </button>
               )}
               <Menu
                 label={`Board ${b.name} actions`}
+                open={menuFor === id}
+                onOpenChange={(o) => setMenuFor(o ? id : null)}
+                owner={() => document.getElementById(`board-tab-${id}`)}
                 items={[
                   { label: 'Rename', onSelect: () => setRenaming(id) },
                   {

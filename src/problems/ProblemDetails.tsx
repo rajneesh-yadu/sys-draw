@@ -50,7 +50,9 @@ export function TagList({ problem }: { problem: Problem }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="space-y-1">
-      <h3 className="text-xs font-semibold tracking-wide text-slate-500 uppercase">{title}</h3>
+      <h3 className="text-xs font-semibold tracking-wide text-slate-500 dark:text-slate-400 uppercase">
+        {title}
+      </h3>
       {children}
     </section>
   );
@@ -79,17 +81,17 @@ export function ProblemDetails({ problem }: { problem: Problem }) {
       </Section>
       <Section title="Scale">
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs" data-testid="problem-scale">
-          <dt className="text-slate-500">Daily active users</dt>
+          <dt className="text-slate-500 dark:text-slate-400">Daily active users</dt>
           <dd>{formatCount(s.dau)}</dd>
-          <dt className="text-slate-500">Read / write ratio</dt>
+          <dt className="text-slate-500 dark:text-slate-400">Read / write ratio</dt>
           <dd>{formatReadWrite(s.readWriteRatio)}</dd>
-          <dt className="text-slate-500">Data size</dt>
+          <dt className="text-slate-500 dark:text-slate-400">Data size</dt>
           <dd>{formatBytes(s.dataSizeBytes)}</dd>
-          <dt className="text-slate-500">Scenario: concurrent users</dt>
+          <dt className="text-slate-500 dark:text-slate-400">Scenario: concurrent users</dt>
           <dd>
             {formatCount(users)} in {Object.keys(problem.scenario.usersByRegion).join(', ')}
           </dd>
-          <dt className="text-slate-500">Scenario: peak load</dt>
+          <dt className="text-slate-500 dark:text-slate-400">Scenario: peak load</dt>
           <dd>
             ≈ {formatCount(Math.round(peak))} requests/s (
             {problem.scenario.flows.map((f) => f.name).join(', ')})
@@ -100,7 +102,9 @@ export function ProblemDetails({ problem }: { problem: Problem }) {
         <ul className="space-y-0.5 text-xs" data-testid="problem-rubric">
           {rubricLines(problem).map((r) => (
             <li key={r.text} className="flex gap-2">
-              <span className="w-8 shrink-0 text-right text-slate-400">×{r.weight}</span>
+              <span className="w-8 shrink-0 text-right text-slate-500 dark:text-slate-400">
+                ×{r.weight}
+              </span>
               <span>{r.text}</span>
             </li>
           ))}

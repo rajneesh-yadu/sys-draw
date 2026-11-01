@@ -88,7 +88,7 @@ export function ProviderSwitcher() {
 
   return (
     <div ref={root} className="relative flex items-center gap-1.5">
-      <Cloud size={14} aria-hidden className="text-slate-400" />
+      <Cloud size={14} aria-hidden className="text-slate-500 dark:text-slate-400" />
       <label className="sr-only" htmlFor="board-provider">
         Cloud provider
       </label>
@@ -173,7 +173,7 @@ export function ProviderSwitcher() {
             </details>
           )}
           {toEntry && (
-            <p className="text-slate-400">
+            <p className="text-slate-500 dark:text-slate-400">
               Prices: {toName} list prices in {toEntry.pricing.region}, as of {toEntry.pricing.asOf}{' '}
               (approximate).
             </p>

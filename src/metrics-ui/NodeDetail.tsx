@@ -25,7 +25,7 @@ export function UtilizationMeter({ m }: { m: NodeMetrics }) {
   return (
     <div>
       <div className="mb-1 flex items-baseline justify-between text-xs">
-        <span className="text-slate-500">Utilisation</span>
+        <span className="text-slate-500 dark:text-slate-400">Utilisation</span>
         <span className="font-medium" data-testid="node-detail-level">
           <FormulaValue label="Utilisation" formula={nodeFormula('utilization', m)}>
             {formatPercent(m.utilization)}
@@ -67,7 +67,7 @@ export function LatencyChart({ m }: { m: NodeMetrics }) {
     { name: 'p99', ms: m.latencyMs.p99 },
   ];
   return (
-    <figure aria-label="Latency percentiles" className="text-slate-500">
+    <figure aria-label="Latency percentiles" className="text-slate-500 dark:text-slate-400">
       <BarChart
         width={280}
         height={96}
@@ -138,7 +138,7 @@ export function NodeDetail({ label, m }: { label: string; m: NodeMetrics }) {
       <dl className="grid grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] gap-x-4 gap-y-0.5 text-xs">
         {rows.map(([field, name, value]) => (
           <div key={field} className="flex items-baseline justify-between gap-2">
-            <dt className="truncate text-slate-500">{name}</dt>
+            <dt className="truncate text-slate-500 dark:text-slate-400">{name}</dt>
             <dd className="whitespace-nowrap">
               <FormulaValue label={name} formula={nodeFormula(field, m)}>
                 {value}

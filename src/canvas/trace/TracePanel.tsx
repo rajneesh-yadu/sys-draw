@@ -60,7 +60,7 @@ export function TracePanel() {
       className="flex h-full w-96 flex-col overflow-hidden border-l border-slate-200 bg-white text-slate-800 shadow-lg dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
     >
       <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-2 dark:border-slate-800">
-        <h2 className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+        <h2 className="text-xs font-semibold tracking-wide text-slate-500 dark:text-slate-400 uppercase">
           Request trace
         </h2>
         <button
@@ -93,7 +93,7 @@ function TraceOptions() {
   return (
     <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 border-b border-slate-200 px-3 py-2 text-xs dark:border-slate-800">
       <label className="flex flex-col gap-0.5">
-        <span className="text-slate-500">Flow</span>
+        <span className="text-slate-500 dark:text-slate-400">Flow</span>
         <select
           className={select}
           value={request.flowId ?? ''}
@@ -109,7 +109,7 @@ function TraceOptions() {
         </select>
       </label>
       <label className="flex flex-col gap-0.5">
-        <span className="text-slate-500">Users in</span>
+        <span className="text-slate-500 dark:text-slate-400">Users in</span>
         <select
           className={select}
           value={request.regionId ?? ''}
@@ -126,7 +126,7 @@ function TraceOptions() {
       </label>
       <fieldset className="col-span-2 flex items-center gap-1">
         <legend className="sr-only">Connection</legend>
-        <span className="mr-1 text-slate-500" aria-hidden>
+        <span className="mr-1 text-slate-500 dark:text-slate-400" aria-hidden>
           Connection
         </span>
         {WARMTH.map((w) => (
@@ -151,7 +151,7 @@ function TraceOptions() {
           </label>
         ))}
         <label className="ml-auto flex items-center gap-1">
-          <span className="text-slate-500">Cache</span>
+          <span className="text-slate-500 dark:text-slate-400">Cache</span>
           <select
             className="rounded border border-slate-200 bg-white px-1 py-0.5 text-xs dark:border-slate-700 dark:bg-slate-900"
             value={request.cache}
@@ -179,7 +179,7 @@ function TraceBody() {
   }
   if (!trace) {
     return (
-      <p className="px-3 py-2 text-xs text-slate-500">
+      <p className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">
         {status === 'running' ? 'Tracing…' : 'No trace yet.'}
       </p>
     );
@@ -258,7 +258,7 @@ function StepControls({ trace }: { trace: TraceView }) {
         <ChevronRight aria-hidden className="h-3.5 w-3.5" />
       </button>
       <span
-        className="ml-auto text-slate-500 tabular-nums"
+        className="ml-auto text-slate-500 dark:text-slate-400 tabular-nums"
         data-testid="trace-position"
         aria-live="polite"
       >
@@ -306,7 +306,9 @@ function TimeBreakdown({ trace }: { trace: TraceView }) {
                 {p.label}
               </td>
               <td className="text-right">{formatMs(p.ms)}</td>
-              <td className="w-12 text-right text-slate-500">{formatPercent(p.share)}</td>
+              <td className="w-12 text-right text-slate-500 dark:text-slate-400">
+                {formatPercent(p.share)}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -320,7 +322,7 @@ function StepDetail() {
   const trace = useTraceStore((s) => s.trace);
   if (!step || !trace) {
     return (
-      <p className="rounded border border-dashed border-slate-200 px-2 py-1.5 text-slate-500 dark:border-slate-700">
+      <p className="rounded border border-dashed border-slate-200 px-2 py-1.5 text-slate-500 dark:text-slate-400 dark:border-slate-700">
         Press Play or Next to send the request; each packet moves along its connection on the
         canvas.
       </p>
@@ -341,7 +343,7 @@ function StepDetail() {
           {layerTag(step)}
         </span>
         <span className="font-semibold">{step.message}</span>
-        {step.async && <span className="text-slate-500">(async)</span>}
+        {step.async && <span className="text-slate-500 dark:text-slate-400">(async)</span>}
       </div>
       <div className="mt-0.5 text-slate-600 dark:text-slate-300">
         {step.from === step.to ? name(step.from) : `${name(step.from)} → ${name(step.to)}`} ·{' '}
@@ -359,7 +361,7 @@ function StepDetail() {
           ))}
         </ul>
       )}
-      <p className="mt-1 text-slate-500">{step.explain}</p>
+      <p className="mt-1 text-slate-500 dark:text-slate-400">{step.explain}</p>
     </section>
   );
 }
@@ -426,9 +428,9 @@ function SequenceDiagram({ trace }: { trace: TraceView }) {
                           }
                     }
                   >
-                    <span className="text-slate-500">{step.layer} </span>
+                    <span className="text-slate-500 dark:text-slate-400">{step.layer} </span>
                     {step.message}
-                    <span className="ml-1 text-slate-500 tabular-nums">
+                    <span className="ml-1 text-slate-500 dark:text-slate-400 tabular-nums">
                       {formatMs(step.timeMs)}
                     </span>
                   </span>

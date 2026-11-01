@@ -15,7 +15,8 @@ import {
   type OnNodeDrag,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react';
+import './canvas.css';
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { registry } from '@/registry';
 import {
   checkConnection,
@@ -48,16 +49,42 @@ import { ComponentNode } from './nodes/ComponentNode';
 import { GroupNode } from './nodes/GroupNode';
 import { isEditableTarget, SHORTCUT_HELP, shortcutFor } from './shortcuts';
 import { toFlowEdges, toFlowNodes, type FlowNode } from './to-flow';
+import { reuseUnchanged, VIRTUALIZE_AT_NODES } from './reuse';
+import { useDocumentColorMode } from './color-mode';
+import { useLowDetail } from './lod';
+
+/** Dot grid; skipped in low detail (S21: at 0.25× it is thousands of dots repainted per pan frame). */
+function CanvasBackground() {
+  const lowDetail = useLowDetail();
+  return lowDetail ? null : <Background variant={BackgroundVariant.Dots} gap={GRID * 2} size={1} />;
+}
+
+// S21: React Flow copies these props into its store whenever their identity changes; inline
+// literals made every canvas render (e.g. each selection) re-render all edges.
+const SNAP_GRID: [number, number] = [GRID, GRID];
+const MULTI_SELECT_KEYS = ['Meta', 'Control', 'Shift'];
+const DEFAULT_EDGE_OPTIONS = { style: { strokeWidth: 1.5 } };
+const FIT_VIEW_OPTIONS = { padding: 0.2, maxZoom: 1 };
 
 const nodeTypes = { component: ComponentNode, sdGroup: GroupNode };
 const edgeTypes = { sdEdge: ProtocolEdge };
 
-/** Keep React Flow's measurements when the store sends fresh node objects. */
-function mergeMeasured(next: FlowNode[], prev: FlowNode[]): FlowNode[] {
+/**
+ * Fold the store's nodes into the local (rendered) copy. Nodes the store did not change (`kept`:
+ * the very objects of the previous derivation) keep their local object, so React Flow skips them
+ * (S21); changed ones take the store's version with React Flow's measurements.
+ */
+function mergeMeasured(
+  next: FlowNode[],
+  prev: FlowNode[],
+  kept?: ReadonlySet<FlowNode>,
+): FlowNode[] {
   const byId = new Map(prev.map((n) => [n.id, n]));
   return next.map((n) => {
-    const m = byId.get(n.id)?.measured;
-    return m ? ({ ...n, measured: m } as FlowNode) : n;
+    const local = byId.get(n.id);
+    if (!local) return n;
+    if (kept?.has(n)) return local;
+    return local.measured ? ({ ...n, measured: local.measured } as FlowNode) : n;
   });
 }
 
@@ -90,23 +117,48 @@ export function BoardCanvas() {
   // otherwise re-fit when the first node is dropped and the view would jump.
   const [fitOnOpen] = useState(() => doc.graph.nodes.length + doc.graph.groups.length > 0);
   const selSet = useMemo(() => new Set(selection), [selection]);
-  const derivedNodes = useMemo(
-    () => toFlowNodes(doc, rects, selSet, registry),
-    [doc, rects, selSet],
-  );
-  const edges = useMemo(() => toFlowEdges(doc, selSet, registry), [doc, selSet]);
+  const freshNodes = useMemo(() => toFlowNodes(doc, rects, selSet, registry), [doc, rects, selSet]);
+  const freshEdges = useMemo(() => toFlowEdges(doc, selSet, registry), [doc, selSet]);
 
+  // S21: reuse unchanged node/edge objects across derivations so only touched elements re-render.
+  const [derived, setDerived] = useState(() => ({ fresh: freshNodes, nodes: freshNodes }));
+  const [edgeState, setEdgeState] = useState(() => ({ fresh: freshEdges, edges: freshEdges }));
   // Local copy so drags and resizes render live; the store gets one command when they end.
-  const [nodes, setNodes] = useState<FlowNode[]>(derivedNodes);
-  const [synced, setSynced] = useState(derivedNodes);
-  if (synced !== derivedNodes) {
-    setSynced(derivedNodes);
-    setNodes((prev) => mergeMeasured(derivedNodes, prev));
+  const [nodes, setNodes] = useState<FlowNode[]>(freshNodes);
+  if (derived.fresh !== freshNodes) {
+    const next = reuseUnchanged(derived.nodes, freshNodes);
+    setDerived({ fresh: freshNodes, nodes: next });
+    if (next !== derived.nodes) {
+      const kept = new Set(derived.nodes);
+      setNodes((prev) => mergeMeasured(next, prev, kept));
+    }
   }
+  if (edgeState.fresh !== freshEdges) {
+    setEdgeState({ fresh: freshEdges, edges: reuseUnchanged(edgeState.edges, freshEdges) });
+  }
+  const derivedNodes = derived.nodes;
+  const edges = edgeState.edges;
   const resync = useCallback(
     () => setNodes((prev) => mergeMeasured(derivedNodes, prev)),
     [derivedNodes],
   );
+  const colorMode = useDocumentColorMode();
+  // S21: compositor layer only while the view moves (see canvas.css); no re-render needed.
+  const wrapperEl = useRef<HTMLDivElement | null>(null);
+  const setWrapperRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      wrapperEl.current = el;
+      setWrapper(el);
+    },
+    [setWrapper],
+  );
+  // Drag-pans only: wheel zoom starts/ends a "move" on every tick, and re-creating the layer
+  // each tick costs more than it saves.
+  const onMoveStart = useCallback((e: MouseEvent | TouchEvent | null) => {
+    if (e && e.type !== 'wheel') wrapperEl.current?.classList.add('sd-moving');
+  }, []);
+  const onMoveEnd = useCallback(() => wrapperEl.current?.classList.remove('sd-moving'), []);
+  const virtualize = doc.graph.nodes.length >= VIRTUALIZE_AT_NODES;
 
   const onNodesChange = useCallback(
     (changes: NodeChange<FlowNode>[]) => {
@@ -280,7 +332,7 @@ export function BoardCanvas() {
   }, [store, actions, groupKind]);
 
   return (
-    <div ref={setWrapper} className="absolute inset-0" data-testid="board-canvas">
+    <div ref={setWrapperRef} className="absolute inset-0" data-testid="board-canvas">
       <ReactFlow<FlowNode>
         nodes={nodes}
         edges={edges}
@@ -295,16 +347,20 @@ export function BoardCanvas() {
         onDrop={onDrop}
         deleteKeyCode={null}
         selectionKeyCode="Shift"
-        multiSelectionKeyCode={['Meta', 'Control', 'Shift']}
+        multiSelectionKeyCode={MULTI_SELECT_KEYS}
         snapToGrid={snap}
-        snapGrid={[GRID, GRID]}
+        snapGrid={SNAP_GRID}
         connectionLineType={ConnectionLineType.Bezier}
-        defaultEdgeOptions={{ style: { strokeWidth: 1.5 } }}
+        defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
         minZoom={0.1}
+        colorMode={colorMode}
+        onMoveStart={onMoveStart}
+        onMoveEnd={onMoveEnd}
+        onlyRenderVisibleElements={virtualize}
         fitView={fitOnOpen}
-        fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
+        fitViewOptions={FIT_VIEW_OPTIONS}
       >
-        <Background variant={BackgroundVariant.Dots} gap={GRID * 2} size={1} />
+        <CanvasBackground />
         <Controls position="bottom-left" />
         <MiniMap
           position="bottom-right"
@@ -343,9 +399,22 @@ export function BoardCanvas() {
         )}
         {doc.graph.nodes.length === 0 && doc.graph.groups.length === 0 && (
           <Panel position="top-center" className="!pointer-events-none !mt-24">
-            <p className="rounded-md bg-white/80 px-3 py-1.5 text-sm text-slate-500 shadow-sm dark:bg-slate-900/80 dark:text-slate-400">
-              Drag components here from the palette
-            </p>
+            <div
+              data-testid="canvas-empty"
+              className="max-w-sm rounded-lg border border-dashed border-slate-300 bg-white/90 px-5 py-4 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900/90"
+            >
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                This board is empty
+              </p>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                Drag components here from the palette, or press{' '}
+                <kbd className="rounded border border-slate-300 px-1 font-mono text-xs dark:border-slate-600">
+                  Ctrl/⌘ K
+                </kbd>{' '}
+                and type a component name. Start from a practice problem with{' '}
+                <span className="font-medium">Problems</span> in the top bar.
+              </p>
+            </div>
           </Panel>
         )}
       </ReactFlow>

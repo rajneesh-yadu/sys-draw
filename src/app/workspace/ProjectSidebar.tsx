@@ -1,5 +1,5 @@
 /** Project list: open, create, rename, duplicate, reorder (drag or menu), delete, export, import. */
-import { FolderPlus, Upload } from 'lucide-react';
+import { FolderPlus, PanelLeftClose, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { importSaveFile, projectFile } from '@/persistence';
 import { useWorkspaceStore, useWorkspaceStoreApi } from '@/store';
@@ -10,7 +10,8 @@ import { NoticeLine } from './notices';
 
 const DRAG_TYPE = 'application/x-sysdraw-project';
 
-export function ProjectSidebar() {
+/** `onCollapse` (S21): show a "Hide Projects" button in the header (the shell collapses the panel). */
+export function ProjectSidebar({ onCollapse }: { onCollapse?: () => void } = {}) {
   const api = useWorkspaceStoreApi();
   const projects = useWorkspaceStore((s) => s.data.projects);
   const boards = useWorkspaceStore((s) => s.data.boards);
@@ -54,7 +55,9 @@ export function ProjectSidebar() {
   return (
     <nav aria-label="Projects" className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-slate-200 px-3 py-1.5 dark:border-slate-800">
-        <h2 className="text-xs font-semibold tracking-wide text-slate-500 uppercase">Projects</h2>
+        <h2 className="text-xs font-semibold tracking-wide text-slate-500 dark:text-slate-400 uppercase">
+          Projects
+        </h2>
         <div className="flex">
           <IconButton label="Import JSON" onClick={() => fileInput.current?.click()}>
             <Upload size={14} aria-hidden />
@@ -69,6 +72,11 @@ export function ProjectSidebar() {
           >
             <FolderPlus size={14} aria-hidden />
           </IconButton>
+          {onCollapse && (
+            <IconButton label="Hide Projects" onClick={onCollapse}>
+              <PanelLeftClose size={14} aria-hidden />
+            </IconButton>
+          )}
         </div>
         <input
           ref={fileInput}
@@ -134,7 +142,9 @@ export function ProjectSidebar() {
                   {p.name}
                 </button>
               )}
-              <span className="text-xs text-slate-400">{p.boardIds.length}</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                {p.boardIds.length}
+              </span>
               <Menu
                 label={`Project ${p.name} actions`}
                 items={[
@@ -172,7 +182,7 @@ export function ProjectSidebar() {
           );
         })}
       </ul>
-      <p className="px-3 pb-1 text-[11px] text-slate-400">
+      <p className="px-3 pb-1 text-[11px] text-slate-500 dark:text-slate-400">
         {Object.keys(boards).length} boards in {projects.length} projects
       </p>
       <NoticeLine />

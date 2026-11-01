@@ -21,7 +21,7 @@ export function Checks({ items, label }: { items: CheckRow[]; label: string }) {
           <span>
             <span className="sr-only">{i.ok ? 'Passed: ' : 'Not yet: '}</span>
             {i.label}
-            {i.detail && <span className="text-slate-500"> — {i.detail}</span>}
+            {i.detail && <span className="text-slate-500 dark:text-slate-400"> — {i.detail}</span>}
           </span>
         </li>
       ))}
