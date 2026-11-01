@@ -56,6 +56,11 @@ export const EdgeConfigSchema = z.object({
   breakerErrorThreshold: RatioSchema.refine((v) => v > 0, 'Must be > 0').optional(),
   /** Seconds the breaker stays open before letting a trial tick through (default 30). */
   breakerOpenSec: z.number().finite().positive().optional(),
+  /**
+   * S14: share of requests that open a new connection (no keep-alive / pool reuse) and so pay the
+   * stack's handshake RTTs. Omit = 0 (every request reuses a warm connection).
+   */
+  newConnectionShare: RatioSchema.optional(),
 });
 export type EdgeConfig = z.infer<typeof EdgeConfigSchema>;
 

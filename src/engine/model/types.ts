@@ -11,6 +11,7 @@ import type {
   ProviderId,
   Scenario,
 } from '@/core';
+import type { ResolvedStack } from '@/network';
 import type { Pool, ScaleSpec } from '../scaling/pools';
 
 export type Op = FlowStep['op'];
@@ -97,6 +98,8 @@ export interface CompiledEdge {
   target: string;
   sync: boolean;
   protocolStack: readonly string[];
+  /** S14: the stack resolved against the protocol catalog (network module). */
+  stack: ResolvedStack;
   /** Timeouts, retries, backoff, circuit breaker (S11). */
   config: Readonly<EdgeConfig>;
   index: number;

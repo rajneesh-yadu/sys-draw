@@ -13,7 +13,21 @@ export default defineComponent({
     {
       id: 'out',
       direction: 'out',
-      protocols: ['http1', 'http2', 'grpc', 'tcp', 'postgres-wire', 'resp'],
+      protocols: [
+        'http1',
+        'http2',
+        'grpc',
+        'tcp',
+        'postgres-wire',
+        'mysql-wire',
+        'resp',
+        'memcache',
+        'kafka-wire',
+        'amqp',
+        'cql',
+        'mongodb-wire',
+        'dns',
+      ],
     },
   ],
   configSchema: z.object({

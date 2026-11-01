@@ -1,17 +1,25 @@
-/** Edge panel: protocol stack picker (filtered by ports + runsOn), sync/async, timeout, retries. */
+/**
+ * Edge panel: protocol stack picker (filtered by ports + runsOn) with the registry's suggested
+ * stack, sync/async, timeout, retries; "Network" tab (S14) with OSI layers, handshakes, ports,
+ * encryption and warnings.
+ */
 import { useId, useMemo, useState } from 'react';
 import { z } from 'zod';
+import { connectionCost, encryptionStatus, resolveStack, stackLabel } from '@/network';
 import { registry } from '@/registry';
 import {
   EdgeConfigSchema,
   edgeProtocolStackOptions,
+  edgeStackSuggestion,
   type EdgeConfigPatch,
   type EdgeInstance,
   type Graph,
+  type Scenario,
 } from '@/store';
 import type { FieldOverrides } from '../form/model';
 import { SchemaForm } from '../form/SchemaForm';
 import { ProtocolDocs } from './DocsView';
+import { EdgeNetwork } from './EdgeNetwork';
 import { PanelTitle, Section, Tabs } from './common';
 import { useDispatch } from './use-dispatch';
 
@@ -39,6 +47,10 @@ const EDGE_OVERRIDES: FieldOverrides = {
     advanced: true,
     help: 'Open when this share of calls failed over the last 10 s (e.g. 0.5); empty = no breaker',
   },
+  newConnectionShare: {
+    label: 'New connections',
+    help: 'Share of requests that open a new connection and pay its handshakes (0 = keep-alive / pooled, 1 = every request)',
+  },
   breakerOpenSec: {
     label: 'Circuit breaker: open for (s)',
     advanced: true,
@@ -46,11 +58,18 @@ const EDGE_OVERRIDES: FieldOverrides = {
   },
 };
 
-const protoName = (id: string) => registry.get(id, 'protocol')?.name ?? id;
 /** Bottom-up stack → "TCP › TLS 1.3 › HTTP/2". */
-const stackLabel = (stack: readonly string[]) => stack.map(protoName).join(' › ');
+const label = (stack: readonly string[]) => stackLabel(registry, stack);
 
-export function EdgePanel({ edge, graph }: { edge: EdgeInstance; graph: Graph }) {
+export function EdgePanel({
+  edge,
+  graph,
+  scenario,
+}: {
+  edge: EdgeInstance;
+  graph: Graph;
+  scenario: Scenario;
+}) {
   const dispatch = useDispatch();
   const pickerId = useId();
   const [pickError, setPickError] = useState<string | null>(null);
@@ -63,9 +82,16 @@ export function EdgePanel({ edge, graph }: { edge: EdgeInstance; graph: Graph })
     return opts.some((o) => o.join('/') === cur) ? opts : [edge.protocolStack, ...opts];
   }, [graph, edge]);
 
-  const layers = edge.protocolStack.map((id) => registry.get(id, 'protocol'));
-  const handshakeRtts = layers.reduce((sum, p) => sum + (p?.handshakeRtts ?? 0), 0);
-  const encrypted = layers.some((p) => p?.encrypted === true);
+  const resolved = useMemo(() => resolveStack(registry, edge.protocolStack), [edge.protocolStack]);
+  const handshakeRtts = connectionCost(resolved, 1).rtts;
+  const encrypted = encryptionStatus(resolved).encrypted;
+  const suggestion = useMemo(() => edgeStackSuggestion(registry, graph, edge), [graph, edge]);
+  const showSuggestion =
+    suggestion !== undefined && suggestion.stack.join('/') !== edge.protocolStack.join('/');
+  const pick = (stack: string[]) => {
+    const res = dispatch({ type: 'updateEdge', edgeId: edge.id, protocolStack: stack });
+    setPickError(res.ok ? null : res.reason);
+  };
 
   const settings = (
     <>
@@ -83,18 +109,11 @@ export function EdgePanel({ edge, graph }: { edge: EdgeInstance; graph: Graph })
             value={edge.protocolStack.join('/')}
             aria-invalid={pickError !== null}
             aria-describedby={`${pickerId}-sum${pickError !== null ? ` ${pickerId}-err` : ''}`}
-            onChange={(e) => {
-              const res = dispatch({
-                type: 'updateEdge',
-                edgeId: edge.id,
-                protocolStack: e.target.value.split('/'),
-              });
-              setPickError(res.ok ? null : res.reason);
-            }}
+            onChange={(e) => pick(e.target.value.split('/'))}
           >
             {options.map((o) => (
               <option key={o.join('/')} value={o.join('/')}>
-                {stackLabel(o)}
+                {label(o)}
               </option>
             ))}
           </select>
@@ -102,6 +121,20 @@ export function EdgePanel({ edge, graph }: { edge: EdgeInstance; graph: Graph })
             {handshakeRtts} handshake RTT{handshakeRtts === 1 ? '' : 's'} on a new connection ·{' '}
             {encrypted ? 'encrypted in transit' : 'plaintext — add TLS for anything sensitive'}
           </p>
+          {showSuggestion && (
+            <div className="mt-1 rounded border border-sky-200 bg-sky-50 p-2 text-xs text-sky-900 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-200">
+              <p>
+                <strong>Suggested:</strong> {label(suggestion.stack)} — {suggestion.why}
+              </p>
+              <button
+                type="button"
+                className="mt-1 rounded border border-sky-400 px-2 py-0.5 font-medium hover:bg-sky-100 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none dark:hover:bg-sky-900"
+                onClick={() => pick(suggestion.stack)}
+              >
+                Use {label(suggestion.stack)}
+              </button>
+            </div>
+          )}
           {pickError !== null && (
             <p id={`${pickerId}-err`} role="alert" className="mt-0.5 text-xs text-red-600">
               {pickError}
@@ -154,6 +187,11 @@ export function EdgePanel({ edge, graph }: { edge: EdgeInstance; graph: Graph })
       <Tabs
         tabs={[
           { id: 'settings', label: 'Settings', content: settings },
+          {
+            id: 'network',
+            label: 'Network',
+            content: <EdgeNetwork edge={edge} graph={graph} scenario={scenario} />,
+          },
           { id: 'docs', label: 'Docs', content: docs },
         ]}
       />

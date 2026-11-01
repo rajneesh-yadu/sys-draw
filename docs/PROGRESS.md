@@ -501,3 +501,49 @@ Known gaps / follow-ups:
 Tests: 87 added (582 total), all passing; `pnpm build` (one chunk-size warning, above), `pnpm lint`, `tsc -b` green.
 
 Next suggested session: S14 — Protocol catalog and edge inspector (several new components already reference protocol ids with no entry yet: `kafka-wire`, `amqp`, `resp`, `memcache`, `cql`, `mongodb-wire`, `postgres-wire`, `http3`). Small S13 follow-ups: provider prices/limits for the new components, TTL-aware hit rate.
+
+---
+
+## S14 — Protocols on every edge — 2026-11-01
+
+Status: done
+Changed: eslint.config.js + docs/ARCHITECTURE.md (dependency table); src/core/schemas/{registry,graph,result}.ts, src/core/README.md; src/registry/protocols/{tcp,tls13,http1,http2,grpc,websocket}.ts + 27 new entries (http3, graphql, sse, dns, smtp, mqtt, amqp, kafka-wire, resp, memcache, postgres-wire, mysql-wire, mongodb-wire, cql, tls12, mtls, json, protobuf, avro, udp, quic, ipv4, ipv6, icmp, anycast, ethernet, fibre), src/registry/{protocol-tools.ts (new), protocols.test.ts (new), index.ts, registry.test.ts, README.md}, src/registry/components/{clients/client.ts, compute/app-server.ts, compute/kubernetes.ts, compute/serverless-function.ts} (port protocols only); src/network/{stack.ts, cost.ts, inspect.ts, network.test.ts} (new), {index.ts, README.md}; src/engine/{simulate.ts, README.md, protocols.test.ts (new)}, src/engine/model/{protocol.ts (new), compile.ts, route.ts, types.ts}, src/engine/geo/distance.ts, src/engine/chaos/{timeline.ts, events.ts}; src/store/{connections.ts, commands.ts, index.ts, README.md, board-store.test.ts, inspector-commands.test.ts}; src/inspector/{Inspector.tsx, panels/EdgePanel.tsx, panels/EdgeNetwork.tsx (new), edge-network.test.tsx (new), README.md}; e2e/protocols.spec.ts (new); docs/PROGRESS.md
+
+**Architecture change (approved by the user at the start of the session):** `engine` and `inspector` may now import `network` (ARCHITECTURE.md module table + `MODULE_DEPENDENCIES`). Everything else is additive; nothing removed or renamed; no saved-format change, no migration (all new fields optional).
+
+Public APIs added/changed:
+
+- `core`: `ProtocolDefinitionSchema` optional `resumedHandshakeRtts`, `unitBytes`, `pattern`, `ports { plain?, secure? }`, `handshakeSequence`, `loss { recoveryRtts, minRecoveryMs, holBlocking }`, `implicit`, `conceptual`, `payloadSizeFactor`, `suggestedStacks [{ from, to, stack, why }]`; `HandshakeMessageSchema`, `ProtocolLossSchema`, `ProtocolSuggestionSchema`, `HOL_BLOCKING_SCOPES`, `PROTOCOL_PATTERNS`, `HANDSHAKE_SENDERS`. `EdgeConfig.newConnectionShare?` (ratio; default 0 = warm). `EdgeMetrics.rttMs?`, `coldLatencyMs?`, `overheadBytes?`; `handshakeMs` is now filled (cold handshake time, was always 0).
+- `registry`: `suggestedStacks(registry, fromDef, toDef)`, `matchScore`, type `StackSuggestion`.
+- `network` (new): `resolveStack`, `activeLayers`, `stackLabel`, `connectionCost(stack, rtt, warm)`, `requestLatency`, `perRequestOverhead(stack, payload)`, `lossDelay`, `osiView`, `handshakeSequence`, `stackPorts`, `isEncrypted`, `encryptionStatus`, `stackWarnings`, constants + types (see src/network/README.md). Note: functions take a `ResolvedStack` (from `resolveStack(registry, ids)`), not raw ids.
+- `engine`: `CompiledEdge.stack`; `NetHop.rttMs?`; `TimelineInput.edgeRttMs?`. `simulate`/`runSimulation` signatures unchanged.
+- `store`: `suggestedEdgeStack`, `edgeStackSuggestion`, type `EdgeStackSuggestion`; `connect` now uses a registry suggestion when one fits (behaviour change for client → CDN, compute → Kafka/stream, anything → DNS).
+- `inspector`: no export changes (EdgePanel gets a `scenario` prop internally).
+  Registry entries added: 27 protocols (33 total). Component ports: `client.app` out + `http3`; app server / serverless / Kubernetes out + `mysql-wire`, `memcache`, `kafka-wire`, `amqp`, `cql`, `mongodb-wire`, `dns`.
+  Tests: 89 added (671 total), all passing; `pnpm build` (the pre-existing chunk-size warning, main chunk now 1.58 MB), `pnpm lint`, `prettier --check src e2e docs` green. e2e: 11/11 pass (new `protocols.spec.ts`).
+
+Done-when check — **switching an edge from HTTP/1.1 to HTTP/2 to HTTP/3 changes cold-request latency by the expected RTTs:**
+
+- Unit (`engine/protocols.test.ts`): client (North America) → server in us-east, RTT 38.79 ms. Cold request = (handshake RTTs + 1) × RTT: HTTP/1.1 over TLS 1.3 = 3 RTT = 116.4 ms; HTTP/2 = 3 RTT (no change: ALPN negotiates it inside the TLS handshake); HTTP/3 over QUIC = 2 RTT = 77.6 ms (−1 RTT); HTTP/1.1 over TLS 1.2 = 4 RTT. Warm steady state stays 1 RTT for all; `newConnectionShare` 0.5 on HTTP/2 makes the edge 2 RTT and raises the flow p50 by exactly one RTT.
+- Packet loss (2 %, 11 kB): TCP +29.85 ms (8 segments, RTO 200 ms), QUIC +7.98 ms (10 packets, 9/8 × 38.8 ms).
+- e2e (production build, real worker): client → reverse proxy in us-east; the edge's Network tab reads New connection 116 ms / Warm 38.8 ms for HTTP/1.1, the same for HTTP/2, and 77.6 ms for HTTP/3 (UDP 443).
+
+Notes (decisions):
+
+- **Handshake model:** layers add `handshakeRtts` (TCP 1, TLS 1.3 1 / resumed 0, TLS 1.2 2 / 1, QUIC 1 incl. TLS / resumed 0, WebSocket 1, MQTT 1, RESP 1 (AUTH), Kafka 2, CQL 2, MySQL 2, MongoDB 2, PostgreSQL 3 (startup + SCRAM), AMQP 4, SMTP 2). Steady-state latency assumes warm connections unless `newConnectionShare` is set, so every pre-S14 number is unchanged; the cold cost is reported per edge.
+- **Stacks without a transport** (saved before S14, e.g. `['postgres-wire']`) are treated as running on TCP (`assumed`); the inspector says so. With no wire protocols registered before, such stacks were the default; new connections now get real stacks (`tcp › tls13 › postgres-wire`).
+- **IP / link layers** are `implicit` registry entries shown in the OSI view, never placed in `protocolStack` (adding `ip` under TCP would have invalidated every saved stack). TCP/UDP header bytes already include IPv4.
+- **Suggestions are data** on protocol entries (`suggestedStacks`): HTTP/3 for `category:clients` → `network.cdn`; Kafka wire over plain TCP for `category:compute` → Kafka / event stream (per the task; the inspector notes it is unencrypted); UDP for anything → DNS.
+- **Warnings** (network `stackWarnings`): plaintext over the internet (an end is a client component), plaintext inside (info), TLS 1.2, HTTP/1.1 head-of-line, multiplexing over TCP (warning when the scenario has packet loss on the edge), ≥ 3-RTT handshakes with > 10 % new connections, unknown/assumed/invalid layers, unreliable UDP.
+
+Known gaps / follow-ups:
+
+- **docs:** NETWORK-SECURITY.md / DATA-MODEL.md / ENGINE.md should record the new protocol fields, `newConnectionShare`, the edge metrics and the engine → network dependency in the next architecture session. engine, registry and inspector READMEs are 33–36 lines (they were already over 30).
+- Not in latency: head-of-line blocking (warned only), TCP slow start for large responses, bandwidth/serialisation time, DNS lookup time, TLS `SSLRequest` extra RTT for classic PostgreSQL. `bytesPerSec` and egress cost stay payload-only (header bytes are shown separately).
+- Cold latency is per edge; there is no end-to-end "first request" figure per flow yet — S15's request trace is the natural place (`handshakeSequence` gives the steps).
+- "Crosses the internet" in the inspector = one end is a client component; zones/security groups come with S16.
+- Encodings (JSON/Protobuf/Avro) are catalog entries only; edges cannot carry them yet (`perRequestOverhead` already applies `payloadSizeFactor` if a stack ever includes one).
+- Tests, build and e2e ran on a Linux copy of the repo (macOS-native `node_modules`); e2e used a local Playwright config pointing at the sandbox's Chromium (not committed). No new dependencies, so no `pnpm install` needed.
+- A `.s14tmp/` folder (source and change tarballs) is left at the repo root because deletes are blocked; it is git-ignored and safe to delete, as are `.s10tmp`–`.s13tmp`.
+
+Next suggested session: S15 — Request trace view (animate DNS → TCP → TLS → HTTP per hop using `handshakeSequence` and edge `rttMs`; add a per-flow cold first-request latency).

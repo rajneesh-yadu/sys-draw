@@ -42,11 +42,18 @@ const S13_COMPONENTS = [
 /** Components that exist on one cloud only (S12). */
 const PROVIDER_ONLY_COMPONENTS = ['database.aurora', 'database.spanner'];
 const SEEDED_PROTOCOLS = ['tcp', 'tls13', 'http1', 'http2', 'grpc', 'websocket'];
+/** S14: the full catalog from NETWORK-SECURITY.md (+ the wire protocols components already named). */
+const S14_PROTOCOLS = [
+  ...['http3', 'graphql', 'sse', 'dns', 'smtp', 'mqtt', 'amqp', 'kafka-wire', 'resp', 'memcache'],
+  ...['postgres-wire', 'mysql-wire', 'mongodb-wire', 'cql'],
+  ...['tls12', 'mtls', 'json', 'protobuf', 'avro'],
+  ...['udp', 'quic', 'ipv4', 'ipv6', 'icmp', 'anycast', 'ethernet', 'fibre'],
+];
 
 describe('seeded registry', () => {
   const all = registry.list();
 
-  it('loads the 14 generic + 15 S13 + 2 provider-only components, 6 protocols and 4 providers', () => {
+  it('loads the 14 generic + 15 S13 + 2 provider-only components, 33 protocols and 4 providers', () => {
     expect(
       registry
         .list({ kind: 'component' })
@@ -58,14 +65,14 @@ describe('seeded registry', () => {
         .list({ kind: 'protocol' })
         .map((p) => p.id)
         .sort(),
-    ).toEqual([...SEEDED_PROTOCOLS].sort());
+    ).toEqual([...SEEDED_PROTOCOLS, ...S14_PROTOCOLS].sort());
     expect(registry.list({ kind: 'provider' }).map((p) => p.id)).toEqual([
       'aws',
       'azure',
       'gcp',
       'generic',
     ]);
-    expect(registry.size).toBe(41);
+    expect(registry.size).toBe(68);
   });
 
   it('has unique ids across all kinds', () => {

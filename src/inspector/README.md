@@ -2,7 +2,7 @@
 
 Schema-driven forms for the selected node, edge, group, or (nothing selected) the board scenario.
 
-- **Depends on:** `store`, `registry` · **Built in:** S05
+- **Depends on:** `store`, `registry`, `network` (S14) · **Built in:** S05
 - **Rules:** Forms are generated from Zod schemas; every committed field edit dispatches exactly one store command (one undo step). Invalid values are blocked in the form with a reason, and again by the store.
 
 ## Public API (index.ts)
@@ -15,6 +15,10 @@ Schema-driven forms for the selected node, edge, group, or (nothing selected) th
 ## Scale quick actions (S09)
 
 Node panel → "On <provider>" (S12, `panels/ProviderInfo.tsx`): product, price-table date, the provider's service limits ("Exceeded" when the run has an `engine.limits` finding for it) and a no-equivalent warning; instance type options show the provider's instance name and price. Node panel → Scaling: +1 replica, Size up/down (same instance family, by vCPU), Add read replica, Shard ×2 — each one store command; fields found via registry `.meta({ scaling })` roles; unavailable actions are disabled with a reason (`panels/scale-actions.ts`).
+
+## Edge network tab (S14)
+
+Edge panel → Settings: stack picker + "Suggested: … [Use …]" (store `edgeStackSuggestion`), "New connections" field (`newConnectionShare`). → Network (`panels/EdgeNetwork.tsx`): encryption, ports, header bytes, request latency for new / resumed / warm connections (RTT from the last run's `perEdge[id].rttMs`), OSI layers, handshake sequence (state toggle), warnings — all from `@/network`.
 
 ## Scenario editor (S10)
 

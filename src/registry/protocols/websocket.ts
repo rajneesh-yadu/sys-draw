@@ -10,7 +10,13 @@ export default defineProtocol({
   reliable: true,
   ordered: true,
   encrypted: false,
-  runsOn: ['tcp', 'tls13'],
+  runsOn: ['tcp', 'tls13', 'tls12'],
+  pattern: 'bidirectional',
+  ports: { plain: [80], secure: [443] },
+  handshakeSequence: [
+    { from: 'client', message: 'GET Upgrade: websocket', detail: 'Sec-WebSocket-Key' },
+    { from: 'server', message: '101 Switching Protocols', detail: 'Sec-WebSocket-Accept' },
+  ],
   docs: {
     summary:
       'Long-lived, two-way message channel opened by an HTTP upgrade. The server can push messages at any time — used for chat, live feeds and multiplayer.',

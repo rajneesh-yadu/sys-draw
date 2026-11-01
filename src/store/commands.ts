@@ -25,7 +25,12 @@ import {
   type Scenario,
 } from '@/core';
 import { mapRegion, type Registry } from '@/registry';
-import { checkConnection, checkProtocolStack, defaultProtocolStack } from './connections';
+import {
+  checkConnection,
+  checkProtocolStack,
+  defaultProtocolStack,
+  suggestedEdgeStack,
+} from './connections';
 import { descendantsOf, labelBase, labelBaseFromName, nextLabel } from './graph-utils';
 import type { BoardDoc, Rect, Subgraph } from './types';
 
@@ -258,7 +263,16 @@ export function applyCommand(d: D, cmd: BoardCommand, ctx: CommandContext): void
     case 'connect': {
       const check = checkConnection(ctx.registry, d.graph as BoardDoc['graph'], cmd);
       if (!check.ok) return fail(check.reason);
-      const protocol = cmd.protocol ?? check.protocols[0];
+      // S14: a registry suggestion for this component pair wins over the generic ranking.
+      const suggestion = suggestedEdgeStack(
+        ctx.registry,
+        d.graph as BoardDoc['graph'],
+        cmd.source,
+        cmd.target,
+        check.protocols,
+        cmd.protocol,
+      );
+      const protocol = cmd.protocol ?? suggestion?.stack.at(-1) ?? check.protocols[0];
       if (protocol === undefined || !check.protocols.includes(protocol)) {
         fail(`Protocol "${String(protocol)}" is not shared by both ports`);
       }
@@ -272,7 +286,7 @@ export function applyCommand(d: D, cmd: BoardCommand, ctx: CommandContext): void
         target: cmd.target,
         sourcePortId: check.sourcePortId,
         targetPortId: check.targetPortId,
-        protocolStack: defaultProtocolStack(ctx.registry, protocol as string),
+        protocolStack: suggestion?.stack ?? defaultProtocolStack(ctx.registry, protocol as string),
         // Fire-and-forget into a queue; request/response everywhere else.
         sync: !(targetDef?.behaviors ?? []).includes('queue'),
         config: {},

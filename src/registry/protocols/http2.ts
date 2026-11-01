@@ -10,7 +10,17 @@ export default defineProtocol({
   reliable: true,
   ordered: true,
   encrypted: false,
-  runsOn: ['tls13', 'tcp'],
+  runsOn: ['tls13', 'tls12', 'mtls', 'tcp'],
+  pattern: 'multiplexed',
+  ports: { plain: [80], secure: [443] },
+  handshakeSequence: [
+    {
+      from: 'client',
+      message: 'Connection preface + SETTINGS',
+      detail: 'sent with the first request, no wait',
+    },
+    { from: 'server', message: 'SETTINGS + SETTINGS ACK' },
+  ],
   docs: {
     summary:
       'Binary HTTP with many concurrent streams on one connection and compressed headers. Same semantics as HTTP/1.1, far fewer connections.',

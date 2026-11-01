@@ -1,6 +1,6 @@
 /** Connection validation by port protocols, and the default protocol stack for a new edge. */
 import type { EdgeInstance, Graph } from '@/core';
-import type { EntryByKind, Registry } from '@/registry';
+import { suggestedStacks, type EntryByKind, type Registry } from '@/registry';
 
 type ComponentDef = EntryByKind['component'];
 type Port = ComponentDef['ports'][number];
@@ -225,4 +225,57 @@ export function checkProtocolStack(
     }
   }
   return null;
+}
+
+export interface EdgeStackSuggestion {
+  stack: string[];
+  why: string;
+}
+
+/**
+ * S14: the registry's default stack for this component pair (e.g. browser → CDN: HTTP/3,
+ * service → Kafka: Kafka wire over TCP), if one fits: its top protocol must be one both ports
+ * speak (and equal `protocol` when given) and every layer must run on the one below.
+ */
+export function suggestedEdgeStack(
+  registry: Registry,
+  graph: Graph,
+  sourceId: string,
+  targetId: string,
+  shared: readonly string[],
+  protocol?: string,
+): EdgeStackSuggestion | undefined {
+  const src = graph.nodes.find((n) => n.id === sourceId);
+  const tgt = graph.nodes.find((n) => n.id === targetId);
+  const srcDef = src && registry.get(src.defId, 'component');
+  const tgtDef = tgt && registry.get(tgt.defId, 'component');
+  if (!srcDef || !tgtDef) return undefined;
+  for (const s of suggestedStacks(registry, srcDef, tgtDef)) {
+    const top = s.stack[s.stack.length - 1] as string;
+    if (!shared.includes(top) || (protocol !== undefined && protocol !== top)) continue;
+    const valid = s.stack.every((id, i) => {
+      const p = registry.get(id, 'protocol');
+      const below = s.stack[i - 1];
+      return (
+        p !== undefined && (below === undefined ? p.runsOn.length === 0 : p.runsOn.includes(below))
+      );
+    });
+    if (valid) return { stack: [...s.stack], why: s.why };
+  }
+  return undefined;
+}
+
+/** The suggestion for an existing edge (shown in the edge inspector). */
+export function edgeStackSuggestion(
+  registry: Registry,
+  graph: Graph,
+  edge: EdgeInstance,
+): EdgeStackSuggestion | undefined {
+  return suggestedEdgeStack(
+    registry,
+    graph,
+    edge.source,
+    edge.target,
+    edgeSharedProtocols(registry, graph, edge),
+  );
 }

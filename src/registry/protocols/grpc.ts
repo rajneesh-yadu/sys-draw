@@ -11,6 +11,8 @@ export default defineProtocol({
   ordered: true,
   encrypted: false,
   runsOn: ['http2'],
+  pattern: 'multiplexed',
+  ports: { plain: [50051], secure: [443] },
   docs: {
     summary:
       'RPC framework that sends Protocol Buffers messages over HTTP/2 streams. Compact, typed and supports streaming in both directions — the default for service-to-service calls.',

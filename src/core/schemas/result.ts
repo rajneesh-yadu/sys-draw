@@ -26,7 +26,14 @@ export type NodeMetrics = z.infer<typeof NodeMetricsSchema>;
 export const EdgeMetricsSchema = z.object({
   rps: NonNegativeNumberSchema,
   latencyMs: LatencyPercentilesSchema,
+  /** Extra time a request on a NEW connection spends on handshakes = handshake RTTs × RTT (S14). */
   handshakeMs: NonNegativeNumberSchema,
+  /** S14: round trip between the two ends (propagation, rps-weighted over user regions), ms. */
+  rttMs: NonNegativeNumberSchema.optional(),
+  /** S14: one request on a cold connection = handshakeMs + RTT (+ loss), ms. */
+  coldLatencyMs: NonNegativeNumberSchema.optional(),
+  /** S14: protocol header bytes added to one request + response by the stack. */
+  overheadBytes: NonNegativeNumberSchema.optional(),
   bytesPerSec: NonNegativeNumberSchema,
   errorRate: RatioSchema,
   costPerMonth: NonNegativeNumberSchema,

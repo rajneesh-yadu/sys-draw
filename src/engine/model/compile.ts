@@ -3,6 +3,7 @@
  * model, attach its region from the enclosing groups, and index edges.
  */
 import type { Graph } from '@/core';
+import { resolveStack } from '@/network';
 import type { Registry } from '@/registry';
 import { behaviorsOf } from '../behaviors';
 import { EVEN_SPEC } from '../scaling/pools';
@@ -112,6 +113,7 @@ export function compile(graph: Graph, registry: ComponentSource): Model {
       target: e.target,
       sync: e.sync,
       protocolStack: e.protocolStack,
+      stack: resolveStack(registry, e.protocolStack),
       config: e.config,
       index,
     };

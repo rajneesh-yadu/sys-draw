@@ -24,7 +24,7 @@ export function Inspector() {
   // `key` resets per-item state (tabs, field errors) when the selection changes.
   if (node) return <NodePanel key={id} node={node} providerId={doc.providerId} />;
   const edge = doc.graph.edges.find((e) => e.id === id);
-  if (edge) return <EdgePanel key={id} edge={edge} graph={doc.graph} />;
+  if (edge) return <EdgePanel key={id} edge={edge} graph={doc.graph} scenario={doc.scenario} />;
   const group = doc.graph.groups.find((g) => g.id === id);
   if (group)
     return <GroupPanel key={id} group={group} graph={doc.graph} providerId={doc.providerId} />;

@@ -2,13 +2,14 @@
 
 Loads, validates and looks up every registry entry (components, protocols, providers, problems, rules, lessons).
 
-- **Depends on:** `core` · **Built in:** S03 (cloud providers: S12)
+- **Depends on:** `core` · **Built in:** S03 (cloud providers: S12, protocol catalog: S14)
 
 ## Public API (index.ts)
 
 - `registry` — the app registry, built at import: `get(id)`, `get(id, kind)`, `require(id, kind)`, `has`, `kindOf`, `sourceOf`, `size`, `list({ kind?, category?, tag?, provider? })` (sorted by kind, then id). Ids are unique across all kinds.
 - `defineComponent | defineProtocol | defineProvider | defineProblem | defineRule | defineLesson` — validate with Zod on import, throw `RegistryEntryError` ("Invalid component "x": path: message"), return a deep-frozen entry.
 - Providers (S12, `provider-tools.ts`): `isAvailableOn` (components tagged `provider-only` exist on their one cloud, never generic), `componentDisplayName`, `componentIcon`, `providerService`, `instancePrice(provider, componentId, typeId)` (service `instancePrices`, else family size × service premium; undefined ⇒ component price), `servicePricing`, `serviceLimits(provider, componentId, config?)`, `mapRegion`/`mapRegionId` (via region `genericId`, else nearest by great-circle), `planProviderSwitch(registry, graph, scenario, from, to)` (renames, icons, regions, no-equivalent warnings, limits); schemas `ProviderServiceSchema`, `ServiceLimitSchema`, `LimitCheckSchema`, `ProviderInstanceFamilySchema`, `AsOfDateSchema`.
+- Protocols (S14, `protocol-tools.ts`): `suggestedStacks(registry, fromDef, toDef)` → matching `suggestedStacks` of every protocol, most specific first (`matchScore`: id 4 > `tag:` 3 > `category:` 2 > any 1). 33 protocols (NETWORK-SECURITY.md table + wire protocols); `implicit` (IPv4, Ethernet, fibre) and `conceptual` (IPv6, ICMP, BGP/Anycast, JSON, Protobuf, Avro) entries are never placed on edges.
 - `findUnresolvedReferences(registry)` — protocol `runsOn` and port protocol ids with no entry.
 - `createRegistry`, `discoverEntries`, `RegistryLoadError`, `REGISTRY_KINDS` — for tests and tooling.
 - Schemas + types for kinds core lacks: `ProviderDefinition`, `RuleDefinition` (+ `RuleContext`, `RuleCheck`), `LessonDefinition`, `RegistryProblemDefinition` (core problem with required `docs`).

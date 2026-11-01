@@ -10,7 +10,16 @@ export default defineProtocol({
   reliable: true,
   ordered: true,
   encrypted: false,
-  runsOn: [], // the IP layer is implicit until the network session adds 'ip'
+  runsOn: [], // IPv4 is implicit (see ipv4.ts): it is shown in the OSI view, never placed on an edge
+  resumedHandshakeRtts: 1, // TCP Fast Open is rarely usable across the internet
+  unitBytes: 1460, // MSS on a 1500 B Ethernet MTU
+  pattern: 'stream',
+  handshakeSequence: [
+    { from: 'client', message: 'SYN', detail: 'initial sequence number' },
+    { from: 'server', message: 'SYN-ACK' },
+    { from: 'client', message: 'ACK', detail: 'may carry the first bytes of data' },
+  ],
+  loss: { recoveryRtts: 3, minRecoveryMs: 200, holBlocking: 'connection' },
   docs: {
     summary:
       'Reliable, ordered byte stream between two hosts. Almost every request in a web system rides on a TCP connection.',

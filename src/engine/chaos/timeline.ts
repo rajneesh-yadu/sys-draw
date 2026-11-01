@@ -27,6 +27,7 @@ import type {
   TimelineMarker,
   TimePoint,
 } from '@/core';
+import { lossDelay } from '@/network';
 import type { NetHop } from '../geo/distance';
 import type { GeoModel } from '../geo/places';
 import {
@@ -66,6 +67,8 @@ export interface TimelineInput {
   geo: GeoModel;
   loads: readonly FlowLoad[];
   options: EngineOptions;
+  /** S14: mean RTT per edge (ms) from the steady-state run, for packet-loss recovery times. */
+  edgeRttMs?: ReadonlyMap<string, number> | undefined;
 }
 
 export interface TimelineResult {
@@ -177,8 +180,15 @@ export function runTimeline(input: TimelineInput): TimelineResult {
           else mul(fx.spikeByRegion, ev.regionId, ev.multiplier);
           break;
         case 'packetLoss': {
-          const ms = packetLossDelayMs(ev.lossRate, bytes);
-          for (const id of ev.edgeId ? [ev.edgeId] : allEdges) add(fx.edgeAdded, id, ms);
+          // S14: recovery depends on the edge's transport (TCP RTO vs QUIC ≈ 9/8 RTT).
+          for (const id of ev.edgeId ? [ev.edgeId] : allEdges) {
+            const e = model.edges.get(id);
+            // No known transport (stub registry, unknown protocols): S11's TCP-like estimate.
+            const ms = e?.stack.transport
+              ? lossDelay(e.stack, input.edgeRttMs?.get(id) ?? 0, ev.lossRate, bytes).ms
+              : packetLossDelayMs(ev.lossRate, bytes);
+            add(fx.edgeAdded, id, ms);
+          }
           break;
         }
         case 'latencyInjection':

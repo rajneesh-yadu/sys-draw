@@ -31,6 +31,9 @@ export {
   edgeSharedProtocols,
   protocolStackOptions,
   rankProtocols,
+  suggestedEdgeStack,
+  edgeStackSuggestion,
+  type EdgeStackSuggestion,
   type ConnectionCheck,
   type ConnectionRequest,
 } from './connections';

@@ -13,6 +13,7 @@ import { placeOf, selectCalls, type GeoWalk } from '../geo/routing';
 import { hasBehavior, isDataStore } from './compile';
 import { asyncExpr, choice, EMPTY, type Expr, seq, visit } from './expr';
 import { engineFinding } from './findings';
+import { withProtocol } from './protocol';
 import type { FlowLoad } from './load';
 import type { CompiledNode, EngineOptions, Model, Op } from './types';
 
@@ -184,7 +185,10 @@ function graphRoute(
   ): Expr => {
     visits++;
     const here = geo ? placeOf(node, caller, geo) : undefined;
-    const net = geo && edgeId !== undefined ? netBetween(caller, here) : undefined;
+    const net =
+      geo && edgeId !== undefined
+        ? withProtocol(netBetween(caller, here), model.edges.get(edgeId))
+        : undefined;
     const calls: Call[] = [];
     if (visits <= options.maxVisits) {
       stack.add(node.id);
@@ -270,7 +274,7 @@ function pathRoute(flow: Flow, model: Model, options: EngineOptions, geo?: GeoWa
       then = b.routeRest?.({ node, op: step.op, step, rest, options });
       if (then !== undefined) break;
     }
-    const net = geo && i > 0 ? netBetween(places[i - 1], places[i]) : undefined;
+    const net = geo && i > 0 ? withProtocol(netBetween(places[i - 1], places[i]), edge) : undefined;
     rest = visit(node.id, step.op, then ?? rest, edge?.id, net);
     if (edge && !edge.sync && !hasBehavior(node, 'queue')) rest = asyncExpr(rest);
   }

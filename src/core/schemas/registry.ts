@@ -110,6 +110,58 @@ export type ComponentDefinition = z.infer<typeof ComponentDefinitionSchema>;
 
 export const OSI_LAYERS = [1, 2, 3, 4, 5, 6, 7] as const;
 
+/** How far a lost packet stalls traffic: the whole connection (TCP), one stream (QUIC), nothing. */
+export const HOL_BLOCKING_SCOPES = ['connection', 'stream', 'none'] as const;
+/** Communication pattern a protocol teaches (S14). */
+export const PROTOCOL_PATTERNS = [
+  'request-response',
+  'multiplexed',
+  'bidirectional',
+  'server-push',
+  'pub-sub',
+  'stream',
+  'datagram',
+  'encoding',
+  'security',
+  'routing',
+] as const;
+export const HANDSHAKE_SENDERS = ['client', 'server'] as const;
+
+/** One message of a connection handshake, in order (S14; shown in the edge inspector and trace). */
+export const HandshakeMessageSchema = z.strictObject({
+  from: z.enum(HANDSHAKE_SENDERS),
+  message: NonEmptyStringSchema, // 'SYN', 'ClientHello'
+  detail: z.string().optional(),
+});
+export type HandshakeMessage = z.infer<typeof HandshakeMessageSchema>;
+
+/**
+ * Loss recovery of a transport (S14): a lost packet costs max(minRecoveryMs, recoveryRtts × RTT)
+ * before it is resent (TCP: RTO ≈ SRTT + 4·RTTVAR ≈ 3 RTT, at least 200 ms on Linux; QUIC: time
+ * threshold 9/8 RTT, 1 ms granularity).
+ */
+export const ProtocolLossSchema = z.strictObject({
+  recoveryRtts: NonNegativeNumberSchema,
+  minRecoveryMs: NonNegativeNumberSchema,
+  holBlocking: z.enum(HOL_BLOCKING_SCOPES),
+});
+export type ProtocolLoss = z.infer<typeof ProtocolLossSchema>;
+
+/**
+ * A default stack for a component pair (S14). Matchers: component id ('messaging.kafka'),
+ * 'category:<category>' or 'tag:<tag>'; an empty list matches anything.
+ */
+export const ProtocolSuggestionSchema = z.strictObject({
+  from: z.array(NonEmptyStringSchema),
+  to: z.array(NonEmptyStringSchema),
+  /** Bottom-up stack, e.g. ['udp', 'quic', 'http3']. */
+  stack: z.array(ProtocolIdSchema).min(1),
+  why: NonEmptyStringSchema,
+});
+export type ProtocolSuggestion = z.infer<typeof ProtocolSuggestionSchema>;
+
+const PortNumberSchema = z.number().int().min(0).max(65_535);
+
 export const ProtocolDefinitionSchema = z.strictObject({
   id: ProtocolIdSchema,
   name: NonEmptyStringSchema,
@@ -122,6 +174,34 @@ export const ProtocolDefinitionSchema = z.strictObject({
   encrypted: z.boolean(),
   /** Allowed lower protocols; empty for the bottom of a stack. */
   runsOn: z.array(ProtocolIdSchema),
+  // ---- S14 (all optional, so older entries stay valid) ----
+  /** Handshake RTTs when a client resumes a session on a new connection (TLS 1.3 / QUIC 0-RTT = 0). */
+  resumedHandshakeRtts: NonNegativeNumberSchema.optional(),
+  /**
+   * `perMessageOverheadBytes` is paid once per this many bytes of the layer above (TCP segment
+   * = MSS 1460, TLS record = 16 384). Omitted = once per message.
+   */
+  unitBytes: PositiveIntSchema.optional(),
+  pattern: z.enum(PROTOCOL_PATTERNS).optional(),
+  /** Typical server ports: plain and over TLS (HTTP 80 / 443, PostgreSQL 5432 / 5432). */
+  ports: z
+    .strictObject({
+      plain: z.array(PortNumberSchema).optional(),
+      secure: z.array(PortNumberSchema).optional(),
+    })
+    .optional(),
+  /** Messages of the handshake on a new connection, in order. */
+  handshakeSequence: z.array(HandshakeMessageSchema).optional(),
+  /** Transports only: how a lost packet is recovered. */
+  loss: ProtocolLossSchema.optional(),
+  /** Assumed under every stack and never placed on an edge (IPv4, Ethernet): shown in the OSI view. */
+  implicit: z.boolean().optional(),
+  /** Taught in docs and the OSI view but not simulated or placed on edges (ICMP, BGP, fibre). */
+  conceptual: z.boolean().optional(),
+  /** Encodings: wire size of a payload relative to JSON (Protobuf ≈ 0.4). */
+  payloadSizeFactor: PositiveNumberSchema.optional(),
+  /** Default stacks for component pairs that should use this protocol. */
+  suggestedStacks: z.array(ProtocolSuggestionSchema).optional(),
   docs: z.strictObject({
     summary: NonEmptyStringSchema,
     handshakeSteps: z.array(z.string()),

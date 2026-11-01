@@ -11,6 +11,7 @@ import type {
   RegionMetrics,
   SimResult,
 } from '@/core';
+import { connectionCost, perRequestOverhead, requestLatency } from '@/network';
 import { instancePrice, servicePricing, userRegion, type ProviderDefinition } from '@/registry';
 import { behaviorsOf } from './behaviors';
 import { netBetween, type NetHop } from './geo/distance';
@@ -90,6 +91,9 @@ interface EdgeNet {
   msW: number;
   n: number;
   ms: number;
+  /** Same sums for the bare RTT (before protocol handshakes), S14. */
+  rttW: number;
+  rtt: number;
   internetRps: number;
   interRegionRps: number;
   /** Explain of the heaviest traversal. */
@@ -111,6 +115,8 @@ function collectNet(
           msW: 0,
           n: 0,
           ms: 0,
+          rttW: 0,
+          rtt: 0,
           internetRps: 0,
           interRegionRps: 0,
           explain: '',
@@ -120,6 +126,8 @@ function collectNet(
         a.msW += lambda * e.net.ms;
         a.n += 1;
         a.ms += e.net.ms;
+        a.rttW += lambda * (e.net.rttMs ?? e.net.ms);
+        a.rtt += e.net.rttMs ?? e.net.ms;
         if (e.net.cls === 'internet') a.internetRps += lambda;
         if (e.net.cls === 'inter-region') a.interRegionRps += lambda;
         if (lambda > a.explainW) {
@@ -251,18 +259,33 @@ export function simulate(
   const geoFindings: Finding[] = [];
   const bytesPerRequest = scenario.payloadBytes.req + scenario.payloadBytes.res;
   const perEdge: Record<string, EdgeMetrics> = {};
+  const edgeRttMs = new Map<string, number>();
   for (const [id, e] of model.edges) {
     const rps = edgeRps.get(id) ?? 0;
     const net = netAcc.get(id);
     let latency = net ? (net.w > 0 ? net.msW / net.w : net.ms / net.n) : 0;
+    const rttMs = net ? (net.w > 0 ? net.rttW / net.w : net.rtt / net.n) : 0;
+    // S14: protocol costs from the network module.
+    const hs = connectionCost(e.stack, rttMs, false);
+    const cold = requestLatency(e.stack, rttMs, false);
+    const overhead = perRequestOverhead(e.stack, scenario.payloadBytes);
+    const share = e.config.newConnectionShare ?? 0;
+    edgeRttMs.set(id, rttMs);
     const explain: Record<string, string> = {
       rps: `Requests per second routed over this connection = ${fmt(rps)}`,
-      bytesPerSec: `rps × (request + response bytes) = ${fmt(rps)} × ${fmt(bytesPerRequest)} = ${fmt(rps * bytesPerRequest)} B/s`,
+      bytesPerSec: `rps × (request + response bytes) = ${fmt(rps)} × ${fmt(bytesPerRequest)} = ${fmt(rps * bytesPerRequest)} B/s (payload only; protocol headers add ${fmt(overhead.overheadBytes)} B per request)`,
       latencyMs: net
-        ? `${net.explain}${net.n > 1 ? ` (shown: mean over user regions weighted by rps = ${fmt(latency)} ms)` : ''}. Handshakes and protocol overhead come with protocols (S14).`
+        ? `${net.explain}${net.n > 1 ? ` (shown: mean over user regions weighted by rps = ${fmt(latency)} ms)` : ''}.` +
+          (share > 0
+            ? ''
+            : ` Warm connections (keep-alive / pooling): no handshake per request — set "New connections" to charge one.`)
         : geo.active
-          ? 'Both ends are in the same place (same region, or an unplaced component next to its caller): no propagation delay. Handshakes come with protocols (S14).'
+          ? 'Both ends are in the same place (same region, or an unplaced component next to its caller): no propagation delay, so handshakes cost ≈ 0 ms.'
           : 'No component is placed in a region, so network distance is 0 ms. Put servers in a Region group to simulate it.',
+      rttMs: `Round trip between the two ends = ${fmt(rttMs)} ms${net && net.n > 1 ? ' (rps-weighted mean over user regions)' : ''}`,
+      handshakeMs: hs.explain,
+      coldLatencyMs: `First request on a new connection: ${cold.explain}`,
+      overheadBytes: overhead.explain,
     };
 
     // Egress: internet (to users / edge) and inter-region transfer, at the AVERAGE rate.
@@ -317,7 +340,10 @@ export function simulate(
     perEdge[id] = {
       rps,
       latencyMs: { p50: latency, p95: latency, p99: latency },
-      handshakeMs: 0,
+      handshakeMs: hs.ms,
+      rttMs,
+      coldLatencyMs: cold.totalMs,
+      overheadBytes: overhead.overheadBytes,
       bytesPerSec: rps * bytesPerRequest,
       errorRate: errors.get(e.target) ?? 0,
       costPerMonth: cost,
@@ -397,7 +423,7 @@ export function simulate(
   // S11: failures over time — only when the scenario has chaos events.
   const tl =
     options.timeline && scenario.events.length > 0
-      ? runTimeline({ model, graph, scenario, geo, loads, options })
+      ? runTimeline({ model, graph, scenario, geo, loads, options, edgeRttMs })
       : undefined;
 
   return {

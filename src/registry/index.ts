@@ -80,6 +80,7 @@ export {
   type SwitchWarning,
   type SwitchRegion,
 } from './provider-tools';
+export { matchScore, suggestedStacks, type StackSuggestion } from './protocol-tools';
 export { USER_REGIONS, UserRegionSchema, userRegion, type UserRegion } from './geo/user-regions';
 
 /** The app's registry: every entry auto-discovered from src/registry/*, validated at import time. */

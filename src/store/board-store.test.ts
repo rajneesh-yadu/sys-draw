@@ -2,7 +2,12 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { GraphSchema, type IdKind } from '@/core';
 import { registry } from '@/registry';
 import { createBoardStore, PASTE_OFFSET, type BoardStore } from './board-store';
-import { checkConnection, defaultProtocolStack, rankProtocols } from './connections';
+import {
+  checkConnection,
+  defaultProtocolStack,
+  edgeStackSuggestion,
+  rankProtocols,
+} from './connections';
 
 /** Deterministic ids: node_1, edge_2, grp_3 … */
 function counterIds() {
@@ -99,7 +104,7 @@ describe('connect', () => {
       'sql-database-1',
     ]);
     const toDb = graph().edges.find((e) => e.target === ids.db)!;
-    expect(toDb.protocolStack).toEqual(['postgres-wire']);
+    expect(toDb.protocolStack).toEqual(['tcp', 'tls13', 'postgres-wire']);
   });
 
   it('rejects incompatible ports, self loops and duplicates with a reason', () => {
@@ -146,7 +151,8 @@ describe('connection helpers', () => {
   it('builds bottom-up stacks preferring encryption', () => {
     expect(defaultProtocolStack(registry, 'http1')).toEqual(['tcp', 'tls13', 'http1']);
     expect(defaultProtocolStack(registry, 'tcp')).toEqual(['tcp']);
-    expect(defaultProtocolStack(registry, 'resp')).toEqual(['resp']);
+    expect(defaultProtocolStack(registry, 'resp')).toEqual(['tcp', 'tls13', 'resp']);
+    expect(defaultProtocolStack(registry, 'http3')).toEqual(['udp', 'quic', 'http3']);
   });
   it('checkConnection picks ports and reports a missing named port', () => {
     const lb = add('network.load-balancer');
@@ -427,5 +433,38 @@ describe('load', () => {
     s().load({ graph: { nodes: [], edges: [], groups: [] }, providerId: 'aws' });
     expect(s().doc.providerId).toBe('aws');
     expect(s().past).toHaveLength(0);
+  });
+});
+
+describe('default stack suggestions (S14)', () => {
+  const stackOf = (src: string, tgt: string) =>
+    graph().edges.find((e) => e.source === src && e.target === tgt)!.protocolStack;
+
+  it('browser → CDN: HTTP/3; service → Kafka: Kafka wire over TCP; client → DNS: UDP', () => {
+    const { client, cdn, lb } = buildF1();
+    expect(stackOf(client, cdn)).toEqual(['udp', 'quic', 'http3']);
+    // no suggestion for CDN → LB: generic ranking, encrypted first
+    expect(stackOf(cdn, lb)).toEqual(['tcp', 'tls13', 'http2']);
+    const app = add('compute.app-server');
+    const kafka = add('messaging.kafka');
+    ok(s().dispatch({ type: 'connect', source: app, target: kafka }));
+    expect(stackOf(app, kafka)).toEqual(['tcp', 'kafka-wire']);
+    const dns = add('network.dns');
+    ok(s().dispatch({ type: 'connect', source: client, target: dns }));
+    expect(stackOf(client, dns)).toEqual(['udp', 'dns']);
+  });
+
+  it('an explicit protocol uses the suggestion only when it is that protocol', () => {
+    const client = add('client.app');
+    const cdn = add('network.cdn');
+    ok(s().dispatch({ type: 'connect', source: client, target: cdn, protocol: 'http2' }));
+    expect(stackOf(client, cdn)).toEqual(['tcp', 'tls13', 'http2']);
+    const e = graph().edges[0]!;
+    expect(edgeStackSuggestion(registry, graph(), e)).toMatchObject({
+      stack: ['udp', 'quic', 'http3'],
+      why: expect.stringContaining('one round trip less'),
+    });
+    // switching HTTP/2 → HTTP/3 on the edge passes the runsOn check
+    ok(s().dispatch({ type: 'updateEdge', edgeId: e.id, protocolStack: ['udp', 'quic', 'http3'] }));
   });
 });

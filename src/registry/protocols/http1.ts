@@ -10,7 +10,9 @@ export default defineProtocol({
   reliable: true,
   ordered: true,
   encrypted: false,
-  runsOn: ['tcp', 'tls13'],
+  runsOn: ['tcp', 'tls13', 'tls12', 'mtls'],
+  pattern: 'request-response',
+  ports: { plain: [80], secure: [443] },
   docs: {
     summary:
       'Text-based request/response protocol. One request at a time per connection, so browsers open about six connections per host to get parallelism.',

@@ -8,7 +8,11 @@ export default defineComponent({
   tags: ['client', 'browser', 'mobile', 'edge-of-system'],
   icon: 'smartphone',
   ports: [
-    { id: 'out', direction: 'out', protocols: ['http1', 'http2', 'websocket', 'grpc', 'dns'] },
+    {
+      id: 'out',
+      direction: 'out',
+      protocols: ['http1', 'http2', 'http3', 'websocket', 'grpc', 'dns'],
+    },
   ],
   configSchema: z.object({
     platform: z.enum(['web', 'mobile']).describe('Browser app or native mobile app'),

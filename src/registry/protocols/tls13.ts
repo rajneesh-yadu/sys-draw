@@ -11,6 +11,18 @@ export default defineProtocol({
   ordered: true,
   encrypted: true,
   runsOn: ['tcp'],
+  resumedHandshakeRtts: 0, // PSK resumption with 0-RTT early data
+  unitBytes: 16384, // max TLS record payload
+  pattern: 'security',
+  handshakeSequence: [
+    { from: 'client', message: 'ClientHello', detail: 'key share, SNI, ALPN' },
+    {
+      from: 'server',
+      message: 'ServerHello … Finished',
+      detail: 'key share, encrypted certificate',
+    },
+    { from: 'client', message: 'Finished', detail: 'first encrypted request in the same flight' },
+  ],
   docs: {
     summary:
       'Encrypts and authenticates a TCP stream. TLS 1.3 needs one round trip to set up (zero with session resumption), versus two for TLS 1.2.',

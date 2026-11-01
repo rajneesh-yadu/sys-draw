@@ -126,13 +126,19 @@ describe('protocol stack helpers', () => {
   it('enumerates stacks by runsOn, encrypted first', () => {
     expect(protocolStackOptions(registry, 'http2')).toEqual([
       ['tcp', 'tls13', 'http2'],
+      ['tcp', 'tls12', 'http2'],
+      ['tcp', 'mtls', 'http2'],
       ['tcp', 'http2'],
     ]);
-    expect(protocolStackOptions(registry, 'grpc')).toEqual([
-      ['tcp', 'tls13', 'http2', 'grpc'],
-      ['tcp', 'http2', 'grpc'],
+    expect(protocolStackOptions(registry, 'grpc')[0]).toEqual(['tcp', 'tls13', 'http2', 'grpc']);
+    expect(protocolStackOptions(registry, 'grpc').at(-1)).toEqual(['tcp', 'http2', 'grpc']);
+    // S14: wire protocols are registered, so they get real stacks
+    expect(protocolStackOptions(registry, 'postgres-wire')).toEqual([
+      ['tcp', 'tls13', 'postgres-wire'],
+      ['tcp', 'tls12', 'postgres-wire'],
+      ['tcp', 'postgres-wire'],
     ]);
-    expect(protocolStackOptions(registry, 'postgres-wire')).toEqual([['postgres-wire']]);
+    expect(protocolStackOptions(registry, 'http3')).toEqual([['udp', 'quic', 'http3']]);
   });
 
   it('lists every option for an edge and each passes checkProtocolStack', () => {

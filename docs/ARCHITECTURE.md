@@ -83,21 +83,21 @@ The UI never computes metrics and the engine never touches React: the store send
 
 **Module boundaries** (each is a folder with an `index.ts` public API; nothing imports another module's internals)
 
-| Module        | Owns                                                                                      | Depends on                    |
-| ------------- | ----------------------------------------------------------------------------------------- | ----------------------------- |
-| `core`        | Zod schemas and types (section 4), ids, units, migrations                                 | nothing                       |
-| `registry`    | Loading and validating all registry entries; lookup by id/tag/provider                    | `core`                        |
-| `store`       | Workspace/project/board state, command bus (every edit is an undoable command), selection | `core`, `registry`            |
-| `canvas`      | React Flow rendering, palette, groups, edge drawing, overlays (heatmap, badges)           | `store`, `registry`           |
-| `inspector`   | Schema-driven forms for nodes, edges, groups, scenario                                    | `store`, `registry`           |
-| `engine`      | Simulation (section 5): pure functions + worker wrapper                                   | `core`, `registry`            |
-| `network`     | Protocol stacks, handshake/overhead math, trace generation (section 6)                    | `core`, `registry`            |
-| `security`    | Security controls, zone model, threat checks                                              | `core`, `registry`            |
-| `metrics-ui`  | Dashboards, per-node panels, charts, formula tooltips                                     | `store`                       |
-| `modes`       | Sandbox/Guided/Interview/Debug/Learn/Chaos controllers                                    | `store`, `registry`, `engine` |
-| `problems`    | Problem library UI, reference-solution loader                                             | `registry`, `store`           |
-| `estimator`   | Back-of-envelope calculator                                                               | `core`                        |
-| `persistence` | IndexedDB adapter, import/export, autosave, snapshots                                     | `core`, `store`               |
+| Module        | Owns                                                                                      | Depends on                     |
+| ------------- | ----------------------------------------------------------------------------------------- | ------------------------------ |
+| `core`        | Zod schemas and types (section 4), ids, units, migrations                                 | nothing                        |
+| `registry`    | Loading and validating all registry entries; lookup by id/tag/provider                    | `core`                         |
+| `store`       | Workspace/project/board state, command bus (every edit is an undoable command), selection | `core`, `registry`             |
+| `canvas`      | React Flow rendering, palette, groups, edge drawing, overlays (heatmap, badges)           | `store`, `registry`            |
+| `inspector`   | Schema-driven forms for nodes, edges, groups, scenario                                    | `store`, `registry`, `network` |
+| `engine`      | Simulation (section 5): pure functions + worker wrapper                                   | `core`, `registry`, `network`  |
+| `network`     | Protocol stacks, handshake/overhead math, trace generation (section 6)                    | `core`, `registry`             |
+| `security`    | Security controls, zone model, threat checks                                              | `core`, `registry`             |
+| `metrics-ui`  | Dashboards, per-node panels, charts, formula tooltips                                     | `store`                        |
+| `modes`       | Sandbox/Guided/Interview/Debug/Learn/Chaos controllers                                    | `store`, `registry`, `engine`  |
+| `problems`    | Problem library UI, reference-solution loader                                             | `registry`, `store`            |
+| `estimator`   | Back-of-envelope calculator                                                               | `core`                         |
+| `persistence` | IndexedDB adapter, import/export, autosave, snapshots                                     | `core`, `store`                |
 
 **Extension contract.** Every registry entry type exports one `define*` helper (`defineComponent`, `defineProvider`, `defineProtocol`, `defineProblem`, `defineRule`, `defineLesson`) that validates with Zod at load time. Registry files are auto-discovered with `import.meta.glob`, so adding a file is enough.
 

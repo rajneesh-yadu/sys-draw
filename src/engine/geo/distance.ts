@@ -37,6 +37,11 @@ export interface NetHop {
   cls?: 'internet' | 'inter-region' | undefined;
   /** S11: the two cloud regions a cloud ↔ cloud hop connects (for network partitions). */
   ends?: readonly [string, string] | undefined;
+  /**
+   * S14: round trip before protocol costs (propagation + last mile). `ms` = rttMs + the share of
+   * new connections × their handshake. Undefined ⇒ `ms` is the bare RTT.
+   */
+  rttMs?: number | undefined;
 }
 
 const rad = (deg: number) => (deg * Math.PI) / 180;

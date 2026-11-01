@@ -38,6 +38,9 @@ export function isActive(ev: ChaosEvent, tSec: number): boolean {
 }
 
 /**
+ * S11 form, kept for compatibility: TCP at RTT ≈ 0. Since S14 the timeline uses the network
+ * module's `lossDelay(stack, rtt, p, bytes)`, which picks the edge's transport (QUIC recovers in
+ * ≈ 9/8 RTT instead of a ≥ 200 ms RTO).
  * Mean extra delay per request from packet loss: a request/response of `bytes` needs
  * k = ⌈bytes / MSS⌉ segments; if any is lost (P = 1 − (1 − p)^k) TCP waits one RTO to resend.
  */
@@ -51,7 +54,7 @@ export function packetLossExplain(lossRate: number, bytes: number): string {
   return (
     `Packet loss ${pct(lossRate)}: ${fmt(bytes)} B ≈ ${k} TCP segments; P(any lost) = 1 − (1 − ${fmt(lossRate)})^${k}` +
     ` = ${pct(1 - (1 - lossRate) ** k)}, each costing one RTO (${TCP_MIN_RTO_MS} ms) ⇒ +${fmt(packetLossDelayMs(lossRate, bytes))} ms per call on average. ` +
-    'QUIC (HTTP/3) recovers faster and avoids head-of-line blocking (protocols come in S14).'
+    'QUIC (HTTP/3) recovers in about 9/8 RTT and only stalls the affected stream (see the edge inspector).'
   );
 }
 
