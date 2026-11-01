@@ -1,5 +1,6 @@
 /** A small accessible popover menu: ⋯ button, arrow-key navigation, Escape/outside click closes. */
 import { MoreHorizontal } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 export interface MenuItem {
@@ -24,6 +25,8 @@ export function Menu({
   const [confirming, setConfirming] = useState<MenuItem | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
+  const popup = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<{ top: number; right: number } | null>(null);
   const id = useId();
 
   const close = (focusButton = true) => {
@@ -34,12 +37,24 @@ export function Menu({
 
   useEffect(() => {
     if (!open) return;
-    const onDown = (e: PointerEvent) => {
-      if (!root.current?.contains(e.target as Node)) close(false);
+    const place = () => {
+      const rect = button.current?.getBoundingClientRect();
+      if (rect) setPosition({ top: rect.bottom + 4, right: Math.max(8, window.innerWidth - rect.right) });
     };
+    place();
+    const onDown = (e: PointerEvent) => {
+      const target = e.target as Node;
+      if (!root.current?.contains(target) && !popup.current?.contains(target)) close(false);
+    };
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
     document.addEventListener('pointerdown', onDown);
-    root.current?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled])')?.focus();
-    return () => document.removeEventListener('pointerdown', onDown);
+    popup.current?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled])')?.focus();
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+      document.removeEventListener('pointerdown', onDown);
+    };
   }, [open, confirming]);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -51,7 +66,7 @@ export function Menu({
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
     e.preventDefault();
     const els = [
-      ...(root.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])') ?? []),
+      ...(popup.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])') ?? []),
     ];
     const i = els.indexOf(document.activeElement as HTMLElement);
     const next = e.key === 'ArrowDown' ? (i + 1) % els.length : (i - 1 + els.length) % els.length;
@@ -90,12 +105,15 @@ export function Menu({
       >
         <MoreHorizontal size={14} aria-hidden />
       </button>
-      {open && (
+      {open && position && createPortal(
         <div
+          ref={popup}
           id={id}
           role="menu"
           aria-label={label}
-          className="absolute top-full right-0 z-50 mt-1 min-w-40 rounded-md border border-slate-200 bg-white py-1 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-800"
+          style={{ position: 'fixed', top: position.top, right: position.right, zIndex: 1000 }}
+          className="min-w-40 rounded-md border border-slate-200 bg-white py-1 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-800"
+          onKeyDown={onKeyDown}
         >
           {confirming ? (
             <>
@@ -141,7 +159,8 @@ export function Menu({
               </button>
             ))
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
