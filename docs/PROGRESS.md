@@ -744,3 +744,31 @@ Known gaps / follow-ups:
 - Tests and build ran on a Linux copy (macOS-native `node_modules`). `.s19tmp/` (source tarball) is left at the repo root because deletes are blocked; safe to delete.
 
 Next suggested session: S20 — one scoring function shared by Interview and the problems module, using `reviewDesign` + SLOs; add design-rule rubric lines and Debug variants (SPOF, hot partition, missing cache).
+
+## S20 — Back-of-envelope calculator — 2026-11-01
+
+What changed:
+
+- `estimator` (was a scaffold): pure math in `estimate.ts` — inputs DAU, requests/user/day, read:write, object size, retention, peak factor, replication, hot-data % (Zod-validated) → requests/day, QPS avg/peak and read/write split, storage per day / per year (× 365 × replication) / kept over retention, ingress/egress avg + peak (bytes/s and bits/s), cache for hot data (hot % × reads/day × size). Every result is an `EstimateLine` with its symbolic formula, the formula with values filled in, and an optional caveat. `scenario.ts` — `scenarioPatchFromEstimate` builds the "Push to scenario" patch. `latency.ts` + `LatencyCard` — latency numbers every engineer should know (log-scale bars, "if L1 = 1 s" column, rules of thumb). `draft.ts` — form parsing (`100M`, `1.5k`, `2,000`) with per-field errors. `EstimatorPanel` / `EstimatorButton` (dialog; the draft survives closing it). Own small `Dialog.tsx` (copy of the problems one, since estimator may import only core).
+- `app`: `estimator/EstimatorTopBarButton` + `push.ts` (`pushEstimateToBoard` = `updateScenario`, one undo step, plus a notice); the AppShell top bar gets "Estimate".
+
+Public APIs added: everything in `src/estimator/index.ts` (see its README). No existing API changed.
+
+Notes (decisions):
+
+- Push maps the estimate onto the engine's load formula λ = users × rpsPerUser × share × peak: users = DAU (spread over the scenario's regions in their current proportions, else `north-america`), rpsPerUser = actions ÷ 86 400, peakMultiplier = peak factor, so the simulated average equals QPS_avg. The daily cycle is turned off (the peak factor already is the busiest hour) and payloads become the per-request average (req = write share × size, res = read share × size) so simulated bandwidth matches. `usersByRegion` is documented as concurrent users; with DAU and a per-day rate the product is the same.
+- Flow shares: read flows share the read fraction and write flows (any `write` step) the write fraction, keeping their relative weights; if all flows are reads (or all writes) they get all traffic; no flows → one `flow_estimator` (empty path, follows the graph). The panel lists these effects before you push.
+- Cache uses the classic "20% of daily read volume" (an upper bound; noted in the UI).
+
+Tests: 33 added (1060 total) — `estimator/estimate.test.ts`, `scenario.test.ts`, `latency.test.ts`, `EstimatorPanel.test.tsx`, `app/estimator/estimator.test.tsx` (F12: DAU 100M × 10/day shows 11.6k rps; push → engine `generateLoad` gives 11 574 avg / 23 148 peak rps; undo restores the scenario). `tsc -b`, `pnpm lint`, `prettier --check src docs e2e` green; `pnpm build` green with the pre-existing chunk-size warning. Checked in Chromium (vite preview): dialog, push, notice, inspector shows the new users and payloads.
+
+Known gaps / follow-ups:
+
+- Estimator inputs are not saved with the board (kept only while the app is open); a board-level field needs a core schema change + migration.
+- No "pull from scenario" (pre-filling inputs from the scenario or a problem's scale numbers); problems could pass their DAU/ratio presets.
+- On a board with no flows the push can't split read/write traffic (one graph-following flow); storage/cache numbers are not pushed into component configs.
+- No e2e for the dialog. Tests/build ran on a Linux copy (macOS-native `node_modules`); `.s20tmp/` (source tarball) is left at the repo root because deletes are blocked — git-ignored, safe to delete.
+
+Next suggested session: S21 — Polish (Lighthouse a11y ≥ 90, 300-node perf test), plus the S19 follow-up: one scoring function shared by Interview and problems.
+
+Files touched: `src/estimator/{index.ts, README.md, estimate.ts, scenario.ts, latency.ts, draft.ts, Dialog.tsx, EstimatorPanel.tsx, LatencyCard.tsx, estimate.test.ts, scenario.test.ts, latency.test.ts, EstimatorPanel.test.tsx}`, `src/app/estimator/{EstimatorTopBarButton.tsx, push.ts, estimator.test.tsx}`, `src/app/layout/AppShell.tsx`, `src/app/README.md`, `docs/PROGRESS.md`.

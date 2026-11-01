@@ -703,6 +703,7 @@ canvas performance pass to 300 nodes at 60 fps, empty states, error boundaries.
 on below points (a,b) first tell user how much change is required, is it just few UI changes or it requires overall redesign
 a. make the PROJECTS and PALLETE section collapsible to left side
 b. make the METRICS section expandable to upper side for better view, since FAILURES OVER TIMES section is below that 
+
 Done when: Lighthouse accessibility >= 90; perf test with 300-node fixture passes.
 ```
 

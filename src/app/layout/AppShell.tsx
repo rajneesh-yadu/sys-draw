@@ -28,6 +28,7 @@ import { useSimulationRunner } from '../simulation/useSimulationRunner';
 import { useTraceRunner } from '../trace/useTraceRunner';
 import { useReviewRunner } from '../review/useReviewRunner';
 import { useSecurityRunner } from '../security/useSecurityRunner';
+import { EstimatorTopBarButton } from '../estimator/EstimatorTopBarButton';
 import {
   BoardTabs,
   NoticeProvider,
@@ -46,6 +47,7 @@ import { useNotice } from '../workspace/notice-context';
  * S17: "Problems" (browser + start) and, on a problem board, "Brief" in the top bar.
  * S18: mode switcher + "Progress" in the top bar; the mode's panel beside the canvas; the mode
  * runner drives the controllers (progress is kept in localStorage by the modes module).
+ * S20: "Estimate" in the top bar (back-of-envelope calculator; pushes into the scenario).
  */
 export function AppShell({
   autosave,
@@ -167,6 +169,7 @@ function TopBar({ autosave }: { autosave?: Autosave | undefined }) {
         <ProblemsButton onNotice={show} />
         <ProblemBriefButton onNotice={show} />
         <ProgressButton />
+        <EstimatorTopBarButton />
       </div>
       <div className="ml-auto flex items-center gap-3 text-xs text-slate-400">
         <ProviderSwitcher />
