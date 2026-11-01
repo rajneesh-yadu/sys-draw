@@ -26,7 +26,7 @@ test('S17: browse → filter → start a problem → load its reference design',
   await browser.getByRole('radio', { name: /Guided/ }).check();
   await browser.getByRole('button', { name: /Start problem/ }).click();
   await expect(browser).toHaveCount(0);
-  await expect(page.getByTestId('board-mode')).toHaveText('guided');
+  await expect(page.getByTestId('board-mode')).toHaveValue('guided');
   await expect(page.getByTestId('board-title')).toContainText('Instagram · Guided');
   await expect(page.locator('.react-flow__node-component')).toHaveCount(0);
 
@@ -49,7 +49,7 @@ test('S17: browse → filter → start a problem → load its reference design',
   await page.getByTestId('problem-item-problem.uber').click();
   await page.getByRole('radio', { name: /Interview/ }).check();
   await page.getByRole('button', { name: /Start problem/ }).click();
-  await expect(page.getByTestId('board-mode')).toHaveText('interview');
+  await expect(page.getByTestId('board-mode')).toHaveValue('interview');
   await page.getByTestId('open-problem-brief').click();
   await expect(page.getByTestId('hints-hidden')).toBeVisible();
   expect(errors).toEqual([]);

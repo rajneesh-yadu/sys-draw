@@ -180,3 +180,30 @@ export const company = (name: string) => `company:${name}`;
 export const GB = 1e9;
 export const TB = 1e12;
 export const PB = 1e15;
+
+// ---------- debug variants (S18) ----------
+
+/**
+ * A broken copy of a reference design for Debug mode. `edit` mutates the copy; keep every node a
+ * flow path visits (the variant is played with the problem's scenario).
+ */
+export function broken(reference: Graph, edit: (g: BrokenGraph) => void): Graph {
+  const g = structuredClone(reference);
+  edit(new BrokenGraph(g));
+  return g;
+}
+
+/** Small helpers for editing a reference copy by node key. */
+export class BrokenGraph {
+  constructor(readonly graph: Graph) {}
+  node(key: string): NodeInstance {
+    const n = this.graph.nodes.find((x) => x.id === nodeId(key));
+    if (!n) throw new Error(`broken(): no node "${key}"`);
+    return n;
+  }
+  edge(from: string, to: string): EdgeInstance {
+    const e = this.graph.edges.find((x) => x.id === edgeId(from, to));
+    if (!e) throw new Error(`broken(): no edge "${from}" → "${to}"`);
+    return e;
+  }
+}

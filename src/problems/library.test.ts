@@ -126,9 +126,13 @@ describe('formatting', () => {
 
 describe('modes and boards', () => {
   it('offers five modes; Debug needs a broken variant; Interview starts blank only', () => {
-    const opts = modeOptions(get('problem.chat'));
+    const opts = modeOptions(get('problem.news-feed'));
     expect(opts.map((m) => m.id)).toEqual(['guided', 'interview', 'sandbox', 'debug', 'chaos']);
     expect(opts.find((m) => m.id === 'debug')?.disabledReason).toMatch(/no broken variant/i);
+    // S18: problems that ship a broken variant can start in Debug.
+    expect(
+      modeOptions(get('problem.chat')).find((m) => m.id === 'debug')?.disabledReason,
+    ).toBeUndefined();
     expect(opts.find((m) => m.id === 'interview')?.starts).toEqual(['blank']);
     expect(opts.find((m) => m.id === 'chaos')?.starts[0]).toBe('reference');
     expect(hintsAllowed('interview')).toBe(false);
@@ -212,7 +216,7 @@ describe('starting a problem', () => {
   });
 
   it('reports a reason instead of throwing for an impossible start', () => {
-    const res = startProblem(ws, get('problem.chat'), { mode: 'debug', start: 'debug' });
+    const res = startProblem(ws, get('problem.news-feed'), { mode: 'debug', start: 'debug' });
     expect(res).toEqual({ ok: false, reason: expect.stringMatching(/no broken variant/i) });
   });
 

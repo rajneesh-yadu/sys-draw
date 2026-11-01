@@ -1,6 +1,6 @@
 /** S17 practice problem: Pastebin / GitHub Gist (level 2). */
 import { defineProblem } from '../../define';
-import { company, design, scenario, STACK, TB } from '../kit';
+import { broken, company, design, scenario, STACK, TB } from '../kit';
 
 const reference = design()
   .group('use1', 'region', 'US East', { regionId: 'us-east' })
@@ -123,7 +123,17 @@ export default defineProblem({
     { ruleId: 'rule.db-internet-reachable', weight: 1 },
     { ruleId: 'rule.plaintext-edge', weight: 1 },
   ],
-  debugVariants: [],
+  debugVariants: [
+    {
+      id: 'missing-index',
+      title: 'Paste reads crawl on a cache miss',
+      graph: broken(reference, (g) => {
+        g.node('db').config = { ...g.node('db').config, queryUsesIndex: false };
+      }),
+      expectedFix:
+        'The hot paste lookup has no index, so every cache miss scans 500 M rows. Turn on "query uses index" for the Metadata database.',
+    },
+  ],
   docs: {
     summary:
       'Design a text-sharing service: metadata vs blob storage, unguessable ids, CDN and cache for hot pastes, and background expiry.',

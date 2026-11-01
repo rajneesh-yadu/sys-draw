@@ -67,6 +67,23 @@ describe('problem library content (S17)', () => {
       expect(ref.groups.filter((g) => g.kind === 'region').every((g) => g.regionId)).toBe(true);
     });
 
+    it('debug variants (S18) are valid graphs that keep every node the flows visit', () => {
+      for (const v of p.debugVariants) {
+        expect(GraphSchema.safeParse(v.graph).success, v.id).toBe(true);
+        const ids = new Set(v.graph.nodes.map((n) => n.id));
+        for (const f of p.scenario.flows)
+          for (const step of f.path)
+            expect(ids.has(step.nodeId), `${v.id}: ${step.nodeId}`).toBe(true);
+        for (const n of v.graph.nodes) {
+          const def = registry.get(n.defId, 'component')!;
+          expect(def.configSchema.safeParse({ ...def.defaults, ...n.config }).success).toBe(true);
+        }
+        for (const r of v.fixedWhenRulesPass ?? [])
+          expect(registry.get(r, 'rule'), r).toBeDefined();
+        expect(JSON.stringify(v.graph)).not.toEqual(JSON.stringify(ref));
+      }
+    });
+
     it('has a scenario preset whose flows walk the reference design', () => {
       expect(ScenarioSchema.safeParse(p.scenario).success).toBe(true);
       expect(p.scenario.flows.length).toBeGreaterThanOrEqual(2);

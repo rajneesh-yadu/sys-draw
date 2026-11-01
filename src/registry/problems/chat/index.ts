@@ -1,6 +1,6 @@
 /** S17 practice problem: chat like WhatsApp or Discord (level 3). */
 import { defineProblem } from '../../define';
-import { company, design, PB, scenario, STACK } from '../kit';
+import { broken, company, design, PB, scenario, STACK } from '../kit';
 
 const reference = design()
   .group('use1', 'region', 'US East', { regionId: 'us-east' })
@@ -150,7 +150,18 @@ export default defineProblem({
     { ruleId: 'rule.plaintext-edge', weight: 1 },
     { ruleId: 'rule.missing-service-auth', weight: 1 },
   ],
-  debugVariants: [],
+  debugVariants: [
+    {
+      id: 'plaintext-websocket',
+      title: 'Messages readable on café Wi-Fi',
+      graph: broken(reference, (g) => {
+        g.edge('client', 'waf').protocolStack = ['tcp', 'websocket'];
+      }),
+      expectedFix:
+        'The apps open ws:// instead of wss://: every chat message crosses the internet in plaintext. Add TLS 1.3 under the WebSocket on the client edge.',
+      fixedWhenRulesPass: ['rule.plaintext-edge'],
+    },
+  ],
   docs: {
     summary:
       'Design a real-time chat system: persistent connections, a session registry, durable ordered message storage, fan-out to online users and sync for offline ones.',

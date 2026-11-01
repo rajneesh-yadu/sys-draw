@@ -1,6 +1,6 @@
 /** S17 practice problem: a payment system like Stripe or PayPal (level 5). */
 import { defineProblem } from '../../define';
-import { company, design, scenario, STACK, TB } from '../kit';
+import { broken, company, design, scenario, STACK, TB } from '../kit';
 
 const reference = design()
   .group('use1', 'region', 'US East (primary)', { regionId: 'us-east' })
@@ -163,7 +163,18 @@ export default defineProblem({
     { ruleId: 'rule.secrets-in-config', weight: 1 },
     { ruleId: 'rule.missing-service-auth', weight: 1 },
   ],
-  debugVariants: [],
+  debugVariants: [
+    {
+      id: 'ledger-in-public-subnet',
+      title: 'The ledger has a public IP',
+      graph: broken(reference, (g) => {
+        g.node('ledger').groupId = 'grp_edge';
+      }),
+      expectedFix:
+        'The ledger database was placed in the public subnet beside the load balancer, so it is reachable from the internet. Move it back into the private data subnet.',
+      fixedWhenRulesPass: ['rule.db-internet-reachable'],
+    },
+  ],
   docs: {
     summary:
       'Design a payment platform: idempotent APIs, an ACID double-entry ledger, PSP integration with unknown outcomes, reconciliation, PCI isolation and a standby region.',

@@ -106,7 +106,7 @@ describe('seeded registry', () => {
       'generic',
     ]);
     expect(registry.list({ kind: 'problem' })).toHaveLength(10); // S17
-    expect(registry.size).toBe(93);
+    expect(registry.size).toBe(98);
   });
 
   it('has unique ids across all kinds', () => {

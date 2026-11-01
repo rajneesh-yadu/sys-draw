@@ -671,3 +671,44 @@ Known gaps / follow-ups:
 - Tests, build and e2e ran on a Linux copy (macOS-native `node_modules`); e2e used a local Playwright config pointing at the sandbox's Chromium (not committed). No new dependencies. A `.s17tmp/` folder (source tarball) is left at the repo root because deletes are blocked; git-ignored and safe to delete, as are `.s10tmp`–`.s16tmp`.
 
 Next suggested session: S18 — Modes (ModeController per mode; Guided steps and Interview timer driven by the problem entry; add `debugVariants` to a few problems for Debug mode).
+
+---
+
+## S18 — Sandbox, Guided, Interview, Debug, Chaos, Learn — 2026-11-01
+
+Status: done
+Changed: src/modes/{types, define, registry, mode-store, runner, board-actions, evaluate, guided, interview, debug, chaos, learn, progress, test-utils}.ts (new), src/modes/controllers/{sandbox, guided, interview, debug, chaos, learn}.ts (new), src/modes/ui/{context.ts, ModesProvider, ModeSwitcher, ModePanel, GuidedPanel, InterviewPanel, DebugPanel, ChaosPanel, LearnPanel, MiniBoard, ProblemPicker, ProgressPage, Checks, Dialog}.tsx + styles.ts (new), src/modes/{evaluate, guided, interview, debug, chaos-learn, progress, runner}.test.ts + ui.test.tsx (new), src/modes/{index.ts, README.md}; src/registry/lessons/{consistent-hashing, cap-theorem, tls-handshake, kafka-partitions, cache-aside}.ts + lessons.test.ts (new), src/registry/problems/kit.ts (`broken()` / `BrokenGraph`), src/registry/problems/{url-shortener, pastebin, rate-limiter, chat, payment-system}/index.ts (`debugVariants`), src/registry/problems/problems.test.ts, src/registry/{registry.test.ts (size 93 → 98), README.md}; src/problems/{library.test.ts, ProblemBrowser.test.tsx} (assumed no variants shipped); src/app/layout/AppShell.tsx; e2e/modes.spec.ts (new), e2e/problems.spec.ts (`board-mode` is now a select: `toHaveValue`); docs/PROGRESS.md
+
+**Public APIs — additive only. No other module's API changed, no saved-format change, no migration** (`Board.mode` / `Board.problemId` already existed; the modes module sets them with the workspace store's own `setState` and edits designs with existing commands — `replaceGraph`, `updateScenario`, `batch`, `updateEdge`).
+
+- `modes` (new content): see src/modes/README.md — `defineMode`, `ModeController`, `ModeContext`, `modes` registry (controllers auto-discovered from `controllers/*.ts`), `createModeStore`, `startModeRunner`, board actions (`setBoardMode`, `setBoardProblem`, `attachProblem`, `fitScenario`, `loadDebugCase`, `loadLessonBoard`), judging helpers (`sloValue`, `checkSlo`, `judgeRubric`, `costShare`, `runRules`, …), per-mode logic (`GUIDED_STEPS`/`guidedSteps`, `INTERVIEW_PROMPTS`/`buildScorecard`, `debugCases`/`debugStatus`/`debugHints`, `CHAOS_PRESETS`/`chaosVerdict`, `listLessons`/`gradeQuiz`), progress (`createProgressStore`, `parseProgress`, `progressSummary`), UI (`ModesProvider`, `useModeRunner`, `ModeSwitcher`, `ModePanel`, `ProgressButton`/`ProgressPage`, `LessonPlayer`, `MiniBoard`).
+- `registry`: 5 lesson entries; 5 problems now ship one debug variant each; `problems/kit.ts` gains `broken(reference, edit)` (internal to the registry folder).
+
+Tests: 83 added (925 total), all passing; `tsc -b`, `pnpm lint`, `prettier --check src docs e2e` green; `pnpm build` green with the pre-existing chunk-size warning. e2e: 15/15 pass (new `modes.spec.ts`).
+
+Done-when — **F11 ("each mode can be entered on any board; Debug mode loads a broken design and confirms when it's fixed")**:
+
+- e2e `modes.spec.ts` (production build, real worker), all on the default free board: Sandbox (no panel) → Guided (pick URL shortener; step 2 estimate 30,000 rps passes "ours ≈ 31k rps") → Interview (clock 45:00, brief shows hints hidden, Finish → scorecard) → Learn (cache-aside lesson, mini-board, "Try it on the board" → 4 nodes, quiz 3/3 passed) → Chaos (Traffic spike ×3 → "1 failure scheduled", verdict on the timeline) → Debug ("Rate limiter: API keys travel in the clear" → symptom "Plaintext over the internet"; Security panel "Fix: Encrypt with TLS 1.3" → "Fixed", panel `data-complete=true`) → Sandbox; Progress lists the lesson (100) and the rate limiter (Debug).
+- Unit: `runner.test.ts` enters all six modes on one board via `setBoardMode`; `debug.test.ts` checks every shipped variant is drawable (connection + stack checks), broken (symptoms, not healthy), and healthy again once the changed elements are restored from the reference; `ui.test.tsx` covers each panel.
+
+Notes (decisions):
+
+- **ModeController** = pure hooks over the mode's own state + `onAction` for panel actions; the runner (not the controllers) reads the stores, forwards graph changes / results / 1 s ticks, asks for a fresh run on enter, and records progress. A session restarts when the board, its mode or its problem changes. Mode state is in memory (an Interview clock restarts after a reload).
+- **Guided** (7 cards): requirements ticked (free board: ≥ 3 written), peak rps (Σ users × rps/user × share × peak) and stored bytes within 2×, ≥ max(2, flows) `VERB /path` endpoints, ≥ 2 entities with ≥ 2 fields, graph has client + service + data store and every flow served (< 1 % errors), every rubric SLO (free board: p99 < 500 ms per flow) and no node > 85 %, no bottleneck + rubric rules pass + a 10× note. Score 100 − 8 per hint (min 40).
+- **Interview**: 45 min; follow-ups at 5/15/25/32/38/43 min (data); auto-finish at 0:00. Scorecard = 70 % rubric (SLOs + rules; rules only count on a non-empty, simulated design) + 15 % cost (≤ 1.25× the reference's monthly cost = full, 0 at 3×; the runner simulates the reference in the worker) + 15 % self-review; renormalised when cost is unknown. Hints/reference stay hidden through the problems module's existing `hintsAllowed('interview')`; the scorecard lists the hints afterwards.
+- **Debug**: healthy = the variant's `fixedWhenRulesPass` rules report nothing and every rubric SLO holds; "fixed" needs a fresh result showing it broken first, then a fresh healthy one (results older than the last graph change are ignored). Hints are generated: where the fault shows (rules vs metrics) → the changed element (diff vs reference) → `expectedFix`; −25 each. Variants: URL shortener single small API server (SLOs), pastebin missing index (SLOs), rate limiter plaintext gateway, chat ws:// (plaintext-edge), payments ledger in the public subnet (db-internet-reachable). Loading on any board replaces graph + scenario as one undo step and sets the board's problem.
+- **Chaos**: presets add one event (start at duration/6, last duration/3) as an undoable `updateScenario`; targets = the problem's availability SLO and loosest p99 SLO (defaults 99 % / 1 s); verdict over the timeline (min availability, max p99, recovery after the last failure).
+- **Learn**: lessons are registry entries; the mini-board is an SVG (modes may not import canvas) highlighting each step's `focusIds`, and "Try it on the board" loads it with `replaceGraph`. Pass = ≥ 2/3 right.
+- **Progress** lives in localStorage (`sysdraw.progress`, `schemaVersion` 1, Zod-validated, forward `PROGRESS_MIGRATIONS`; unreadable/newer data starts fresh with a warning), separate from the workspace file. An attempt is recorded on completion, or when an unfinished session of ≥ 10 s ends.
+- The top-bar `board-mode` test id moved from a text span to the mode `<select>`.
+
+Known gaps / follow-ups:
+
+- **docs:** MODES.md / DATA-MODEL.md should record the progress file, the controller hooks beyond the four in MODES.md (`onTick`, `onAction`, `score`, `subject`, `needsReferenceCost`) and the scoring weights in the next architecture session.
+- Board mode/problem changes are not undoable and do not bump the project's `updatedAt` (no store API for it; autosave still saves them).
+- Progress is per browser (not exported with the workspace). Interview / Guided state is not persisted across reloads.
+- Only security rules exist as registry rules, so Debug faults are either SLO-visible (capacity, missing index) or security-visible; SPOF / hot-partition / cache-stampede variants need engine findings as rules (S19) or chaos-backed checks. Guided's API / data-model checks are format checks, not semantic ones.
+- Chaos verdict uses the analytical timeline the engine already produces; no per-flow targets during chaos. Learn quizzes are multiple choice only.
+- Tests, build and e2e ran on a Linux copy of the repo (macOS-native `node_modules`); e2e used a local Playwright config pointing at the sandbox's Chromium (not committed). No new dependencies. A `.s18tmp/` folder (source tarball) is left at the repo root because deletes are blocked; git-ignored and safe to delete, as are `.s10tmp`–`.s17tmp`.
+
+Next suggested session: S19 — Evaluator and review rules (engine findings such as SPOF / hot partition as registry rules, `reviewSecurity` merged into findings, one scoring function shared by Interview and the problems module).

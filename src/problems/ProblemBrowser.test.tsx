@@ -70,8 +70,8 @@ describe('problem browser', () => {
     expect(within(pane).getByTestId('problem-scale')).toHaveTextContent('100 : 1 reads : writes');
     expect(within(pane).getByTestId('problem-scale')).toHaveTextContent('≈ 30.6k requests/s');
     expect(within(pane).getByTestId('problem-rubric')).toHaveTextContent('p99 < 200 ms (Redirect)');
-    // Debug is disabled with a reason (no broken variants ship yet).
-    expect(within(pane).getByRole('radio', { name: /Debug/ })).toBeDisabled();
+    // S18: the URL shortener ships a broken variant, so Debug can be chosen.
+    expect(within(pane).getByRole('radio', { name: /Debug/ })).toBeEnabled();
   });
 
   it('starts a problem on a new board in the chosen mode and closes', () => {

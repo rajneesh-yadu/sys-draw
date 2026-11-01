@@ -1,6 +1,6 @@
 /** S17 practice problem: a distributed API rate limiter (level 1). */
 import { defineProblem } from '../../define';
-import { company, design, GB, scenario, STACK } from '../kit';
+import { broken, company, design, GB, scenario, STACK } from '../kit';
 
 const reference = design()
   .group('use1', 'region', 'US East', { regionId: 'us-east' })
@@ -110,7 +110,18 @@ export default defineProblem({
     { ruleId: 'rule.no-rate-limit-public-api', weight: 2 },
     { ruleId: 'rule.plaintext-edge', weight: 1 },
   ],
-  debugVariants: [],
+  debugVariants: [
+    {
+      id: 'plaintext-gateway',
+      title: 'API keys travel in the clear',
+      graph: broken(reference, (g) => {
+        g.edge('client', 'gw').protocolStack = ['tcp', 'http1'];
+      }),
+      expectedFix:
+        'Clients reach the API gateway over plain HTTP/1.1, so API keys and tokens cross the internet unencrypted. Put TLS 1.3 (and HTTP/2) on the client → gateway edge.',
+      fixedWhenRulesPass: ['rule.plaintext-edge'],
+    },
+  ],
   docs: {
     summary:
       'Design a distributed rate limiter that protects an API: shared counters, a fast check on every request and a clear answer (429) when a client is over its limit.',

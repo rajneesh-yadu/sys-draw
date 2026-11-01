@@ -1,6 +1,6 @@
 /** S17 practice problem: a URL shortener such as bit.ly or TinyURL (level 1). */
 import { defineProblem } from '../../define';
-import { company, design, scenario, STACK, TB } from '../kit';
+import { broken, company, design, scenario, STACK, TB } from '../kit';
 
 const reference = design()
   .group('use1', 'region', 'US East', { regionId: 'us-east' })
@@ -110,7 +110,17 @@ export default defineProblem({
     { ruleId: 'rule.no-rate-limit-public-api', weight: 1 },
     { ruleId: 'rule.db-internet-reachable', weight: 1 },
   ],
-  debugVariants: [],
+  debugVariants: [
+    {
+      id: 'single-api-server',
+      title: 'Redirects time out at peak',
+      graph: broken(reference, (g) => {
+        g.node('api').scaling = { replicas: 1, instanceType: 'small' };
+      }),
+      expectedFix:
+        'The Shortener API runs on one small instance and saturates at peak. Scale it out (≈ 4 medium replicas behind the load balancer) or up.',
+    },
+  ],
   docs: {
     summary:
       'Design a service that turns long URLs into short aliases and redirects millions of clicks a second: id generation, a key-value store and a hot-key cache.',

@@ -10,6 +10,15 @@ import {
 } from '@/canvas';
 import { Inspector } from '@/inspector';
 import { MetricsDrawer } from '@/metrics-ui';
+import {
+  createModeStore,
+  createProgressStore,
+  ModePanel,
+  ModesProvider,
+  ModeSwitcher,
+  ProgressButton,
+  useModeRunner,
+} from '@/modes';
 import type { Autosave } from '@/persistence';
 import { ProblemBriefButton, ProblemsButton } from '@/problems';
 import { projectOfBoard, useWorkspaceStore } from '@/store';
@@ -32,6 +41,8 @@ import { useNotice } from '../workspace/notice-context';
  * `autosave` comes from persistence (main.tsx); without it nothing is saved (tests).
  * `simulate` (default true) keeps the open board simulated (300 ms after each change, or on Run).
  * S17: "Problems" (browser + start) and, on a problem board, "Brief" in the top bar.
+ * S18: mode switcher + "Progress" in the top bar; the mode's panel beside the canvas; the mode
+ * runner drives the controllers (progress is kept in localStorage by the modes module).
  */
 export function AppShell({
   autosave,
@@ -44,6 +55,10 @@ export function AppShell({
   // S16: security overlay + threat review — the canvas shows it, this runner fills it.
   const [securityStore] = useState(createSecurityStore);
   useSecurityRunner(securityStore);
+  // S18: modes — the session of the open board and local progress.
+  const [modeStore] = useState(createModeStore);
+  const [progressStore] = useState(() => createProgressStore());
+  useModeRunner(modeStore, progressStore);
 
   // Ctrl/Cmd+S saves now instead of opening the browser's "Save page" dialog.
   useEffect(() => {
@@ -60,63 +75,66 @@ export function AppShell({
 
   return (
     <NoticeProvider>
-      <CanvasProvider traceStore={traceStore} securityStore={securityStore}>
-        <div className="flex h-screen flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-          <TopBar autosave={autosave} />
+      <ModesProvider modeStore={modeStore} progressStore={progressStore}>
+        <CanvasProvider traceStore={traceStore} securityStore={securityStore}>
+          <div className="flex h-screen flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+            <TopBar autosave={autosave} />
 
-          <div className="flex min-h-0 flex-1">
-            <aside
-              aria-label="Projects"
-              data-testid="region-projects"
-              className="w-52 shrink-0 border-r border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900"
-            >
-              <ProjectSidebar />
-            </aside>
+            <div className="flex min-h-0 flex-1">
+              <aside
+                aria-label="Projects"
+                data-testid="region-projects"
+                className="w-52 shrink-0 border-r border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <ProjectSidebar />
+              </aside>
 
-            <aside
-              aria-label="Component palette"
-              data-testid="region-palette"
-              className="w-60 shrink-0 overflow-y-auto border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
-            >
-              <PanelHeader title="Palette" />
-              <Palette />
-            </aside>
+              <aside
+                aria-label="Component palette"
+                data-testid="region-palette"
+                className="w-60 shrink-0 overflow-y-auto border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+              >
+                <PanelHeader title="Palette" />
+                <Palette />
+              </aside>
 
-            <div className="flex min-w-0 flex-1 flex-col">
-              <BoardTabs />
-              <div className="flex min-h-0 flex-1">
-                <main
-                  id="board-canvas-region"
-                  aria-label="Design canvas"
-                  data-testid="region-canvas"
-                  className="relative min-h-0 min-w-0 flex-1"
+              <div className="flex min-w-0 flex-1 flex-col">
+                <BoardTabs />
+                <div className="flex min-h-0 flex-1">
+                  <main
+                    id="board-canvas-region"
+                    aria-label="Design canvas"
+                    data-testid="region-canvas"
+                    className="relative min-h-0 min-w-0 flex-1"
+                  >
+                    <BoardCanvas />
+                  </main>
+                  <TracePanel />
+                  <SecurityPanel />
+                  <ModePanelWithNotices />
+                </div>
+
+                <section
+                  aria-label="Metrics"
+                  data-testid="region-metrics"
+                  className="shrink-0 border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
                 >
-                  <BoardCanvas />
-                </main>
-                <TracePanel />
-                <SecurityPanel />
+                  <MetricsDrawer />
+                </section>
               </div>
 
-              <section
-                aria-label="Metrics"
-                data-testid="region-metrics"
-                className="shrink-0 border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+              <aside
+                aria-label="Inspector"
+                data-testid="region-inspector"
+                className="w-72 shrink-0 overflow-y-auto border-l border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
               >
-                <MetricsDrawer />
-              </section>
+                <PanelHeader title="Inspector" />
+                <Inspector />
+              </aside>
             </div>
-
-            <aside
-              aria-label="Inspector"
-              data-testid="region-inspector"
-              className="w-72 shrink-0 overflow-y-auto border-l border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
-            >
-              <PanelHeader title="Inspector" />
-              <Inspector />
-            </aside>
           </div>
-        </div>
-      </CanvasProvider>
+        </CanvasProvider>
+      </ModesProvider>
     </NoticeProvider>
   );
 }
@@ -124,7 +142,6 @@ export function AppShell({
 function TopBar({ autosave }: { autosave?: Autosave | undefined }) {
   const projectName = useWorkspaceStore((s) => projectOfBoard(s.data, s.activeBoardId)?.name);
   const boardName = useWorkspaceStore((s) => s.data.boards[s.activeBoardId]?.name);
-  const mode = useWorkspaceStore((s) => s.data.boards[s.activeBoardId]?.mode ?? 'sandbox');
   const { show } = useNotice();
   return (
     <header
@@ -138,16 +155,20 @@ function TopBar({ autosave }: { autosave?: Autosave | undefined }) {
       <div className="flex items-center gap-2">
         <ProblemsButton onNotice={show} />
         <ProblemBriefButton onNotice={show} />
+        <ProgressButton />
       </div>
       <div className="ml-auto flex items-center gap-3 text-xs text-slate-400">
         <ProviderSwitcher />
         {autosave && <SaveStatus autosave={autosave} />}
-        <span className="capitalize" data-testid="board-mode">
-          {mode}
-        </span>
+        <ModeSwitcher />
       </div>
     </header>
   );
+}
+
+function ModePanelWithNotices() {
+  const { show } = useNotice();
+  return <ModePanel onNotice={show} />;
 }
 
 function PanelHeader({ title }: { title: string }) {
