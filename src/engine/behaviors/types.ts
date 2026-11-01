@@ -45,6 +45,11 @@ export interface FinishContext {
   statsOf(nodeId: string): NodeStats | undefined;
 }
 
+/** What `tune` may change on a compiled node (applied in behavior order at compile time). */
+export type NodeTuning = Partial<
+  Pick<CompiledNode, 'serviceTimeMs' | 'responseServiceMs' | 'scale' | 'serversPerInstance'>
+>;
+
 /** DNS answer policy when several regions can serve a user (S10 geo). */
 export type GeoPolicy = 'latency' | 'geo' | 'failover' | 'weighted' | 'simple';
 
@@ -74,6 +79,13 @@ export interface Behavior {
    * node then load their hottest replica f = 1 + √(2 ln N / V) × the average (scaling/pools.ts).
    */
   hashVirtualNodes?(node: CompiledNode): number | undefined;
+  /**
+   * S13: compile-time tuning from the node's config (consistency level, indexes, acks, pod
+   * packing…). Receives the node as tuned so far by earlier behaviors; returns fields to replace.
+   * `serviceTimeMs` is the WORK a request puts on the node (capacity, ρ); `responseServiceMs` the
+   * time the caller waits for it besides queueing (e.g. the R-th fastest of N replicas).
+   */
+  tune?(node: CompiledNode): NodeTuning | undefined;
   /** Adjust metrics/explain after queueing (e.g. hit rate, queue lag). */
   finish?(ctx: FinishContext): void;
 }

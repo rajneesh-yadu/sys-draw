@@ -81,7 +81,7 @@ export function compile(graph: Graph, registry: ComponentSource): Model {
     }
     const scale = scaleSpecOf(def, base.config, instanceType);
     const s = def.perf.serviceTimeMs;
-    nodes.set(n.id, {
+    const compiled: CompiledNode = {
       ...base,
       kind: def.category === 'clients' ? 'source' : 'service',
       scale,
@@ -93,7 +93,8 @@ export function compile(graph: Graph, registry: ComponentSource): Model {
       serviceTimeMs: { read: s.read / scale.speedup, write: s.write / scale.speedup },
       baseServiceTimeMs: { ...s },
       saturationBehavior: def.perf.saturationBehavior,
-    });
+    };
+    nodes.set(n.id, tuneNode(compiled));
   });
 
   const edges = new Map<string, CompiledEdge>();
@@ -133,6 +134,16 @@ export function compile(graph: Graph, registry: ComponentSource): Model {
   }
 
   return { nodes, edges, out, inbound, issues };
+}
+
+/** S13: applies each behavior's `tune` in order (config-driven service times, scale, packing). */
+export function tuneNode(node: CompiledNode): CompiledNode {
+  let cur = node;
+  for (const b of behaviorsOf(cur.behaviors)) {
+    const t = b.tune?.(cur);
+    if (t) cur = { ...cur, ...t };
+  }
+  return cur;
 }
 
 export function hasBehavior(node: CompiledNode, id: string): boolean {

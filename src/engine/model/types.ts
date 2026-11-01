@@ -25,7 +25,10 @@ export interface SimInput {
 export interface EngineOptions {
   /** Requests per second per concurrent user for the inferred flow (scenario without flows). */
   defaultRpsPerUser: number;
-  /** Cache hit rate when a cache node does not set `config.hitRate` (fixed for now; Zipf later). */
+  /**
+   * Cache hit rate when a cache node has neither `config.hitRate` nor the Zipf inputs
+   * (`keyCount`, `avgItemBytes`) — see behaviors/cache.ts.
+   */
   defaultCacheHitRate: number;
   /** A saturated node is evaluated at this utilisation (M/M/c is undefined at ρ ≥ 1). */
   rhoCap: number;
@@ -72,6 +75,12 @@ export interface CompiledNode {
   serversPerInstance: number;
   /** Effective service times = registry service times ÷ vertical speedup. */
   serviceTimeMs: { read: number; write: number };
+  /**
+   * S13: time a request spends being served besides queueing, when it differs from the work it
+   * puts on the node (quorum reads wait for the R-th fastest replica; acks=all waits for followers).
+   * Undefined = `serviceTimeMs`.
+   */
+  responseServiceMs?: { read: number; write: number } | undefined;
   /** Registry service times on the baseline (first) instance type. */
   baseServiceTimeMs: { read: number; write: number };
   saturationBehavior: PerfModel['saturationBehavior'];

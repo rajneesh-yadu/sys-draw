@@ -36,7 +36,10 @@ describe('Palette + BoardCanvas', () => {
     setup();
     fireEvent.change(screen.getByLabelText('Search components'), { target: { value: 'redis' } });
     const items = within(screen.getByTestId('palette')).getAllByRole('button');
-    expect(items.map((b) => b.getAttribute('data-def-id'))).toEqual(['cache.in-memory']);
+    expect(items.map((b) => b.getAttribute('data-def-id'))).toEqual([
+      'cache.in-memory',
+      'cache.redis',
+    ]);
   });
 
   it('undoes and redoes with keyboard shortcuts', async () => {

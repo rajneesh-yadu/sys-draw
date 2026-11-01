@@ -162,14 +162,19 @@ export function nodeQueueing(
   });
 
   const errorRate = lambda > 0 ? Math.min(1, Math.max(0, 1 - served / lambda)) : 0;
+  // S13: the caller waits Wq + the response service time (quorum, acks…), which may differ from
+  // the work S that sets capacity.
+  const rRead = node.responseServiceMs?.read ?? sRead;
+  const rWrite = node.responseServiceMs?.write ?? sWrite;
   const responseMs = {
-    read: wqSumR + sRead,
-    write: wqSumW + sWrite,
+    read: wqSumR + rRead,
+    write: wqSumW + rWrite,
     mean:
       lambda > 0
-        ? (rps.read * (wqSumR + sRead) + rps.write * (wqSumW + sWrite)) / lambda
-        : wqSumR + sRead,
+        ? (rps.read * (wqSumR + rRead) + rps.write * (wqSumW + rWrite)) / lambda
+        : wqSumR + rRead,
   };
+  const meanResponseService = lambda > 0 ? (rps.read * rRead + rps.write * rWrite) / lambda : rRead;
   const b = per[busiest] ?? {
     li: 0,
     sMean: sRead,
@@ -209,7 +214,7 @@ export function nodeQueueing(
   }
   explain.latencyMs =
     (single
-      ? `T = Wq + S̄ = ${fmt(wqSum)} + ${fmt(meanServiceMs)} = ${fmt(responseMs.mean)} ms; ` +
+      ? `T = Wq + S̄ = ${fmt(wqSum)} + ${fmt(meanResponseService)} = ${fmt(responseMs.mean)} ms; ` +
         `Wq = C(c,a)/(cμ − λ) with c = ${fmt(b.c)}, a = λ/μ = ${fmt(b.a)}, C = ${fmt(b.C)}` +
         (saturated ? ` (evaluated at ρ = ${fmt(options.rhoCap)})` : '') +
         '. '
@@ -217,6 +222,9 @@ export function nodeQueueing(
         `Wq per instance from M/M/c (Erlang C). `) +
     (node.scale.speedup !== 1
       ? `Service times S = S_base / ${fmt(node.scale.speedup)} (instance size). `
+      : '') +
+    (node.responseServiceMs
+      ? `A request waits ${fmt(rRead)} ms (read) / ${fmt(rWrite)} ms (write) to be served, while the work it puts on the node — which sets ρ and capacity — is ${fmt(sRead)} / ${fmt(sWrite)} ms (see the component's own notes). `
       : '') +
     `Percentiles assume an exponential tail: p50 = T·ln 2, p95 = T·ln 20, p99 = T·ln 100.`;
   explain.queueDepth = single

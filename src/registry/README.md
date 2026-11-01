@@ -27,4 +27,6 @@ Loads, validates and looks up every registry entry (components, protocols, provi
 - Add a file in the right folder exporting a `define*` result (default or named). Nothing else (F2).
 - Config fields: `.describe('help text')`; mark advanced knobs with `.meta({ advanced: true })`.
 - Scaling/cost roles (S09): `.meta({ scaling: 'shards' | 'keySkew' | 'readReplicas' | 'standby' | 'storageGb' | 'storageCopies' | 'maxInstances' | 'minInstances' })` — the engine and the inspector's Scale actions find fields by role. `perf.serviceTimeMs` is measured on the FIRST instance type.
+- Performance knobs (S13): `.meta({ perfEffect: { <option>: { read?, write?, readAddMs?, writeAddMs?, why } } })` on a config field + behavior `configPerf` — factors scale work and wait, `*AddMs` add wait only (booleans key as 'true'/'false').
+- Behavior config contracts (S13, read by name): cache `keyCount`, `avgItemBytes`, `zipfExponent`, `evictionPolicy`, `usableMemoryFraction`, `readPreference`; queue/log `partitions`, `replicationFactor`, `messageBytes`, `retentionHours`, `storageGb`, `keySkew`; quorum `replicationFactor`, `readConsistency`, `writeConsistency`, `vnodes`; see each behavior file's header for the rest.
 - A file with no entry, or the wrong kind for its folder, fails loading with the file path.

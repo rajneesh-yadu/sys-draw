@@ -5,7 +5,7 @@
  */
 export { runSimulation, disposeSimulationWorker } from './client';
 export { simulate, BOTTLENECK_UTILIZATION, INTER_REGION_PRICE_FACTOR } from './simulate';
-export { compile, type ComponentSource } from './model/compile';
+export { compile, tuneNode, type ComponentSource } from './model/compile';
 export {
   generateLoad,
   inferFlow,
@@ -29,7 +29,22 @@ export {
 } from './model/latency';
 export { erlangB, erlangC, mmc, expQuantileFactor, type MmcResult } from './queueing/mmc';
 export { nodeQueueing } from './queueing/node';
-export { BEHAVIORS, defineBehavior, type Behavior, type GeoPolicy } from './behaviors';
+export {
+  BEHAVIORS,
+  defineBehavior,
+  type Behavior,
+  type GeoPolicy,
+  type NodeTuning,
+} from './behaviors';
+export { kthOfN, maxOfN, replicasFor } from './behaviors/lib/order-stats';
+export { harmonic, zipfHitRate, evictionModel, type EvictionModel } from './behaviors/lib/zipf';
+export {
+  PerfEffectSchema,
+  perfEffectsOf,
+  activeEffects,
+  type PerfEffect,
+} from './behaviors/lib/perf-effects';
+export { cacheModel, cacheCapacityItems } from './behaviors/cache';
 export {
   DEFAULT_ENGINE_OPTIONS,
   type EngineOptions,

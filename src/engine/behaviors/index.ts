@@ -30,6 +30,7 @@ export { defineBehavior } from './types';
 export type {
   Behavior,
   GeoPolicy,
+  NodeTuning,
   Call,
   RouteOutContext,
   RouteRestContext,

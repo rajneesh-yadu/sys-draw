@@ -39,6 +39,24 @@ export default defineComponent({
       .enum(['lru', 'lfu', 'ttl', 'random'])
       .describe('What to drop when memory is full')
       .meta({ advanced: true }),
+    keyCount: z
+      .number()
+      .int()
+      .min(1)
+      .max(1e12)
+      .describe('Distinct keys that get read (the working set the cache could hold)'),
+    avgItemBytes: z
+      .number()
+      .int()
+      .min(1)
+      .max(512 * 2 ** 20)
+      .describe('Average cached value size in bytes'),
+    zipfExponent: z
+      .number()
+      .min(0)
+      .max(2)
+      .describe('Popularity skew s: key i is read ∝ 1/i^s (0 = uniform, ~0.8 typical web)')
+      .meta({ advanced: true }),
   }),
   defaults: {
     engine: 'redis',
@@ -47,6 +65,9 @@ export default defineComponent({
     shards: 1,
     replicasPerShard: 1,
     evictionPolicy: 'lru',
+    keyCount: 100_000_000,
+    avgItemBytes: 1024,
+    zipfExponent: 0.8,
   },
   instanceTypes: [...MEMORY_OPTIMISED_INSTANCES],
   perf: {
@@ -60,7 +81,7 @@ export default defineComponent({
     summary:
       'In-memory key-value store (Redis / Memcached) that answers in well under a millisecond and absorbs read traffic before it reaches the database.',
     howItWorks:
-      'With cache-aside, the app checks the cache first; on a miss it reads the database and stores the result with a TTL. Hit rate depends on how skewed popularity is (a few hot keys get most reads), how much memory you have and the TTL. Only misses reach the database: DB load = reads × (1 − hit rate). Sharding spreads keys over nodes; replicas add failover.',
+      'With cache-aside, the app checks the cache first; on a miss it reads the database and stores the result with a TTL. Hit rate depends on how skewed popularity is (a few hot keys get most reads), how much memory you have and the TTL; the simulator computes it from a Zipf popularity model over keyCount keys vs the items that fit in memory. Only misses reach the database: DB load = reads × (1 − hit rate). Sharding spreads keys over nodes; replicas add failover.',
     tradeoffs: [
       'Huge latency and cost win for read-heavy data, but the cache can serve stale values until TTL or invalidation.',
       'When a cache node fails or a hot key expires, misses stampede the database (thundering herd).',

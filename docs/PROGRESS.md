@@ -450,3 +450,54 @@ Known gaps / follow-ups:
 - A `.s12tmp/` folder (the source and change tarballs used to copy the repo) is left at the repo root because the connected folder blocks deletes; it is git-ignored (`.*tmp`) and safe to delete, as are `.s10tmp`/`.s11tmp`.
 
 Next suggested session: S13 — Data and messaging tools (Kafka, Redis, Cassandra, Elasticsearch… as components; give each its `providerNames` and add its prices/limits under `services` in aws.ts / gcp.ts / azure.ts). Small S12 follow-ups: "Replace with nearest equivalent" action, limit-based throttling.
+
+## S13 — Deep components with real behavior — 2026-11-01
+
+Status: done
+Changed: src/engine/behaviors/{types.ts, index.ts, cache.ts, queue.ts, configPerf.ts (new), quorum.ts (new), consensus.ts (new), partitionedKv.ts (new), relational.ts (new), replicaReads.ts (new), scatterGather.ts (new), columnar.ts (new), podPacking.ts (new), metricsStore.ts (new), lib/{config.ts, order-stats.ts, zipf.ts, perf-effects.ts, lib.test.ts} (new)}; src/engine/{model/types.ts, model/compile.ts, queueing/node.ts, chaos/timeline.ts, index.ts, README.md, engine.test.ts, deep-components.test.ts (new)}; src/registry/components/{messaging/kafka.ts, messaging/rabbitmq.ts, cache/redis.ts, cache/memcached.ts, database/cassandra.ts, database/kv-store.ts, database/postgres.ts, database/mongodb.ts, database/elasticsearch.ts, database/clickhouse.ts, database/coordination.ts, network/reverse-proxy.ts, network/service-mesh.ts, compute/kubernetes.ts, observability/prometheus.ts} (all new), cache/cache.ts; src/registry/{README.md, registry.test.ts}; src/canvas/Canvas.test.tsx; docs/PROGRESS.md
+Public APIs added/changed (all additive, inside `engine` and `registry`; `core` untouched; no saved-format change, no migration):
+
+- `engine`: `Behavior.tune?(node) → NodeTuning` (compile-time, applied in behavior order by new `tuneNode`, exported with `compile`); type `NodeTuning`; `CompiledNode.responseServiceMs?` — what a caller waits for besides Wq when it differs from the work `serviceTimeMs` that sets ρ/capacity (nodeQueueing uses it for `responseMs`; chaos "dependency slow" scales both). New exports: `kthOfN`, `maxOfN`, `replicasFor`, `harmonic`, `zipfHitRate`, `evictionModel`, `EvictionModel`, `PerfEffectSchema`, `perfEffectsOf`, `activeEffects`, `PerfEffect`, `cacheModel`, `cacheCapacityItems`. New behaviors: `configPerf`, `quorum`, `consensus`, `partitionedKv`, `relational`, `replicaReads`, `scatterGather`, `columnar`, `podPacking`, `metricsStore`. `cache` and `queue` extended (below). `EngineOptions.defaultCacheHitRate` is now only the fallback for caches without Zipf inputs.
+- `registry`: 15 component entries; a new data convention `.meta({ perfEffect })` on config fields (read by `configPerf`). Generic components went from 14 to 29.
+
+What each component models (hand-computed tests in `engine/deep-components.test.ts`, one or more per component; math in `behaviors/lib/lib.test.ts`, Zipf checked against exact sums over 10^6 keys within 1%):
+
+- **Kafka** (`messaging.kafka`; MSK / Managed Kafka / HDInsight Kafka): partitions, RF (broker write work × RF), acks (all = +2 ms producer wait, 0 = no wait note), min ISR, compression, retention vs disk warning, consumer groups (each consumer node = a group that reads everything; active consumers = min(instances, P); hottest partition must fit one consumer; lag and "s behind"). `messaging.stream` gets the same log semantics because it has `partitions` (its write work is now × RF too).
+- **RabbitMQ** (self-hosted): competing consumers (work-queue lag), quorum/classic/stream queues, persistence, publisher confirms as perfEffects.
+- **Redis** (ElastiCache / Memorystore Cluster / Azure Managed Redis): cluster shards, replicas (`readPreference` primary ⇒ replicas billed as standbys, no read capacity), maxmemory policies (LRU/LFU/random/volatile-ttl/noeviction), persistence (aof-always × 3 on writes), Zipf hit rate from keyCount × item size vs RAM × shards × usable fraction.
+- **Memcached** (self-hosted): nodes = shards of memory, multi-threaded (linear), LRU Zipf hit rate.
+- **Cassandra** (self-hosted): N/R/W from consistency levels (capped at cluster size), work R·S_r / N·S_w, wait slowest-of-R / W-th fastest of N, vnodes ⇒ ring imbalance, R + W > N explain, compaction strategy.
+- **Key-Value Store (DynamoDB-style)** (`database.kv-store`; DynamoDB / Firestore Datastore mode / Cosmos DB for Table): 3 000 RU / 1 000 WU per partition, ⌈GB/10⌉ splits, eventual/strong/transactional reads, GSIs and transactional writes multiply units, hot keys throttle (reject).
+- **PostgreSQL** (RDS / Cloud SQL / Azure Database): primary + read replicas, HA standby, index on/off (seq scan = rows ÷ 5 000 rows/ms), secondary indexes (+30% write each), sync vs async replication, connection pooling.
+- **MongoDB** (DocumentDB / Firestore Mongo compat / Cosmos DB for MongoDB): shards, secondaries, readPreference, writeConcern majority (+1.5 ms), readConcern linearizable.
+- **Elasticsearch / OpenSearch**: scatter-gather (work P·S, wait S·H_P), replicas multiply indexing, refresh delay, over-sharding / yellow-cluster notes, query type.
+- **ClickHouse** (self-hosted): scan work = rows × columns ÷ (50 000 values/ms per vCPU), linear vertical scaling, "too many parts" warning for > 1 insert/s per server.
+- **Coordination Service (ZooKeeper / etcd)** (self-hosted): leader + majority commit (S_w × (1 + ⌊n/2⌋-th fastest of n − 1 followers)), linearizable vs local reads, even-ensemble warning; write capacity independent of members.
+- **Reverse Proxy (Nginx / Envoy)** (self-hosted): `loadBalancer` routing + TLS termination / upstream keep-alive costs.
+- **Service Mesh** (VPC Lattice / Cloud Service Mesh / Istio add-on for AKS): sidecar vs ambient data plane, mTLS, `loadBalancer` routing.
+- **Kubernetes Cluster** (EKS / GKE / AKS): replicas = worker nodes; pods per node from CPU/memory requests, c = pods × concurrency per pod; no vertical speedup (bigger nodes fit more pods); Pending warning.
+- **Prometheus + Grafana** (AMP / GMP / Azure Monitor managed Prometheus): series → samples/s, storage (also billed via `scale.storageGb`), head memory vs instance RAM (OOM warning); dashboard queries are reads on its edges.
+
+Notes (decisions):
+
+- **Work vs wait.** One service time could not express quorum/acks/scatter-gather (latency ≠ load), hence `responseServiceMs`. Queueing (Wq) still comes from the work; the explain says when they differ.
+- **Data over code.** Simple knobs (acks, queue type, persistence, mTLS, query type, compaction, write/read concerns…) are `perfEffect` data on the config field, applied by the generic `configPerf` behavior; only structural models (quorum, consensus, partition budgets, scatter-gather, scans, pod packing, TSDB sizing, Zipf) are code. Behaviors read their documented config keys by name (listed in each behavior header and the registry README).
+- **Provider names.** Components with a first-party managed product on all three clouds name it; the rest (RabbitMQ, Memcached, Cassandra, ClickHouse, ZooKeeper/etcd, Nginx/Envoy) are provider-neutral (self-hosted on VMs) because the provider tests require all three clouds or exactly one. Elasticsearch names Elastic Cloud on GCP/Azure (a marketplace service). AWS App Mesh is retired (Sept 2026), so the mesh maps to VPC Lattice.
+- The "Kubernetes cluster group" is a component (the canvas `cluster` group kind in `core` is unchanged); its replicas are worker nodes.
+- Constants that are approximations are named and documented in the behavior files (5 000 rows/ms scan, +30% per index, 1 ms sync-replica RTT, 50 000 values/ms/vCPU, 4 KB per series, 64 B per cache item, 2 ms acks=all).
+
+Known gaps / follow-ups:
+
+- **Cache TTL is not in the Zipf hit rate** (needs per-key request rates at routing time, i.e. a load-aware second pass); write invalidations neither. `noeviction` is modelled as random replacement + an OOM note.
+- No provider `services` entries (prices/limits) for the new components yet: on AWS/GCP/Azure they are priced with the component price × the provider multiplier (DynamoDB-style KV uses the board's $/million requests). MSK, ElastiCache, Keyspaces, OpenSearch prices and limits are a small follow-up in aws.ts / gcp.ts / azure.ts.
+- Kafka: partitions are not instances (brokers = replicas); per-partition broker throughput limits, consumer rebalances and exactly-once are not modelled. RabbitMQ prefetch / exchange type are explain-only.
+- Cassandra/quorum: node failures do not yet change R/W availability in the chaos timeline (explain says how many failures each tolerates). Elasticsearch replicas > nodes is a note, not a placement error.
+- Kubernetes: HPA/cluster-autoscaler delays use the generic autoscale policy; control-plane fee ($0.10/h) not in cost.
+- ENGINE.md still lists `replicatedStore`/`shardedStore` (used by `database.nosql`, not implemented); the new behaviors and the `tune` hook should be recorded in ENGINE.md / DATA-MODEL.md (`perfEffect` meta) in the next architecture session.
+- **Build warning:** the app's main chunk is now ~1.53 MB (registry docs + behaviors, +72 KB), just over the 1.5 MB `chunkSizeWarningLimit` in vite.config.ts; the build succeeds. Next: code-split the app chunk (lazy-load panels or registry docs) or raise the limit deliberately.
+- **Vitest module cache:** after adding a new behavior file, vitest kept the old `import.meta.glob` expansion of `behaviors/index.ts` until `node_modules/.vitest-cache` was deleted (noted in engine README).
+- Tests and the build ran on a Linux copy of the repo (macOS-native `node_modules`); e2e was not run this session (no UI changes). A `.s13tmp/` folder (source tarball) is left at the repo root because deletes are blocked; it is git-ignored and safe to delete, as are `.s10tmp`–`.s12tmp`.
+
+Tests: 87 added (582 total), all passing; `pnpm build` (one chunk-size warning, above), `pnpm lint`, `tsc -b` green.
+
+Next suggested session: S14 — Protocol catalog and edge inspector (several new components already reference protocol ids with no entry yet: `kafka-wire`, `amqp`, `resp`, `memcache`, `cql`, `mongodb-wire`, `postgres-wire`, `http3`). Small S13 follow-ups: provider prices/limits for the new components, TTL-aware hit rate.

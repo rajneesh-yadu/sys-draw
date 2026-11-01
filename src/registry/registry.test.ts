@@ -21,6 +21,24 @@ const SEEDED_COMPONENTS = [
   'messaging.stream',
   'storage.object',
 ];
+/** S13 deep components: real products with behaviors (generic, or provider-neutral self-hosted). */
+const S13_COMPONENTS = [
+  'messaging.kafka',
+  'messaging.rabbitmq',
+  'cache.redis',
+  'cache.memcached',
+  'database.cassandra',
+  'database.kv-store',
+  'database.postgres',
+  'database.mongodb',
+  'database.elasticsearch',
+  'database.clickhouse',
+  'database.coordination',
+  'network.reverse-proxy',
+  'network.service-mesh',
+  'compute.kubernetes',
+  'observability.prometheus',
+];
 /** Components that exist on one cloud only (S12). */
 const PROVIDER_ONLY_COMPONENTS = ['database.aurora', 'database.spanner'];
 const SEEDED_PROTOCOLS = ['tcp', 'tls13', 'http1', 'http2', 'grpc', 'websocket'];
@@ -28,13 +46,13 @@ const SEEDED_PROTOCOLS = ['tcp', 'tls13', 'http1', 'http2', 'grpc', 'websocket']
 describe('seeded registry', () => {
   const all = registry.list();
 
-  it('loads the 14 generic + 2 provider-only components, 6 protocols and 4 providers', () => {
+  it('loads the 14 generic + 15 S13 + 2 provider-only components, 6 protocols and 4 providers', () => {
     expect(
       registry
         .list({ kind: 'component' })
         .map((c) => c.id)
         .sort(),
-    ).toEqual([...SEEDED_COMPONENTS, ...PROVIDER_ONLY_COMPONENTS].sort());
+    ).toEqual([...SEEDED_COMPONENTS, ...S13_COMPONENTS, ...PROVIDER_ONLY_COMPONENTS].sort());
     expect(
       registry
         .list({ kind: 'protocol' })
@@ -47,7 +65,7 @@ describe('seeded registry', () => {
       'gcp',
       'generic',
     ]);
-    expect(registry.size).toBe(26);
+    expect(registry.size).toBe(41);
   });
 
   it('has unique ids across all kinds', () => {
@@ -109,16 +127,25 @@ describe('registry API', () => {
   it('list filters by category', () => {
     expect(registry.list({ category: 'database' }).map((e) => e.id)).toEqual([
       'database.aurora',
+      'database.cassandra',
+      'database.clickhouse',
+      'database.coordination',
+      'database.elasticsearch',
+      'database.kv-store',
+      'database.mongodb',
       'database.nosql',
+      'database.postgres',
       'database.spanner',
       'database.sql',
     ]);
-    expect(registry.list({ kind: 'component', category: 'network' })).toHaveLength(4);
+    expect(registry.list({ kind: 'component', category: 'network' })).toHaveLength(6);
   });
 
   it('list filters by tag', () => {
     expect(registry.list({ tag: 'cache' }).map((e) => e.id)).toEqual([
       'cache.in-memory',
+      'cache.memcached',
+      'cache.redis',
       'network.cdn',
     ]);
   });
@@ -127,7 +154,7 @@ describe('registry API', () => {
     const onAws = registry.list({ kind: 'component', provider: 'aws' }).map((c) => c.id);
     expect(onAws).toContain('storage.object');
     expect(onAws).toContain('client.app'); // provider-neutral
-    expect(registry.list({ kind: 'component', provider: 'generic' })).toHaveLength(14);
+    expect(registry.list({ kind: 'component', provider: 'generic' })).toHaveLength(29);
     expect(onAws).toContain('database.aurora');
     expect(onAws).not.toContain('database.spanner');
     expect(registry.list({ kind: 'provider', provider: 'aws' }).map((p) => p.id)).toEqual(['aws']);

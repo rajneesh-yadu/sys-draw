@@ -36,8 +36,24 @@ const g: Graph = {
 };
 
 describe('engine public API', () => {
-  it('ships the S07 behaviors plus the S10 geo ones (cdn, dns)', () => {
-    expect([...BEHAVIORS.keys()].sort()).toEqual(['cache', 'cdn', 'dns', 'loadBalancer', 'queue']);
+  it('ships the S07 behaviors, the S10 geo ones (cdn, dns) and the S13 deep-component ones', () => {
+    expect([...BEHAVIORS.keys()].sort()).toEqual([
+      'cache',
+      'cdn',
+      'columnar',
+      'configPerf',
+      'consensus',
+      'dns',
+      'loadBalancer',
+      'metricsStore',
+      'partitionedKv',
+      'podPacking',
+      'queue',
+      'quorum',
+      'relational',
+      'replicaReads',
+      'scatterGather',
+    ]);
   });
 
   it('compiles real components and attaches regions', () => {

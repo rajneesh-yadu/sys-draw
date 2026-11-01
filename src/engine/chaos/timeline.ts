@@ -403,6 +403,14 @@ export function runTimeline(input: TimelineInput): TimelineResult {
           read: n.serviceTimeMs.read * factor,
           write: n.serviceTimeMs.write * factor,
         },
+        ...(n.responseServiceMs
+          ? {
+              responseServiceMs: {
+                read: n.responseServiceMs.read * factor,
+                write: n.responseServiceMs.write * factor,
+              },
+            }
+          : {}),
       }));
     for (const [id, share] of fx.hot)
       patch(id, (n) =>
