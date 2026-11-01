@@ -280,3 +280,44 @@ Known gaps / follow-ups:
 - A `.s08tmp/` folder (the source tarball used to copy the repo into the sandbox) is left at the repo root because the connected folder blocks deletes; safe to delete.
 
 Next suggested session: S09 — Scaling and cost (instance size → capacity, cost/month per node; the drawer's cost KPI and the node cost row will fill in automatically).
+
+---
+
+## S09 — Scaling models — 2026-11-01
+
+Status: done
+Changed: src/engine/{index.ts, README.md, simulate.ts, test-fixtures.ts, scaling.test.ts (new)}, src/engine/scaling/{vertical,pools,roles,spec,autoscale}.ts + scaling.test.ts (all new), src/engine/cost/cost.ts (new), src/engine/queueing/node.ts (rewritten on instance pools), src/engine/model/{types,compile}.ts, src/engine/behaviors/{loadBalancer,types}.ts, src/registry/components/{database/sql, database/nosql, cache/cache, storage/object-storage, compute/serverless-function, network/load-balancer}.ts, src/registry/README.md, src/inspector/panels/{ScaleActions.tsx, scale-actions.ts} (new), src/inspector/panels/NodePanel.tsx, src/inspector/scale-actions.test.tsx (new), src/inspector/README.md, e2e/scaling.spec.ts (new), docs/PROGRESS.md
+Public APIs added/changed:
+
+- `engine` (own module, additive): `verticalSpeedup`, `verticalScale`, `AMDAHL_PARALLEL_FRACTION`, `scaleSpecOf`, `buildPools`, `capacityForMix`, `poolUtilization`, `consistentHashImbalance`, `servingInstances`, `readersPerShard`, `SCALING_ROLES`, `scalingFields`, `roleValue`, `desiredReplicas`, `steadyStateReplicas`, `autoscaleTimeline`, `nodeCost`, `FALLBACK_PRICING`, `HOURS_PER_MONTH`, `SECONDS_PER_MONTH`, `LB_ALGORITHMS`, `DEFAULT_VIRTUAL_NODES`, `lbAlgorithm`, `targetWeight`; types `Pool`, `ScaleSpec`, `ScalingRole`, `VerticalScale`, `AutoscaleTick`, `AutoscaleTimelineOptions`, `NodeCost`, `Pricing`, `LbAlgorithm`. `CompiledNode` gained `scale`, `autoscale?`, `baseServiceTimeMs` (`serviceTimeMs` is now the size-adjusted value) and its `config` is now `{...def.defaults, ...node.config}`; `NodeStats` gained `replicas`, `pools`, `costPerMonth`; `Behavior` gained optional `hashVirtualNodes`. `simulate`/`runSimulation`/`nodeQueueing` signatures unchanged.
+- `inspector`: no export changes (Scale actions are inside `NodePanel`).
+- No other module's public API changed. `core` untouched.
+  Registry entries changed (data only): config fields tagged with `.meta({ scaling: role })` in sql, nosql, cache, object storage, serverless; new fields `database.sql` `shards`, `shardKeySkew` (advanced) and `network.load-balancer` `virtualNodes` (advanced) — all `.default(...)`, so existing boards without them still validate (no migration).
+  Tests: 39 added (358 total), all passing; `pnpm build`, `pnpm lint`, `prettier --check src e2e` green. e2e: 6/6 pass (new `scaling.spec.ts`).
+
+F6 acceptance: `e2e/scaling.spec.ts` (production build, real worker): client → LB → app server at 6 000 rps shows 60 %; "+1 replica" in the inspector → 30 % and system cost $87 → $157 (node $140); "Size up" small → medium → 17 % and node cost $280; "Add read replica" is disabled for an app server with a reason. Unit level (`engine/scaling.test.ts`, hand-computed): doubling replicas halves ρ exactly and doubles cost; medium (2× vCPU, sublinear) gives ρ/1.818.
+Single-writer tests: 80 writes/s keep the primary at ρ 0.8 with 0, 3, 7 read replicas and with 4 scaling replicas; 150 writes/s stay saturated (ρ 1.5) with 5 replicas; reads drop 2.4 → 0.8 with 2 replicas; only sharding (×2 ⇒ 0.75) or a bigger primary (Amdahl, 0.4875) raises write capacity. Mixed read/write pools checked against M/M/1 by hand.
+
+Notes (decisions):
+
+- **Data-driven roles.** The engine and the Scale actions never read field names; they look for `.meta({ scaling })` roles: `shards`, `keySkew`, `readReplicas`, `standby`, `storageGb`, `storageCopies`, `maxInstances`, `minInstances`. A new database tags its own fields and gets sharding/replicas/cost for free.
+- **Vertical:** `perf.serviceTimeMs` is measured on the component's FIRST instance type; k = vCPU/baseline vCPU; μ × f(k) with `linear` f = k and `sublinear`/`single-writer` Amdahl f = 1/(0.1 + 0.9/k). Latency per request drops too (S/f).
+- **Pools:** a node = instance pools, each instance its own M/M/c. Even replicas; consistent hash ⇒ hottest replica f = 1 + √(2 ln N/V) × average (V = LB `virtualNodes`, default 100); single-writer ⇒ per shard 1 primary (all writes + 1/(1+R) of reads) + R = readReplicas + (replicas − 1) read replicas; shards ⇒ hottest shard max(skew, 1/S). Node `utilization` = busiest instance; latency = traffic-weighted mean of (Wq + S); errors per saturated instance; capacity = λ at which the busiest instance hits ρ = 1 for the current mix.
+- **LB algorithms:** round-robin/random/consistent-hash weight targets by instance count; least-connections by capacity (bigger instances get more).
+- **Autoscaling:** analytical runs use the policy's steady state, replicas = clamp(⌈work/(c·target)⌉ per shard, min, max) on AVERAGE utilisation (like cloud target tracking); "capped at max" is explained. `autoscaleTimeline(policy, loadPerTick, …)` replays it tick by tick with warm-up and a scale-in cooldown (default 60 s) for S11; it is not wired to a run yet.
+- **Serverless:** `maxInstances` role ⇒ one pool with c = concurrency limit × perf c; billed busy instances = λ_avg × S̄ (Little), at least `minInstances`.
+- **Cost/month (730 h):** instance-priced ⇒ (serving instances + standbys) × $/h × provider `instancePriceMultiplier`; $0/h managed services ⇒ requests × provider `requestsUsdPerMillion`; + storage GB × copies (single-writer: primary + replicas + standby; else `storageCopies` role) × `storageUsdPerGbMonth`. Request/busy volumes use λ ÷ `peakMultiplier`. Prices come from the board's provider entry, `FALLBACK_PRICING` (= generic) if it isn't registered. Explain strings show every term.
+- Quick actions: +1 replica (disabled while autoscaling owns the count), Size up/down within the instance family (`mem-*` vs plain, ordered by vCPU), Add read replica (`readReplicas` role, bounded by the schema's max), Shard ×2 (`shards` role). Each click = one store command = one undo step; failures show the store's reason in `role="alert"`.
+
+Known gaps / follow-ups:
+
+- **metrics-ui** (not touched): the system "Cost / month" tooltip appends the first service node's cost explain (`formulas.ts`), which now reads like that node's cost. Show the per-node breakdown there instead.
+- Egress cost and edge `costPerMonth` are still 0 (S10 geo). Read-replica lag/stale reads, cold starts and the autoscaler's reaction over time are S10/S11.
+- NoSQL `replicationFactor` and consistency affect storage cost only, not throughput; cache `replicasPerShard` is failover only; the message queue has no partitions knob, so queue partitions are not modelled.
+- Hash imbalance applies within one target's replicas, not across several target nodes; LB weights use configured replicas even when targets autoscale.
+- A node's percentiles still assume an exponential stage around the traffic-weighted mean (no mixture across pools), so a hot shard's tail is understated in node p99.
+- The app now shows non-zero costs on every board; designs saved before S09 keep working (new config fields have defaults).
+- Tests/e2e ran on a Linux copy of the repo (macOS-native `node_modules`); e2e used a local Playwright config pointing at the sandbox's Chromium (not committed). No new dependencies.
+- A `.s09tmp/` folder (source tarball used to copy the repo) is left at the repo root because the connected folder blocks deletes; safe to delete.
+
+Next suggested session: S10 — Global users and geo (fill `perEdge.latencyMs` and egress cost; the per-edge latency hook in `simulate.ts` is ready).

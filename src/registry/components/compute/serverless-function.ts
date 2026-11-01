@@ -29,14 +29,15 @@ export default defineComponent({
       .int()
       .min(1)
       .max(100_000)
-      .describe('Maximum simultaneous invocations; extra requests are throttled'),
+      .describe('Maximum simultaneous invocations; extra requests are throttled')
+      .meta({ scaling: 'maxInstances' }),
     provisionedConcurrency: z
       .number()
       .int()
       .min(0)
       .max(100_000)
       .describe('Pre-warmed instances that never cold-start (billed while idle)')
-      .meta({ advanced: true }),
+      .meta({ advanced: true, scaling: 'minInstances' }),
     coldStartMs: z
       .number()
       .min(0)

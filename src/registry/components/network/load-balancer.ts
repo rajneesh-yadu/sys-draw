@@ -51,6 +51,14 @@ export default defineComponent({
       .meta({ advanced: true }),
     crossZone: z.boolean().describe('Spread traffic evenly across zones').meta({ advanced: true }),
     stickySessions: z.boolean().describe('Pin a client to one target').meta({ advanced: true }),
+    virtualNodes: z
+      .number()
+      .int()
+      .min(1)
+      .max(1000)
+      .default(100)
+      .describe('Consistent hashing: ring points per target (more = more even spread)')
+      .meta({ advanced: true }),
   }),
   defaults: {
     layer: 'L7',
@@ -61,6 +69,7 @@ export default defineComponent({
     idleTimeoutSec: 60,
     crossZone: true,
     stickySessions: false,
+    virtualNodes: 100,
   },
   instanceTypes: [{ id: 'standard', vCpu: 2, memGb: 4, netGbps: 25, costUsdPerHour: 0.0225 }],
   perf: {

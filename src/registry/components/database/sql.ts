@@ -12,14 +12,43 @@ export default defineComponent({
   ports: [{ id: 'in', direction: 'in', protocols: ['postgres-wire', 'mysql-wire', 'tcp'] }],
   configSchema: z.object({
     engine: z.enum(['postgres', 'mysql']).describe('Database engine'),
-    storageGb: z.number().int().min(10).max(65_536).describe('Provisioned storage'),
+    storageGb: z
+      .number()
+      .int()
+      .min(10)
+      .max(65_536)
+      .describe('Provisioned storage (per copy)')
+      .meta({ scaling: 'storageGb' }),
     readReplicas: z
       .number()
       .int()
       .min(0)
       .max(15)
-      .describe('Read-only copies that take read traffic'),
-    multiAz: z.boolean().describe('Synchronous standby in another zone for automatic failover'),
+      .describe('Read-only copies that take read traffic (writes still go to the one primary)')
+      .meta({ scaling: 'readReplicas' }),
+    multiAz: z
+      .boolean()
+      .describe(
+        'Synchronous standby in another zone for automatic failover (billed, serves no traffic)',
+      )
+      .meta({ scaling: 'standby' }),
+    shards: z
+      .number()
+      .int()
+      .min(1)
+      .max(1024)
+      .default(1)
+      .describe(
+        'Split rows over N primaries by a shard key; each shard has its own primary and replicas',
+      )
+      .meta({ advanced: true, scaling: 'shards' }),
+    shardKeySkew: z
+      .number()
+      .min(0)
+      .max(1)
+      .default(0)
+      .describe('Share of traffic on the hottest shard (0 = evenly spread)')
+      .meta({ advanced: true, scaling: 'keySkew' }),
     replication: z
       .enum(['async', 'semi-sync', 'sync'])
       .describe('How writes reach replicas (async = fast writes, replicas may lag)')
@@ -48,6 +77,8 @@ export default defineComponent({
     storageGb: 100,
     readReplicas: 0,
     multiAz: false,
+    shards: 1,
+    shardKeySkew: 0,
     replication: 'async',
     isolation: 'read-committed',
     maxConnections: 500,

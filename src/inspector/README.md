@@ -12,6 +12,10 @@ Schema-driven forms for the selected node, edge, group, or (nothing selected) th
 - `buildFormModel(schema, overrides?)` → `{ basic, advanced }` `FieldModel[]`; `buildFields`, `buildField`, `defaultValueFor`, `inferUnit`, `humanize`.
 - `issuesByPath(schema, value)`, `readableIssue`, `errorAt`, `setAtPath`, `getAtPath`.
 
+## Scale quick actions (S09)
+
+Node panel → Scaling: +1 replica, Size up/down (same instance family, by vCPU), Add read replica, Shard ×2 — each one store command; fields found via registry `.meta({ scaling })` roles; unavailable actions are disabled with a reason (`panels/scale-actions.ts`).
+
 ## Field kinds
 
 number (unit from `.meta({unit})` or key suffix `Ms`/`Sec`/`Gb`/`Bytes`…, min/max/int), enum (select), boolean (switch), string, nested object (optional ⇒ on/off switch), array (add/remove), record (key/value rows). Anything else renders as "not editable here yet".

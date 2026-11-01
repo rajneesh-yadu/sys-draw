@@ -17,12 +17,25 @@ export default defineComponent({
       .int()
       .min(1)
       .max(10_000)
-      .describe('Number of shards the key space is split into'),
-    replicationFactor: z.number().int().min(1).max(7).describe('Copies of each partition'),
+      .describe('Number of shards the key space is split into')
+      .meta({ scaling: 'shards' }),
+    replicationFactor: z
+      .number()
+      .int()
+      .min(1)
+      .max(7)
+      .describe('Copies of each partition (durability; every copy applies every write)')
+      .meta({ scaling: 'storageCopies' }),
     consistency: z
       .enum(['eventual', 'quorum', 'strong'])
       .describe('Read consistency: eventual is fastest, strong always sees the latest write'),
-    storageGb: z.number().int().min(1).max(1_000_000).describe('Data stored'),
+    storageGb: z
+      .number()
+      .int()
+      .min(1)
+      .max(1_000_000)
+      .describe('Data stored')
+      .meta({ scaling: 'storageGb' }),
     capacityMode: z
       .enum(['provisioned', 'on-demand'])
       .describe('Pre-buy throughput or pay per request')
@@ -32,7 +45,7 @@ export default defineComponent({
       .min(0)
       .max(1)
       .describe('Share of traffic hitting the single hottest partition (0 = perfectly even)')
-      .meta({ advanced: true }),
+      .meta({ advanced: true, scaling: 'keySkew' }),
   }),
   defaults: {
     dataModel: 'key-value',

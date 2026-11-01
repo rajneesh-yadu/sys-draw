@@ -54,6 +54,11 @@ export interface Behavior {
   routeRest?(ctx: RouteRestContext): Expr | undefined;
   /** If this node is a cache used cache-aside by its caller: its hit rate. */
   cacheAsideHitRate?(node: CompiledNode, options: EngineOptions): number | undefined;
+  /**
+   * Load balancers using consistent hashing: ring points per target instance. Targets of this
+   * node then load their hottest replica f = 1 + √(2 ln N / V) × the average (scaling/pools.ts).
+   */
+  hashVirtualNodes?(node: CompiledNode): number | undefined;
   /** Adjust metrics/explain after queueing (e.g. hit rate, queue lag). */
   finish?(ctx: FinishContext): void;
 }

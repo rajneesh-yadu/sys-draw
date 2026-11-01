@@ -4,6 +4,9 @@
  */
 import type { Graph } from '@/core';
 import type { Registry } from '@/registry';
+import { behaviorsOf } from '../behaviors';
+import { EVEN_SPEC } from '../scaling/pools';
+import { scaleSpecOf } from '../scaling/spec';
 import { engineFinding } from './findings';
 import type { CompiledEdge, CompiledNode, Model } from './types';
 
@@ -34,8 +37,9 @@ export function compile(graph: Graph, registry: ComponentSource): Model {
       id: n.id,
       label: n.label,
       defId: n.defId,
-      config: n.config,
+      config: def ? { ...def.defaults, ...n.config } : n.config,
       replicas: Math.max(1, n.scaling.replicas),
+      ...(n.scaling.autoscale ? { autoscale: n.scaling.autoscale } : {}),
       regionId: regionOf(n.groupId),
       groupId: n.groupId,
       index,
@@ -54,8 +58,10 @@ export function compile(graph: Graph, registry: ComponentSource): Model {
         ...base,
         kind: 'unknown',
         behaviors: [],
+        scale: { ...EVEN_SPEC },
         serversPerInstance: 1,
         serviceTimeMs: { read: 0, write: 0 },
+        baseServiceTimeMs: { read: 0, write: 0 },
         saturationBehavior: 'queue',
       });
       return;
@@ -73,15 +79,19 @@ export function compile(graph: Graph, registry: ComponentSource): Model {
         ),
       );
     }
+    const scale = scaleSpecOf(def, base.config, instanceType);
+    const s = def.perf.serviceTimeMs;
     nodes.set(n.id, {
       ...base,
       kind: def.category === 'clients' ? 'source' : 'service',
+      scale,
       def,
       category: def.category,
       behaviors: def.behaviors ?? [],
       instanceType,
       serversPerInstance: def.perf.maxConcurrencyPerInstance,
-      serviceTimeMs: { ...def.perf.serviceTimeMs },
+      serviceTimeMs: { read: s.read / scale.speedup, write: s.write / scale.speedup },
+      baseServiceTimeMs: { ...s },
       saturationBehavior: def.perf.saturationBehavior,
     });
   });
@@ -107,6 +117,19 @@ export function compile(graph: Graph, registry: ComponentSource): Model {
     out.get(e.source)?.push(ce);
     inbound.get(e.target)?.push(ce);
   });
+
+  // Upstream behaviors that shape how a target's replicas are loaded (consistent hashing).
+  for (const e of edges.values()) {
+    const src = nodes.get(e.source);
+    const tgt = nodes.get(e.target);
+    if (!src || !tgt || tgt.kind !== 'service') continue;
+    for (const b of behaviorsOf(src.behaviors)) {
+      const v = b.hashVirtualNodes?.(src);
+      if (v === undefined) continue;
+      const cur = tgt.scale.hashVirtualNodes;
+      tgt.scale = { ...tgt.scale, hashVirtualNodes: cur === undefined ? v : Math.min(cur, v) };
+    }
+  }
 
   return { nodes, edges, out, inbound, issues };
 }

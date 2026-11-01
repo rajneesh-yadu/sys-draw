@@ -1,5 +1,6 @@
 /** Internal model types shared by every engine stage. Not part of the saved format. */
 import type {
+  Autoscale,
   ComponentDefinition,
   Finding,
   FlowStep,
@@ -9,6 +10,7 @@ import type {
   ProviderId,
   Scenario,
 } from '@/core';
+import type { Pool, ScaleSpec } from '../scaling/pools';
 
 export type Op = FlowStep['op'];
 
@@ -52,12 +54,19 @@ export interface CompiledNode {
   category?: string | undefined;
   behaviors: readonly string[];
   config: Readonly<Record<string, unknown>>;
-  /** Horizontal scale: identical instances, each with its own queue. */
+  /** Horizontal scale: configured replicas (per shard), each with its own queue. */
   replicas: number;
+  /** Target-tracking policy; the analytical run uses its steady-state replica count. */
+  autoscale?: Autoscale | undefined;
+  /** Vertical, data and platform scaling (S09). */
+  scale: ScaleSpec;
   instanceType?: InstanceType | undefined;
   /** Parallel servers inside one instance (M/M/c's c) = perf.maxConcurrencyPerInstance. */
   serversPerInstance: number;
+  /** Effective service times = registry service times ÷ vertical speedup. */
   serviceTimeMs: { read: number; write: number };
+  /** Registry service times on the baseline (first) instance type. */
+  baseServiceTimeMs: { read: number; write: number };
   saturationBehavior: PerfModel['saturationBehavior'];
   /** Cloud region from the nearest enclosing group with a `regionId`. */
   regionId?: string | undefined;
@@ -93,14 +102,19 @@ export interface NodeStats {
   lambda: number;
   /** Requests completed per second = λ × (1 − errorRate). */
   servedRps: number;
-  /** Arrival rate per instance = λ / replicas. */
+  /** Replicas in effect (configured, or the autoscaler's steady state). */
+  replicas: number;
+  /** Instance pools the node's traffic is spread over (see scaling/pools.ts). */
+  pools: Pool[];
+  /** Arrival rate at the busiest instance. */
   lambdaPerInstance: number;
-  /** Mean service time S̄ over the read/write mix (ms). */
+  /** Mean service time S̄ over the read/write mix at the busiest instance (ms). */
   meanServiceMs: number;
   /** Service rate of one server, μ = 1000 / S̄ (rps). */
   muPerServer: number;
-  /** Max throughput of the whole node = replicas × c × μ (rps). */
+  /** Max throughput of the whole node for this read/write mix (busiest instance at ρ = 1). */
   capacityRps: number;
+  /** Utilisation of the busiest instance. */
   utilization: number;
   /** Erlang C: probability an arrival has to wait. */
   waitProbability: number;
@@ -110,5 +124,6 @@ export interface NodeStats {
   responseMs: { read: number; write: number; mean: number };
   hitRate?: number | undefined;
   saturated: boolean;
+  costPerMonth: number;
   explain: Record<string, string>;
 }

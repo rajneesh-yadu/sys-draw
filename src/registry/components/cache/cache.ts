@@ -27,7 +27,7 @@ export default defineComponent({
       .min(1)
       .max(500)
       .describe('Cluster shards (each holds part of the keys)')
-      .meta({ advanced: true }),
+      .meta({ advanced: true, scaling: 'shards' }),
     replicasPerShard: z
       .number()
       .int()

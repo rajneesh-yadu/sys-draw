@@ -13,7 +13,7 @@ export default defineComponent({
     storageClass: z
       .enum(['standard', 'infrequent', 'archive'])
       .describe('Cheaper classes cost more per read and may take hours to retrieve (archive)'),
-    storageGb: z.number().min(1).max(1e9).describe('Data stored'),
+    storageGb: z.number().min(1).max(1e9).describe('Data stored').meta({ scaling: 'storageGb' }),
     publicAccess: z
       .boolean()
       .describe('Allow anonymous reads (normally off — serve via CDN instead)'),

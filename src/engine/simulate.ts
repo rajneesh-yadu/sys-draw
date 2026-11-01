@@ -27,6 +27,7 @@ import {
 } from './model/types';
 import { nodeQueueing } from './queueing/node';
 import { expQuantileFactor } from './queueing/mmc';
+import { FALLBACK_PRICING, nodeCost, type Pricing } from './cost/cost';
 
 /** Nodes at or above this utilisation are listed as bottlenecks. */
 export const BOTTLENECK_UTILIZATION = 0.85;
@@ -114,6 +115,12 @@ function latencyOf(
   }
 }
 
+/** The board provider's price table (falls back to generic list prices). */
+function pricingOf(registry: ComponentSource, providerId: string | undefined): Pricing {
+  const p = registry.get(providerId ?? 'generic', 'provider');
+  return p ? { ...p.pricing } : { ...FALLBACK_PRICING };
+}
+
 export function simulate(
   input: SimInput,
   registry: ComponentSource,
@@ -161,8 +168,14 @@ export function simulate(
     }
   }
 
+  const pricing = pricingOf(registry, input.providerId);
+  let systemCost = 0;
   const perNode: Record<string, NodeMetrics> = {};
   for (const [id, s] of stats) {
+    const cost = nodeCost(s.node, s, pricing, scenario.peakMultiplier);
+    s.costPerMonth = cost.costPerMonth;
+    if (s.node.kind === 'service') s.explain.costPerMonth = cost.explain;
+    systemCost += cost.costPerMonth;
     const t = s.responseMs.mean;
     perNode[id] = {
       utilization: s.utilization,
@@ -176,7 +189,7 @@ export function simulate(
       },
       errorRate: s.errorRate,
       ...(s.hitRate !== undefined ? { hitRate: s.hitRate } : {}),
-      costPerMonth: 0,
+      costPerMonth: s.costPerMonth,
       explain: s.explain,
     };
   }
@@ -224,7 +237,7 @@ export function simulate(
     system: {
       rps: totalRps,
       availability: totalRps > 0 ? okRps / totalRps : 1,
-      costPerMonth: 0,
+      costPerMonth: systemCost,
       bottlenecks,
     },
     findings: [...model.issues, ...plan.issues],

@@ -15,7 +15,20 @@ function comp(
   read: number,
   write: number,
   c: number,
-  opts: { behaviors?: string[]; saturation?: Sat } = {},
+  opts: {
+    behaviors?: string[];
+    saturation?: Sat;
+    curve?: 'linear' | 'sublinear' | 'single-writer';
+    config?: z.ZodObject;
+    defaults?: Record<string, unknown>;
+    instanceTypes?: {
+      id: string;
+      vCpu: number;
+      memGb: number;
+      netGbps: number;
+      costUsdPerHour: number;
+    }[];
+  } = {},
 ) {
   return defineComponent({
     id,
@@ -27,19 +40,33 @@ function comp(
       { id: 'in', direction: 'in', protocols: ['http2'] },
       { id: 'out', direction: 'out', protocols: ['http2'] },
     ],
-    configSchema: z.object({}),
-    defaults: {},
-    instanceTypes: [{ id: 'std', vCpu: 1, memGb: 1, netGbps: 1, costUsdPerHour: 0.1 }],
+    configSchema: opts.config ?? z.object({}),
+    defaults: opts.defaults ?? {},
+    instanceTypes: opts.instanceTypes ?? [STD, BIG],
     perf: {
       serviceTimeMs: { read, write },
       maxConcurrencyPerInstance: c,
-      scaleCurve: 'linear',
+      scaleCurve: opts.curve ?? 'linear',
       saturationBehavior: opts.saturation ?? 'queue',
     },
     ...(opts.behaviors ? { behaviors: opts.behaviors } : {}),
     docs: { summary: `Test component ${id}`, howItWorks: '', tradeoffs: [], interviewTips: [] },
   });
 }
+
+/** Instance sizes: std is the baseline; big has 4× the vCPU at 4× the price. */
+const STD = { id: 'std', vCpu: 1, memGb: 1, netGbps: 1, costUsdPerHour: 0.1 };
+const BIG = { id: 'big', vCpu: 4, memGb: 4, netGbps: 1, costUsdPerHour: 0.4 };
+
+/** Data-store config using the scaling roles (`.meta({ scaling })`). */
+const storeConfig = z.object({
+  readReplicas: z.number().int().min(0).meta({ scaling: 'readReplicas' }),
+  shards: z.number().int().min(1).meta({ scaling: 'shards' }),
+  keySkew: z.number().min(0).max(1).meta({ scaling: 'keySkew' }),
+  storageGb: z.number().min(0).meta({ scaling: 'storageGb' }),
+  standby: z.boolean().meta({ scaling: 'standby' }),
+});
+const storeDefaults = { readReplicas: 0, shards: 1, keySkew: 0, storageGb: 0, standby: false };
 
 /** Components: S in ms (read/write), c = servers per instance. */
 export const testRegistry: Registry = createRegistry(
@@ -53,6 +80,32 @@ export const testRegistry: Registry = createRegistry(
     comp('cache.test', 'cache', 0.5, 0.5, 1, { behaviors: ['cache'] }), // μ = 2000 rps
     comp('database.test', 'database', 20, 40, 1), // μ = 50 rps (reads)
     comp('messaging.queue', 'messaging', 1, 1, 1, { behaviors: ['queue'] }),
+    // μ = 100 rps per instance; one primary per shard takes every write.
+    comp('database.primary', 'database', 10, 10, 1, {
+      curve: 'single-writer',
+      config: storeConfig,
+      defaults: storeDefaults,
+    }),
+    // μ = 100 rps per instance; shards split reads AND writes.
+    comp('database.sharded', 'database', 10, 10, 1, {
+      config: storeConfig,
+      defaults: storeDefaults,
+    }),
+    comp('compute.sub', 'compute', 10, 10, 1, { curve: 'sublinear' }),
+    // Pay-per-request ($0/h) and platform-scaled (serverless-like) components.
+    comp('storage.managed', 'storage', 10, 10, 100, {
+      instanceTypes: [{ id: 'managed', vCpu: 1, memGb: 1, netGbps: 1, costUsdPerHour: 0 }],
+      config: z.object({ storageGb: z.number().meta({ scaling: 'storageGb' }) }),
+      defaults: { storageGb: 1000 },
+    }),
+    comp('compute.fn', 'compute', 30, 30, 1, {
+      saturation: 'reject',
+      config: z.object({
+        limit: z.number().int().meta({ scaling: 'maxInstances' }),
+        warm: z.number().int().meta({ scaling: 'minInstances' }),
+      }),
+      defaults: { limit: 10, warm: 0 },
+    }),
   ].map((entry) => ({ kind: 'component' as const, entry, source: 'engine/test-fixtures.ts' })),
 );
 

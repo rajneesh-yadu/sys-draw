@@ -25,4 +25,5 @@ Loads, validates and looks up every registry entry (components, protocols, provi
 
 - Add a file in the right folder exporting a `define*` result (default or named). Nothing else (F2).
 - Config fields: `.describe('help text')`; mark advanced knobs with `.meta({ advanced: true })`.
+- Scaling/cost roles (S09): `.meta({ scaling: 'shards' | 'keySkew' | 'readReplicas' | 'standby' | 'storageGb' | 'storageCopies' | 'maxInstances' | 'minInstances' })` — the engine and the inspector's Scale actions find fields by role. `perf.serviceTimeMs` is measured on the FIRST instance type.
 - A file with no entry, or the wrong kind for its folder, fails loading with the file path.

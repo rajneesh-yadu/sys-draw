@@ -1,4 +1,4 @@
-/** Node panel: label, generated component config (Basic / Advanced) and scaling. */
+/** Node panel: label, generated component config (Basic / Advanced) and scaling (+ quick actions). */
 import { useMemo } from 'react';
 import { z } from 'zod';
 import { componentDisplayName, registry } from '@/registry';
@@ -7,6 +7,7 @@ import type { FieldOverrides } from '../form/model';
 import { SchemaForm } from '../form/SchemaForm';
 import { ComponentDocs } from './DocsView';
 import { PanelTitle, Section, Tabs } from './common';
+import { ScaleActions } from './ScaleActions';
 import { useDispatch } from './use-dispatch';
 
 const LabelSchema = z.object({
@@ -79,6 +80,7 @@ export function NodePanel({ node, providerId }: { node: NodeInstance; providerId
         />
       </Section>
       <Section title="Scaling">
+        <ScaleActions def={def} node={node} />
         <SchemaForm
           label="Scaling"
           schema={NodeScalingSchema}
