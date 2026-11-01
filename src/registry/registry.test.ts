@@ -69,11 +69,33 @@ const S16_RULES = [
   'rule.open-admin-ports',
   'rule.security-group-blocks',
 ];
+const S19_RULES = [
+  'rule.spof',
+  'rule.no-lb-before-replicas',
+  'rule.no-cache-hot-read',
+  'rule.sync-slow-dependency',
+  'rule.no-queue-spiky-writes',
+  'rule.unbounded-retries',
+  'rule.no-cdn-static-media',
+  'rule.single-region-global-users',
+  'rule.db-connections-exceed-limit',
+  'rule.hot-partition',
+  'rule.no-idempotency-payments',
+  'rule.no-timeout-sync-call',
+  'rule.no-circuit-breaker',
+  'rule.overloaded-node',
+  'rule.no-autoscaling',
+  'rule.stateful-servers',
+  'rule.db-missing-index',
+  'rule.single-az',
+  'rule.queue-without-consumer',
+  'rule.cross-region-sync-call',
+];
 
 describe('seeded registry', () => {
   const all = registry.list();
 
-  it('loads the 14 generic + 15 S13 + 7 S16 security + 2 provider-only components, 33 protocols, 4 providers, 8 rules and 10 problems', () => {
+  it('loads the 14 generic + 15 S13 + 7 S16 security + 2 provider-only components, 33 protocols, 4 providers, 8 security + 20 design rules and 10 problems', () => {
     expect(
       registry
         .list({ kind: 'component' })
@@ -92,7 +114,7 @@ describe('seeded registry', () => {
         .list({ kind: 'rule' })
         .map((r) => r.id)
         .sort(),
-    ).toEqual([...S16_RULES].sort());
+    ).toEqual([...S16_RULES, ...S19_RULES].sort());
     expect(
       registry
         .list({ kind: 'protocol' })
@@ -106,7 +128,7 @@ describe('seeded registry', () => {
       'generic',
     ]);
     expect(registry.list({ kind: 'problem' })).toHaveLength(10); // S17
-    expect(registry.size).toBe(98);
+    expect(registry.size).toBe(118);
   });
 
   it('has unique ids across all kinds', () => {

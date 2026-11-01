@@ -178,3 +178,16 @@ export {
   type TraceOptions,
 } from './trace/trace';
 export { runTrace } from './client';
+// S19 — design review (registry rules + engine findings, worst first, with one-click fixes)
+export {
+  reviewDesign,
+  designFix,
+  designRules,
+  ruleSkipReason,
+  reviewContext,
+  reviewKey,
+  REVIEW_SEVERITY_RANK,
+  type ReviewInput,
+  type ReviewFinding,
+  type DesignReview,
+} from './review/review';

@@ -33,6 +33,7 @@ import { useCanvasActions, useGroupRects } from './actions';
 import { useCanvasUi } from './context';
 import { useTraceStore, useTraceStoreApi } from './trace/context';
 import { useSecurityStore, useSecurityStoreApi } from './security/context';
+import { useReviewStore, useReviewStoreApi } from './review/context';
 import { decodePaletteItem, DND_MIME } from './dnd';
 import {
   findDropGroup,
@@ -446,6 +447,7 @@ function Toolbar(props: {
       <span className="mx-1 h-4 w-px bg-slate-200 dark:bg-slate-700" />
       <TraceToggle />
       <SecurityToggle />
+      <ReviewToggle />
     </div>
   );
 }
@@ -471,6 +473,37 @@ function SecurityToggle() {
       {serious > 0 && (
         <span
           data-testid="security-badge"
+          className="ml-1 rounded-full bg-red-600 px-1.5 text-[10px] font-semibold text-white"
+          aria-label={`${serious} critical or error findings`}
+        >
+          {serious}
+        </span>
+      )}
+    </button>
+  );
+}
+
+/** S19: opens/closes the design review; the badge counts critical + error findings. */
+function ReviewToggle() {
+  const review = useReviewStoreApi();
+  const open = useReviewStore((s) => s.open);
+  const serious = useReviewStore(
+    (s) =>
+      s.view?.findings.filter((f) => f.severity === 'critical' || f.severity === 'error').length ??
+      0,
+  );
+  return (
+    <button
+      type="button"
+      className={`${btn} ${open ? 'bg-sky-50 text-sky-800 dark:bg-sky-950 dark:text-sky-200' : ''}`}
+      aria-pressed={open}
+      onClick={() => review.getState().setOpen(!open)}
+      title="Design review: single points of failure, bottlenecks, missing caches/queues, retries, cost…"
+    >
+      Review
+      {serious > 0 && (
+        <span
+          data-testid="review-badge"
           className="ml-1 rounded-full bg-red-600 px-1.5 text-[10px] font-semibold text-white"
           aria-label={`${serious} critical or error findings`}
         >

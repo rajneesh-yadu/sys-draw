@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import {
   BoardCanvas,
   CanvasProvider,
+  createReviewStore,
   createSecurityStore,
   createTraceStore,
   Palette,
+  FindingsPanel,
   SecurityPanel,
   TracePanel,
 } from '@/canvas';
@@ -24,6 +26,7 @@ import { ProblemBriefButton, ProblemsButton } from '@/problems';
 import { projectOfBoard, useWorkspaceStore } from '@/store';
 import { useSimulationRunner } from '../simulation/useSimulationRunner';
 import { useTraceRunner } from '../trace/useTraceRunner';
+import { useReviewRunner } from '../review/useReviewRunner';
 import { useSecurityRunner } from '../security/useSecurityRunner';
 import {
   BoardTabs,
@@ -55,6 +58,9 @@ export function AppShell({
   // S16: security overlay + threat review — the canvas shows it, this runner fills it.
   const [securityStore] = useState(createSecurityStore);
   useSecurityRunner(securityStore);
+  // S19: design review (registry rules + simulation findings) — the canvas shows it.
+  const [reviewStore] = useState(createReviewStore);
+  useReviewRunner(reviewStore);
   // S18: modes — the session of the open board and local progress.
   const [modeStore] = useState(createModeStore);
   const [progressStore] = useState(() => createProgressStore());
@@ -76,7 +82,11 @@ export function AppShell({
   return (
     <NoticeProvider>
       <ModesProvider modeStore={modeStore} progressStore={progressStore}>
-        <CanvasProvider traceStore={traceStore} securityStore={securityStore}>
+        <CanvasProvider
+          traceStore={traceStore}
+          securityStore={securityStore}
+          reviewStore={reviewStore}
+        >
           <div className="flex h-screen flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
             <TopBar autosave={autosave} />
 
@@ -111,6 +121,7 @@ export function AppShell({
                   </main>
                   <TracePanel />
                   <SecurityPanel />
+                  <FindingsPanel />
                   <ModePanelWithNotices />
                 </div>
 

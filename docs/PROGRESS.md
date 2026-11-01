@@ -712,3 +712,35 @@ Known gaps / follow-ups:
 - Tests, build and e2e ran on a Linux copy of the repo (macOS-native `node_modules`); e2e used a local Playwright config pointing at the sandbox's Chromium (not committed). No new dependencies. A `.s18tmp/` folder (source tarball) is left at the repo root because deletes are blocked; git-ignored and safe to delete, as are `.s10tmp`–`.s17tmp`.
 
 Next suggested session: S19 — Evaluator and review rules (engine findings such as SPOF / hot partition as registry rules, `reviewSecurity` merged into findings, one scoring function shared by Interview and the problems module).
+
+## S19 — Design review engine — 2026-11-01
+
+What changed:
+
+- `registry`: `RuleDefinition.appliesTo?` (`RuleAppliesToSchema`: `categories?`, `tags?`, `defIds?`, `needs?: ('scenario' | 'result')[]`; additive, optional). `FixStep` gains `setNodeConfig`, `setNodeScaling`, `setEdgeConfig` (additive union members). `design-tools.ts` (internal helpers for rules: request path from clients, callers/callees, `regionOf`/`enclosingGroup`, `fieldWithRole`, `writeShare`, `maxInstances`/`minInstances`). **20 design rules** in `rules/`: `spof`, `no-lb-before-replicas`, `no-cache-hot-read`, `sync-slow-dependency`, `no-queue-spiky-writes`, `unbounded-retries`, `no-cdn-static-media`, `single-region-global-users`, `db-connections-exceed-limit`, `hot-partition`, `no-idempotency-payments`, `no-timeout-sync-call`, `no-circuit-breaker`, `overloaded-node`, `no-autoscaling`, `stateful-servers`, `db-missing-index`, `single-az`, `queue-without-consumer`, `cross-region-sync-call` (28 rules with S16's 8; "no rate limiting" is S16's `rule.no-rate-limit-public-api`, now shown in the same panel). One-click fixes on 13 of them, only where safe: SPOF (2 replicas + LB on a lone direct edge, or turn on the DB/cache standby), LB insert, Redis cache-aside, retries → 3 + exp backoff, CDN insert, Postgres pooling, idempotency-key store, timeout (3 × callee p99, else 1 s), circuit breaker (50 %, 30 s), scale overloaded stateless compute to ~60 %, autoscaling (¼ fleet ≥ 2 … fleet, 60 %), add index, add a queue worker.
+- `engine`: `review/review.ts` — `reviewDesign`, `designFix`, `designRules`, `ruleSkipReason`, `reviewContext`, `reviewKey`, `REVIEW_SEVERITY_RANK`, types `ReviewInput`, `ReviewFinding`, `DesignReview` (exported from `engine/index.ts`). Runs on the main thread (rule functions are not sent to the worker); merges the result's `engine.*` findings that still point at existing ids.
+- `canvas`: `review/` — `createReviewStore`, `FindingsPanel`, `useReviewStore(Api)`, `categoryCounts`, `jumpTarget`, `REVIEW_CATEGORIES`/`REVIEW_CATEGORY_LABEL`, view types; `CanvasProvider` takes `reviewStore?`; toolbar "Review" toggle with a critical+error badge.
+- `app`: `review/runner.ts` (`startReviewRunner`, `toReviewView`, `applyReviewFix`) + `useReviewRunner`; `security/runner.ts` `planToCommands` maps the 3 new fix steps; AppShell mounts `<FindingsPanel />`.
+
+Public APIs added: engine review exports above; canvas review exports above; registry `RuleAppliesToSchema`, `type RuleAppliesTo`, `RuleDefinition.appliesTo`, 3 `FixStep` kinds. No existing signature changed.
+
+Notes (decisions):
+
+- The task text says `check(graph, result)`; the existing contract is `check(ctx)` with `ctx.graph` / `ctx.result` / `ctx.scenario`, so rules keep that (no API break for S16 rules, modes and problems).
+- `appliesTo` doubles as coverage: the panel lists rules "not applicable" with the reason (e.g. "needs a simulation result" until the first run finishes).
+- Thresholds (in the rule files): hot read ≥ 1 000 rps or ≥ 70 % DB utilisation with < 50 % writes; slow dependency p99 ≥ 500 ms; spiky = peak ≥ 3× or a ≥ 2× spike event, write-heavy ≥ 30 % of steps; retries > 3 or backoff `none`; overloaded ≥ 85 % (≥ 100 % critical); hot partition skew ≥ 20 % and ≥ 2× fair share; missing index on ≥ 100 k rows; global users = two user regions ≥ 10 % each and ≥ 3 000 km apart; Postgres without pooling capped at 100 connections, unknown pool = 10 per instance.
+- Payments are recognised by label (/pay|checkout|billing|charge|ledger|wallet|stripe/) and satisfied by a callee whose label mentions idempotency/dedup — there is no idempotency field in the data model.
+- Tests: `registry/rules/design-rules.test.ts` (positive + negative fixture per rule, fix plans applied and re-checked), `engine/review/review.test.ts`, `canvas/review/review.test.tsx`, `app/review/runner.test.ts`; `registry.test.ts` now expects 28 rules / 118 entries. `no-cache-hot-read` is tagged `caching` (not `cache`) so `list({ tag: 'cache' })` still returns only components.
+
+Tests: 102 added (1027 total), all passing; `tsc -b`, `pnpm lint`, `prettier --check src docs e2e` green; `pnpm build` green with the pre-existing chunk-size warning. e2e not re-run (no existing selector matches "Design review").
+
+Known gaps / follow-ups:
+
+- No shared scoring function yet (Interview / problems still score rubric rules via `modes/evaluate.ts`); rubric items can now reference the 20 design rules, but no problem does yet.
+- The Security panel still shows its own S16 review; the Review panel repeats security findings under "Security" (one place to see everything). A later session could make the Security panel the overlay legend only.
+- Result-based rules use the latest finished result for the board, which can trail an edit by the 300 ms debounce; findings pointing at deleted ids are dropped.
+- No canvas highlight of finding targets beyond selection + focus; no e2e for the panel.
+- Debug variants can now use design rules (`fixedWhenRulesPass`) for SPOF / hot-partition / missing-cache faults.
+- Tests and build ran on a Linux copy (macOS-native `node_modules`). `.s19tmp/` (source tarball) is left at the repo root because deletes are blocked; safe to delete.
+
+Next suggested session: S20 — one scoring function shared by Interview and the problems module, using `reviewDesign` + SLOs; add design-rule rubric lines and Debug variants (SPOF, hot partition, missing cache).

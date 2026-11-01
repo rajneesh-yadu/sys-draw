@@ -52,3 +52,19 @@ export {
   type SecurityEncryption,
   type FixHandler,
 } from './security/security-store';
+// S19 — design review panel (the app runs the engine's review and applies fixes)
+export { FindingsPanel } from './review/FindingsPanel';
+export { useReviewStore, useReviewStoreApi } from './review/context';
+export {
+  createReviewStore,
+  categoryCounts,
+  jumpTarget,
+  REVIEW_CATEGORIES,
+  REVIEW_CATEGORY_LABEL,
+  type ReviewState,
+  type ReviewStore,
+  type ReviewView,
+  type ReviewViewFinding,
+  type ReviewCategory,
+  type ReviewFilter,
+} from './review/review-store';

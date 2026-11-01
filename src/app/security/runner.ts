@@ -134,6 +134,23 @@ export function planToCommands(
           out.push({ type: 'connect', source: from, target: id, id: newId('edge') });
         break;
       }
+      // S19 (design review fixes)
+      case 'setNodeConfig':
+        out.push({ type: 'updateConfig', nodeId: s.nodeId, config: s.config });
+        break;
+      case 'setNodeScaling':
+        out.push({
+          type: 'updateNode',
+          nodeId: s.nodeId,
+          scaling: {
+            ...(s.replicas !== undefined ? { replicas: s.replicas } : {}),
+            ...(s.autoscale !== undefined ? { autoscale: s.autoscale } : {}),
+          },
+        });
+        break;
+      case 'setEdgeConfig':
+        out.push({ type: 'updateEdge', edgeId: s.edgeId, config: s.config });
+        break;
     }
   }
   return out;

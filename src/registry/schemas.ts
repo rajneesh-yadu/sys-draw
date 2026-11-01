@@ -13,7 +13,9 @@ import {
   ProviderIdSchema,
   RegionIdSchema,
   RegistryIdSchema,
+  type Autoscale,
   type ComponentDefinition,
+  type EdgeConfig,
   type Finding,
   type Graph,
   type GroupKind,
@@ -241,7 +243,22 @@ export type FixStep =
   /** Put a new `defId` node in the middle of an edge (client → WAF → entry). */
   | { kind: 'insertOnEdge'; edgeId: string; defId: string; label: string }
   /** Add a `defId` node next to `near` and connect each of `connectFrom` to it. */
-  | { kind: 'addNode'; defId: string; label: string; near: string; connectFrom: string[] };
+  | { kind: 'addNode'; defId: string; label: string; near: string; connectFrom: string[] }
+  /** S19: shallow-merge config fields into a node (validated against its component schema). */
+  | { kind: 'setNodeConfig'; nodeId: string; config: Record<string, unknown> }
+  /** S19: change a node's replicas and/or autoscaling (`autoscale: null` turns it off). */
+  | {
+      kind: 'setNodeScaling';
+      nodeId: string;
+      replicas?: number | undefined;
+      autoscale?: Autoscale | null | undefined;
+    }
+  /** S19: merge fields into an edge's config (`null` removes a field). */
+  | {
+      kind: 'setEdgeConfig';
+      edgeId: string;
+      config: { [K in keyof EdgeConfig]?: EdgeConfig[K] | null };
+    };
 
 export interface FixPlan {
   /** Button / undo label, e.g. "Move Orders DB into a private data subnet". */
@@ -251,6 +268,24 @@ export interface FixPlan {
 /** Builds the one-click fix for one of the rule's findings (undefined = no automatic fix). */
 export type RuleFix = (ctx: RuleContext, finding: Finding) => FixPlan | undefined;
 
+/**
+ * S19: when a rule is worth running. The review skips a rule whose `appliesTo` does not match the
+ * board, so the panel can say "not checked" instead of "passed". All parts are optional; every
+ * given part must hold: some node matches `categories` / `tags` / `defIds` (any of them), and a
+ * scenario / simulation result exists when `needs` asks for one.
+ */
+export const RuleAppliesToSchema = z.strictObject({
+  /** Component categories ('compute', 'database', …): the board needs one such node. */
+  categories: z.array(NonEmptyStringSchema).optional(),
+  /** Component tags: the board needs a node whose component has one of them. */
+  tags: z.array(NonEmptyStringSchema).optional(),
+  /** Component ids: the board needs one such node. */
+  defIds: z.array(RegistryIdSchema).optional(),
+  /** Inputs the check reads: 'result' = a simulation result, 'scenario' = the traffic scenario. */
+  needs: z.array(z.enum(['scenario', 'result'])).optional(),
+});
+export type RuleAppliesTo = z.infer<typeof RuleAppliesToSchema>;
+
 export const RuleDefinitionSchema = z.strictObject({
   id: RegistryIdSchema, // 'rule.spof'
   title: NonEmptyStringSchema,
@@ -258,6 +293,8 @@ export const RuleDefinitionSchema = z.strictObject({
   /** Default severity of the findings this rule emits. */
   severity: FindingSeveritySchema,
   tags: z.array(z.string()),
+  /** S19: which boards the rule is relevant to (omit = every board). */
+  appliesTo: RuleAppliesToSchema.optional(),
   check: z.custom<RuleCheck>((v) => typeof v === 'function', {
     message: 'check must be a function (ctx) => Finding[]',
   }),
