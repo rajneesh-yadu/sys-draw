@@ -24,6 +24,7 @@ import {
   type RegionField,
 } from './formulas';
 import { FormulaValue } from './FormulaValue';
+import { FailuresPanel } from './FailuresPanel';
 import { NodeDetail } from './NodeDetail';
 
 const btn =
@@ -110,28 +111,31 @@ function DrawerBody() {
   const selectedId = selection.find((id) => result.perNode[id] !== undefined);
   const selected = selectedId !== undefined ? result.perNode[selectedId] : undefined;
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] divide-x divide-slate-100 dark:divide-slate-800">
-      <div className="space-y-3 p-3">
-        <section aria-label="System" className="space-y-3">
-          <SystemKpis result={result} scenario={scenario} />
-          <FlowTable result={result} scenario={scenario} />
-          <RegionTable result={result} />
-        </section>
-        <section aria-label="Bottlenecks" className="space-y-3">
-          <Bottlenecks result={result} labelOf={labelOf} />
-          <Findings findings={result.findings} />
+    <>
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] divide-x divide-slate-100 dark:divide-slate-800">
+        <div className="space-y-3 p-3">
+          <section aria-label="System" className="space-y-3">
+            <SystemKpis result={result} scenario={scenario} />
+            <FlowTable result={result} scenario={scenario} />
+            <RegionTable result={result} />
+          </section>
+          <section aria-label="Bottlenecks" className="space-y-3">
+            <Bottlenecks result={result} labelOf={labelOf} />
+            <Findings findings={result.findings} />
+          </section>
+        </div>
+        <section aria-label="Component" className="p-3">
+          {selected && selectedId !== undefined ? (
+            <NodeDetail label={labelOf(selectedId) ?? selectedId} m={selected} />
+          ) : (
+            <p className="text-sm text-slate-400">
+              Select a component (or a bottleneck) to see its utilisation, queue and latency.
+            </p>
+          )}
         </section>
       </div>
-      <section aria-label="Component" className="p-3">
-        {selected && selectedId !== undefined ? (
-          <NodeDetail label={labelOf(selectedId) ?? selectedId} m={selected} />
-        ) : (
-          <p className="text-sm text-slate-400">
-            Select a component (or a bottleneck) to see its utilisation, queue and latency.
-          </p>
-        )}
-      </section>
-    </div>
+      <FailuresPanel />
+    </>
   );
 }
 

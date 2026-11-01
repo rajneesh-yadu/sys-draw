@@ -25,4 +25,4 @@ Zod schemas and inferred types for every saved document and registry entry, pref
 ## Extension points
 
 - Saved type changes: add `migrations/vN-to-vN+1.ts`, append to `MIGRATIONS`, bump `CURRENT_SCHEMA_VERSION`, add a vN fixture test.
-- New chaos event kinds are additive (no migration).
+- New chaos event kinds are additive (no migration). S11 added `hotKey`, `dependencySlow`, `diskFull`, `coldStartBurst` (+ `CHAOS_EVENT_KINDS`), optional `EdgeConfig.breakerErrorThreshold` / `breakerOpenSec`, optional `TimePoint.nodes` / `edges` / `activeEventIds` (`NodeTickSchema`, `EdgeTickSchema`, `NODE_TICK_STATES`, `BREAKER_STATES`) and `SimResult.timelineEvents` (`TimelineMarkerSchema`, `TIMELINE_MARKER_KINDS`).

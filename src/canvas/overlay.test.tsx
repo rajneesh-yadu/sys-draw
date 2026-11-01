@@ -11,7 +11,7 @@ import {
 } from '@/store';
 import { BoardCanvas } from './BoardCanvas';
 import { CanvasProvider } from './CanvasProvider';
-import { EDGE_WIDTH, edgeStrokeWidth, maxEdgeRps } from './overlay';
+import { EDGE_WIDTH, edgeStrokeWidth, maxEdgeRps, tickEdgeStyle } from './overlay';
 
 describe('edgeStrokeWidth', () => {
   it('scales with the square root of rps relative to the busiest edge', () => {
@@ -92,5 +92,74 @@ describe('node overlays', () => {
     expect(
       screen.getAllByTestId('component-node').map((n) => n.getAttribute('data-level')),
     ).toEqual(['ok', 'warn', 'hot']);
+  });
+});
+
+describe('failure timeline playback (S11)', () => {
+  it('edge style per tick: breaker states and failing edges carry a text badge', () => {
+    expect(tickEdgeStyle({ rps: 5, errorRate: 0 })).toEqual({ dashed: false });
+    expect(tickEdgeStyle({ rps: 5, errorRate: 1, breaker: 'open' })).toMatchObject({
+      dashed: true,
+      badge: 'breaker open',
+    });
+    expect(tickEdgeStyle({ rps: 5, errorRate: 0, breaker: 'half-open' }).badge).toBe(
+      'breaker half-open',
+    );
+    expect(tickEdgeStyle({ rps: 5, errorRate: 0.5 })).toMatchObject({ badge: '50% fail' });
+  });
+
+  it('shows the scrubbed tick on the nodes: down, degraded with errors, autoscaled replicas', async () => {
+    const { board, sim } = setup();
+    const [a, b, c] = board.getState().doc.graph.nodes.map((n) => n.id) as [string, string, string];
+    const tick = (
+      state: 'up' | 'down' | 'degraded',
+      utilization: number,
+      errorRate = 0,
+      replicas = 1,
+    ) => ({
+      utilization,
+      rpsIn: 10,
+      errorRate,
+      p99Ms: 12,
+      replicas,
+      state,
+    });
+    const result: SimResult = {
+      perNode: { [a]: metrics(0.3), [b]: metrics(0.3), [c]: metrics(0.3) },
+      perEdge: {},
+      perFlow: {},
+      system: { rps: 1, availability: 1, costPerMonth: 0, bottlenecks: [] },
+      findings: [],
+      timeline: [
+        { tSec: 0, rps: 1, p50Ms: 1, p99Ms: 2, errorRate: 0, availability: 1 },
+        {
+          tSec: 1,
+          rps: 1,
+          p50Ms: 1,
+          p99Ms: 2,
+          errorRate: 0.5,
+          availability: 0.5,
+          nodes: {
+            [a]: tick('down', 0, 1),
+            [b]: tick('degraded', 0.9, 0.2),
+            [c]: tick('up', 0.3, 0, 3),
+          },
+        },
+      ],
+    };
+    act(() => void sim.getState().finish(sim.getState().start(), 'board_x', result));
+    await screen.findAllByTestId('node-overlay');
+    expect(
+      screen.getAllByTestId('component-node').map((n) => n.getAttribute('data-state')),
+    ).toEqual([null, null, null]);
+    act(() => sim.getState().setTick(1));
+    const nodes = screen.getAllByTestId('component-node');
+    expect(nodes.map((n) => n.getAttribute('data-state'))).toEqual(['down', 'degraded', 'up']);
+    expect(nodes.map((n) => n.getAttribute('data-level'))).toEqual(['ok', 'hot', 'ok']);
+    expect(screen.getByText('Down')).toBeInTheDocument();
+    expect(screen.getByText('20% err')).toBeInTheDocument();
+    expect(screen.getByLabelText('3 replicas')).toBeInTheDocument();
+    act(() => sim.getState().setTick(null));
+    expect(screen.queryByText('Down')).toBeNull();
   });
 });

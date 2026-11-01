@@ -1,13 +1,15 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { TriangleAlert } from 'lucide-react';
+import { CircleX, TriangleAlert } from 'lucide-react';
 import { memo } from 'react';
 import {
   formatMs,
   formatPercent,
   formatRps,
+  playbackPoint,
   useSimulationStore,
   UTILIZATION_LEVEL_LABEL,
   type NodeMetrics,
+  type NodeTick,
 } from '@/store';
 import { LEVEL_STYLES, utilizationLevel } from '../overlay';
 import type { ComponentFlowNode, PortView } from '../to-flow';
@@ -51,37 +53,83 @@ function PortHandles({ ports }: { ports: readonly PortView[] }) {
   );
 }
 
+/** What the overlay shows: steady-state metrics, or one tick of the failure timeline (S11). */
+interface OverlayView {
+  utilization: number;
+  rpsIn: number;
+  p99Ms: number;
+  explain: Record<string, string>;
+  tick?: { tSec: number; state: NodeTick['state']; errorRate: number } | undefined;
+}
+
+function steadyView(m: NodeMetrics): OverlayView {
+  return { utilization: m.utilization, rpsIn: m.rpsIn, p99Ms: m.latencyMs.p99, explain: m.explain };
+}
+
+function tickView(t: NodeTick, tSec: number): OverlayView {
+  return {
+    utilization: t.utilization,
+    rpsIn: t.rpsIn,
+    p99Ms: t.p99Ms,
+    explain: {},
+    tick: { tSec, state: t.state, errorRate: t.errorRate },
+  };
+}
+
 /** Performance strip under a node: utilisation pill (colour + %), throughput and p99 (S08). */
-function MetricsOverlay({ m }: { m: NodeMetrics }) {
-  const level = utilizationLevel(m.utilization);
+function MetricsOverlay({ v }: { v: OverlayView }) {
+  const level = utilizationLevel(v.utilization);
   const levelLabel = UTILIZATION_LEVEL_LABEL[level];
+  const at = v.tick ? ` at ${v.tick.tSec} s` : '';
+  const down = v.tick?.state === 'down';
   return (
     <div
       data-testid="node-overlay"
       data-level={level}
+      data-state={v.tick?.state}
       className="pointer-events-auto absolute top-full left-0 mt-1 flex w-full items-center gap-1 text-[10px] leading-none font-medium tabular-nums"
     >
-      <span
-        className={`flex items-center gap-0.5 rounded px-1 py-0.5 ${LEVEL_STYLES[level].pill}`}
-        title={`Utilisation ${formatPercent(m.utilization)} (${levelLabel})\n${m.explain.utilization ?? ''}`}
-        aria-label={`Utilisation ${formatPercent(m.utilization)}, ${levelLabel}`}
-      >
-        {level === 'hot' && <TriangleAlert aria-hidden className="h-2.5 w-2.5" />}
-        {formatPercent(m.utilization)}
-      </span>
+      {down ? (
+        <span
+          className="flex items-center gap-0.5 rounded bg-red-600 px-1 py-0.5 text-white dark:bg-red-500"
+          title={`Down${at}: every call to it fails`}
+        >
+          <CircleX aria-hidden className="h-2.5 w-2.5" />
+          Down
+        </span>
+      ) : (
+        <span
+          className={`flex items-center gap-0.5 rounded px-1 py-0.5 ${LEVEL_STYLES[level].pill}`}
+          title={`Utilisation ${formatPercent(v.utilization)} (${levelLabel})${at}\n${v.explain.utilization ?? ''}`}
+          aria-label={`Utilisation ${formatPercent(v.utilization)}, ${levelLabel}`}
+        >
+          {level === 'hot' && <TriangleAlert aria-hidden className="h-2.5 w-2.5" />}
+          {formatPercent(v.utilization)}
+        </span>
+      )}
+      {v.tick && !down && v.tick.errorRate >= 0.01 && (
+        <span
+          className="rounded bg-red-100 px-1 py-0.5 text-red-800 dark:bg-red-950 dark:text-red-200"
+          title={`${formatPercent(v.tick.errorRate)} of calls fail${at}`}
+        >
+          {formatPercent(v.tick.errorRate)} err
+        </span>
+      )}
       <span
         className="rounded bg-white/90 px-1 py-0.5 text-slate-700 dark:bg-slate-900/90 dark:text-slate-300"
-        title={m.explain.rpsIn ?? 'Requests per second arriving at this component'}
+        title={v.explain.rpsIn ?? `Requests per second arriving at this component${at}`}
       >
-        {formatRps(m.rpsIn)}
+        {formatRps(v.rpsIn)}
       </span>
-      <span
-        data-testid="node-p99"
-        className="ml-auto rounded bg-slate-800 px-1 py-0.5 text-white dark:bg-slate-200 dark:text-slate-900"
-        title={`p99 latency at this component\n${m.explain.latencyMs ?? ''}`}
-      >
-        p99 {formatMs(m.latencyMs.p99)}
-      </span>
+      {!down && (
+        <span
+          data-testid="node-p99"
+          className="ml-auto rounded bg-slate-800 px-1 py-0.5 text-white dark:bg-slate-200 dark:text-slate-900"
+          title={`p99 latency at this component${at}\n${v.explain.latencyMs ?? ''}`}
+        >
+          p99 {formatMs(v.p99Ms)}
+        </span>
+      )}
     </div>
   );
 }
@@ -93,16 +141,26 @@ export const ComponentNode = memo(function ComponentNode({
   selected,
 }: NodeProps<ComponentFlowNode>) {
   const metrics = useSimulationStore((s) => s.result?.perNode[id]);
-  const level = metrics ? utilizationLevel(metrics.utilization) : undefined;
+  // S11: while scrubbing the failure timeline, show that tick instead of the steady state.
+  const tSec = useSimulationStore((s) => playbackPoint(s.result, s.playback)?.tSec);
+  const tick = useSimulationStore((s) => playbackPoint(s.result, s.playback)?.nodes?.[id]);
+  const view =
+    tick && tSec !== undefined ? tickView(tick, tSec) : metrics ? steadyView(metrics) : undefined;
+  const level = view ? utilizationLevel(view.utilization) : undefined;
+  const down = tick?.state === 'down';
   const border = !data.known
     ? 'border-dashed border-red-400'
-    : level
-      ? `border-2 ${LEVEL_STYLES[level].border}`
-      : 'border-slate-300 dark:border-slate-700';
+    : down
+      ? 'border-2 border-dashed border-red-600 opacity-70 dark:border-red-500'
+      : level
+        ? `border-2 ${LEVEL_STYLES[level].border}`
+        : 'border-slate-300 dark:border-slate-700';
+  const replicas = tick && tick.state !== 'down' ? tick.replicas : data.replicas;
   return (
     <div
       data-testid="component-node"
       data-level={level}
+      data-state={tick?.state}
       className={`relative flex h-full w-full items-center gap-2.5 rounded-lg border bg-white px-3 shadow-sm dark:bg-slate-900 ${border} ${
         selected ? 'ring-2 ring-sky-500/60 ring-offset-1 dark:ring-offset-slate-950' : ''
       }`}
@@ -121,12 +179,12 @@ export const ComponentNode = memo(function ComponentNode({
       </div>
       <span
         className="absolute -top-2 -right-2 rounded-full bg-slate-800 px-1.5 py-0.5 text-[10px] leading-none font-semibold text-white tabular-nums dark:bg-slate-200 dark:text-slate-900"
-        title={`${data.replicas} replica${data.replicas === 1 ? '' : 's'}`}
-        aria-label={`${data.replicas} replicas`}
+        title={`${replicas} replica${replicas === 1 ? '' : 's'}${replicas !== data.replicas ? ` (autoscaled; ${data.replicas} configured)` : ''}`}
+        aria-label={`${replicas} replicas`}
       >
-        ×{data.replicas}
+        ×{replicas}
       </span>
-      {metrics && <MetricsOverlay m={metrics} />}
+      {view && <MetricsOverlay v={view} />}
     </div>
   );
 });

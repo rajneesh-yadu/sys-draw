@@ -35,6 +35,8 @@ export interface NetHop {
   distanceKm: number;
   explain: string;
   cls?: 'internet' | 'inter-region' | undefined;
+  /** S11: the two cloud regions a cloud ↔ cloud hop connects (for network partitions). */
+  ends?: readonly [string, string] | undefined;
 }
 
 const rad = (deg: number) => (deg * Math.PI) / 180;
@@ -82,6 +84,8 @@ export function netBetween(
         ? 'inter-region'
         : undefined;
   const d = haversineKm(from, to);
+  const ends =
+    from.kind === 'cloud' && to.kind === 'cloud' ? ([from.id, to.id] as const) : undefined;
   const m =
     from.kind === 'cloud' && to.kind === 'cloud'
       ? measured[measuredKey(from.id, to.id)]
@@ -91,6 +95,7 @@ export function netBetween(
       ms: m + lastMile,
       distanceKm: d,
       cls,
+      ...(ends ? { ends } : {}),
       explain: `RTT ${from.name} → ${to.name} = measured ${fmt(m)} ms`,
     };
   }
@@ -105,6 +110,7 @@ export function netBetween(
     ms,
     distanceKm: d,
     cls,
+    ...(ends ? { ends } : {}),
     explain: `RTT ${from.name} → ${to.name} = ${parts}${lm} = ${fmt(ms)} ms`,
   };
 }

@@ -29,6 +29,10 @@ export function fixedDist(ms: number): Dist {
 }
 
 function compact(branches: Branch[], maxBranches: number): Dist {
+  if (branches.length === 1) {
+    const b = branches[0] as Branch;
+    return b.p > 0 ? [{ ...b }] : [];
+  }
   const byKey = new Map<string, Branch>();
   for (const b of branches) {
     if (b.p <= 0) continue;
@@ -38,30 +42,90 @@ function compact(branches: Branch[], maxBranches: number): Dist {
     else byKey.set(key, { ...b });
   }
   const list = [...byKey.values()].sort((x, y) => x.fixed + x.mean - (y.fixed + y.mean));
-  // Merge the two adjacent branches with the closest totals until under the cap (moment-weighted).
-  while (list.length > maxBranches) {
-    let best = 0;
-    let bestGap = Infinity;
-    for (let i = 0; i + 1 < list.length; i++) {
-      const a = list[i] as Branch;
-      const b = list[i + 1] as Branch;
-      const gap = b.fixed + b.mean - (a.fixed + a.mean);
-      if (gap < bestGap) {
-        bestGap = gap;
-        best = i;
+  if (list.length <= maxBranches) return list;
+  return mergeClosest(list, maxBranches);
+}
+
+/**
+ * Repeatedly merges the two ADJACENT branches whose totals (fixed + mean) are closest — ties go
+ * to the leftmost pair — until `maxBranches` remain (moment-weighted merge). Same result as a
+ * linear scan per merge, in O(n log n) with a heap over a linked list.
+ */
+function mergeClosest(sorted: Branch[], maxBranches: number): Branch[] {
+  const n = sorted.length;
+  const items = sorted.map((b) => ({ ...b }));
+  const next = Array.from({ length: n }, (_, i) => (i + 1 < n ? i + 1 : -1));
+  const prev = Array.from({ length: n }, (_, i) => i - 1);
+  const alive = new Array<boolean>(n).fill(true);
+  const version = new Array<number>(n).fill(0);
+  const total = (i: number) => (items[i] as Branch).fixed + (items[i] as Branch).mean;
+  // Heap of [gap, left index, left version, right index, right version]; order: gap, then left.
+  type H = [number, number, number, number, number];
+  const heap: H[] = [];
+  const less = (a: H, b: H) => a[0] < b[0] || (a[0] === b[0] && a[1] < b[1]);
+  const push = (h: H) => {
+    heap.push(h);
+    let i = heap.length - 1;
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (!less(heap[i] as H, heap[p] as H)) break;
+      [heap[i], heap[p]] = [heap[p] as H, heap[i] as H];
+      i = p;
+    }
+  };
+  const pop = (): H | undefined => {
+    const top = heap[0];
+    const last = heap.pop();
+    if (heap.length > 0 && last) {
+      heap[0] = last;
+      let i = 0;
+      for (;;) {
+        const l = 2 * i + 1;
+        const r = l + 1;
+        let m = i;
+        if (l < heap.length && less(heap[l] as H, heap[m] as H)) m = l;
+        if (r < heap.length && less(heap[r] as H, heap[m] as H)) m = r;
+        if (m === i) break;
+        [heap[i], heap[m]] = [heap[m] as H, heap[i] as H];
+        i = m;
       }
     }
-    const a = list[best] as Branch;
-    const b = list[best + 1] as Branch;
+    return top;
+  };
+  const pair = (i: number) => {
+    const j = next[i] as number;
+    if (j >= 0) push([total(j) - total(i), i, version[i] as number, j, version[j] as number]);
+  };
+  for (let i = 0; i + 1 < n; i++) pair(i);
+  let count = n;
+  while (count > maxBranches) {
+    const h = pop();
+    if (!h) break;
+    const [, i, vi, j, vj] = h;
+    if (!alive[i] || !alive[j] || version[i] !== vi || version[j] !== vj || next[i] !== j) continue;
+    const a = items[i] as Branch;
+    const b = items[j] as Branch;
     const p = a.p + b.p;
-    list.splice(best, 2, {
+    items[i] = {
       p,
       mean: (a.p * a.mean + b.p * b.mean) / p,
       sq: (a.p * a.sq + b.p * b.sq) / p,
       fixed: (a.p * a.fixed + b.p * b.fixed) / p,
-    });
+    };
+    alive[j] = false;
+    version[i] = (version[i] as number) + 1;
+    const k = next[j] as number;
+    next[i] = k;
+    if (k >= 0) prev[k] = i;
+    count--;
+    const pi = prev[i] as number;
+    if (pi >= 0) pair(pi);
+    pair(i);
   }
-  return list;
+  const out: Branch[] = [];
+  for (let i = 0; i >= 0 && i < n; i = next[i] as number)
+    if (alive[i]) out.push(items[i] as Branch);
+  return out;
 }
 
 /** Latency of A followed by B. */

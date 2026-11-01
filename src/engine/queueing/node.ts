@@ -21,7 +21,10 @@ import { mmc } from './mmc';
 type Rps = { read: number; write: number };
 
 /** Replicas in effect: configured, or the autoscaler's steady state for this load. */
-function effectiveReplicas(node: CompiledNode, rps: Rps): { replicas: number; explain?: string } {
+export function effectiveReplicas(
+  node: CompiledNode,
+  rps: Rps,
+): { replicas: number; explain?: string } {
   const policy = node.autoscale;
   if (!policy || node.scale.platform) return { replicas: node.replicas };
   // Instances needed so AVERAGE utilisation ≤ target: ⌈(work ÷ c) / target⌉, spread over shards.

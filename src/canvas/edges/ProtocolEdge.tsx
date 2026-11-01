@@ -1,7 +1,14 @@
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from '@xyflow/react';
 import { memo } from 'react';
-import { formatMs, formatRps, useBoardStoreApi, useSimulationStore } from '@/store';
-import { edgeStrokeWidth, maxEdgeRps } from '../overlay';
+import {
+  formatMs,
+  formatPercent,
+  formatRps,
+  playbackPoint,
+  useBoardStoreApi,
+  useSimulationStore,
+} from '@/store';
+import { edgeStrokeWidth, maxEdgeRps, tickEdgeStyle } from '../overlay';
 import type { FlowEdge } from '../to-flow';
 
 /**
@@ -24,6 +31,10 @@ export const ProtocolEdge = memo(function ProtocolEdge({
   const board = useBoardStoreApi();
   const metrics = useSimulationStore((s) => s.result?.perEdge[id]);
   const maxRps = useSimulationStore((s) => maxEdgeRps(s.result?.perEdge));
+  // S11: while scrubbing the failure timeline, thickness and colour follow that tick.
+  const tick = useSimulationStore((s) => playbackPoint(s.result, s.playback)?.edges?.[id]);
+  const tickMax = useSimulationStore((s) => maxEdgeRps(playbackPoint(s.result, s.playback)?.edges));
+  const tickStyle = tick ? tickEdgeStyle(tick) : undefined;
   const [path, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -32,7 +43,11 @@ export const ProtocolEdge = memo(function ProtocolEdge({
     sourcePosition,
     targetPosition,
   });
-  const width = metrics ? edgeStrokeWidth(metrics.rps, maxRps) : 1.5;
+  const width = tick
+    ? edgeStrokeWidth(tick.rps, tickMax)
+    : metrics
+      ? edgeStrokeWidth(metrics.rps, maxRps)
+      : 1.5;
   const text = typeof label === 'string' ? label : '';
   const title = metrics
     ? [
@@ -43,6 +58,9 @@ export const ProtocolEdge = memo(function ProtocolEdge({
         .filter(Boolean)
         .join('\n')
     : text;
+  const tickTitle = tick
+    ? `${formatRps(tick.rps)}, ${formatPercent(tick.errorRate)} of calls fail${tick.breaker ? `, circuit breaker ${tick.breaker}` : ''}`
+    : '';
   return (
     <>
       <BaseEdge
@@ -52,6 +70,8 @@ export const ProtocolEdge = memo(function ProtocolEdge({
         style={{
           ...style,
           strokeWidth: width,
+          ...(tickStyle?.stroke ? { stroke: tickStyle.stroke } : {}),
+          ...(tickStyle?.dashed ? { strokeDasharray: '6 4' } : {}),
           ...(selected ? { stroke: '#0ea5e9' } : {}),
         }}
       />
@@ -61,15 +81,21 @@ export const ProtocolEdge = memo(function ProtocolEdge({
             data-testid="edge-label"
             data-rps={metrics?.rps}
             data-stroke-width={width}
-            title={title}
+            data-breaker={tick?.breaker}
+            title={tickTitle ? `${title}\n${tickTitle}` : title}
             onClick={() => board.getState().setSelection([id])}
             className="nodrag nopan pointer-events-auto absolute rounded border border-slate-200 bg-white/95 px-1 py-0.5 text-[10px] leading-none text-slate-700 tabular-nums shadow-sm dark:border-slate-700 dark:bg-slate-900/95 dark:text-slate-300"
             style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
           >
             {text}
-            {metrics && (
+            {metrics && !tickStyle?.badge && (
               <span className="ml-1 text-slate-500 dark:text-slate-400">
                 · {formatMs(metrics.latencyMs.p50)}
+              </span>
+            )}
+            {tickStyle?.badge && (
+              <span className="ml-1 font-semibold text-red-700 dark:text-red-300">
+                · {tickStyle.badge}
               </span>
             )}
           </div>

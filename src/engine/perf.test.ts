@@ -62,4 +62,38 @@ describe('performance', () => {
     expect(Object.keys(r.perRegion ?? {})).toHaveLength(9);
     expect(ms).toBeLessThan(1000);
   });
+
+  it('timeline: 300 nodes, 60 one-second ticks with an outage, a spike and a breaker, in < 1 s', () => {
+    const apps = Array.from({ length: 296 }, (_, i) => `app${i}`);
+    const g = graph(
+      [
+        node('c', 'client.test'),
+        node('lb', 'network.lb', 20),
+        ...apps.map((a) => node(a, 'compute.app')),
+        node('cache', 'cache.test', 4),
+        node('db', 'database.test', 4),
+      ],
+      [
+        edge('c', 'lb'),
+        ...apps.flatMap((a) => [
+          edge('lb', a),
+          edge(a, 'cache'),
+          { ...edge(a, 'db'), config: { retries: 1, breakerErrorThreshold: 0.5 } },
+        ]),
+      ],
+    );
+    const events = [
+      { id: 'evt_a', kind: 'nodeOutage' as const, nodeId: 'node_app0', atSec: 10 },
+      { id: 'evt_b', kind: 'trafficSpike' as const, multiplier: 2, atSec: 20, durationSec: 10 },
+      { id: 'evt_c', kind: 'nodeOutage' as const, nodeId: 'node_db', atSec: 40, durationSec: 5 },
+    ];
+    const t0 = performance.now();
+    const r = simulate({ graph: g, scenario: scenario(10_000, [], { events }) }, reg, {
+      defaultRpsPerUser: 1,
+    });
+    const ms = performance.now() - t0;
+    expect(r.timeline).toHaveLength(60);
+    expect(Object.keys(r.timeline?.[0]?.nodes ?? {})).toHaveLength(300);
+    expect(ms).toBeLessThan(1000);
+  });
 });

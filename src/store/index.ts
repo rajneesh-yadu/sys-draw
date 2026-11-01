@@ -58,6 +58,7 @@ export { BoardStoreProvider } from './BoardStoreProvider';
 // Simulation results for the open board (S08). The app runs the engine; UI modules read here.
 export {
   createSimulationStore,
+  playbackPoint,
   formatMs,
   formatPercent,
   formatRps,
@@ -66,6 +67,7 @@ export {
   UTILIZATION_LEVEL_LABEL,
   UTILIZATION_THRESHOLDS,
   type FocusRequest,
+  type Playback,
   type SimulationState,
   type SimulationStatus,
   type SimulationStore,
@@ -133,4 +135,13 @@ export {
   type FlowMetrics,
   type Finding,
   type FindingSeverity,
+  // S11 — chaos events and timelines (metrics-ui edits events; canvas shows ticks).
+  ChaosEventSchema,
+  CHAOS_EVENT_KINDS,
+  type ChaosEvent,
+  type ChaosEventKind,
+  type TimePoint,
+  type TimelineMarker,
+  type NodeTick,
+  type EdgeTick,
 } from '@/core';

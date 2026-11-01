@@ -2,7 +2,7 @@
 
 Analytical simulation: compile → load → route → M/M/c queueing → latency composition → `SimResult` with explain strings. Pure TS, no React, deterministic; runs in a Web Worker (Comlink).
 
-- **Depends on:** `core`, `registry` · **Built in:** S07 (scaling + cost: S09, geo: S10)
+- **Depends on:** `core`, `registry` · **Built in:** S07 (scaling + cost: S09, geo: S10, failures over time: S11)
 
 ## Public API (index.ts)
 
@@ -20,11 +20,11 @@ Each replica is an M/M/c queue (c = `perf.maxConcurrencyPerInstance`, μ = 1000/
 
 **Geo (S10).** Active once a node sits in a Region group with a known region (provider `regions`, else generic). Load is per user region (λ_r = users_r × rpsPerUser × share × peak × daily-cycle factor at the busiest UTC moment) and each region is routed separately: clients (geo-DNS, DNS `routingPolicy`), LBs and CDNs with targets in several regions pick the nearest healthy one (`regionOutage`/region `groupOutage` events = down); reads to copies of the same data store go to the nearest. Each hop pays RTT = 2 × 1.5 × d / 200 km/ms + 1 ms (+ user last mile); unplaced nodes sit with their caller; CDN/DNS sit at an edge PoP by the user. Edges get mean RTT, egress cost (internet, inter-region × 0.25) and, store → store, replication lag = RTT/2 + Wq + S_write. Reads never cross store → store edges.
 
+**Failures over time (S11).** 1 s ticks (⌈D/600⌉ s for long runs); each tick = `evaluate` under that tick's conditions, state carried over: nodes down (node/AZ/group/region events) fail every call; LBs drop a dead target after `healthCheckIntervalSec × unhealthyThreshold` (10 × 3 = 30 s) if a target is still up; clients leave a dead region after the DNS TTL (60 s); spikes scale routed rps; packet loss adds (1 − (1 − p)^⌈B/1460⌉) × 200 ms per hop; latency injection adds fixed ms (edge, or node answers without using capacity); dependency slow multiplies service time; hot key raises the hottest shard's share; disk full fails writes; cold starts add coldStartMs × (1 − elapsed/D) per request; partitions cut cloud ↔ cloud hops. Edges: retries ⇒ λ × A with A = (1 − (1 − a)^(r+1))/a, success 1 − (1 − a)^(r+1); timeouts P = e^(−τ/T̄); circuit breakers open at the configured failure ratio over 10 s, fail fast for `breakerOpenSec` (30), then one half-open trial tick. `queue` saturation carries a backlog (λ − capacity per second, wait = backlog/capacity). Autoscaling: target tracking per tick, warm-up delay, 60 s scale-in cooldown. Unchanged ticks reuse the previous evaluation; queueing results are cached per node + rps. API: `simulate` adds `timeline` + `timelineEvents` (+ `engine.chaos` findings) when the scenario has events (`EngineOptions.timeline`, `maxTimelineTicks` 600). `runTimeline(input)`; `evaluate(model, routed, options, durationSec, perturbation?, seedErrors?, queueCache?)` (steps 4–6, shared by the analytical run and every tick); `expectedAttempts`, `retrySuccess`, `timeoutProbability`, `RETRY_BACKOFF_BASE_MS`; chaos helpers `eventWindow`, `isActive`, `eventLabel`, `packetLossDelayMs`/`packetLossExplain`, `nodesInGroup`, `healthCheckDelaySec`, `dnsTtlSec` and their constants. `CompiledEdge.config`, `NetHop.ends`.
+
 ## Layout
 
-- model/ — types, compile, load, route, expr, latency · queueing/ — mmc, node · behaviors/ — one file per behavior
-- simulate.ts (one run) · worker.ts + worker-api.ts + client.ts (Comlink) · test-fixtures.ts (tests only)
-- scaling/ — vertical, pools, roles, spec, autoscale · cost/ — cost.ts · geo/ — distance, diurnal, places, routing · chaos/ — empty until S11
+- model/ — types, compile, load, route, expr, latency · queueing/ — mmc, node · behaviors/ — one file per behavior · simulate.ts (one run) · worker.ts + worker-api.ts + client.ts (Comlink) · test-fixtures.ts (tests only) · scaling/ — vertical, pools, roles, spec, autoscale · cost/ — cost.ts · geo/ — distance, diurnal, places, routing · chaos/ — events.ts (event timing, targets, delays), timeline.ts (tick loop) · model/evaluate.ts (shared steps 4–6)
 
 ## Extension points
 

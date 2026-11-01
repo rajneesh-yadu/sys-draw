@@ -69,9 +69,40 @@ export const ChaosEventSchema = z.discriminatedUnion('kind', [
     regionA: RegionIdSchema,
     regionB: RegionIdSchema,
   }),
+  // S11 — failures over time.
+  /** One key (a celebrity user, a viral post) carries `share` of the node's traffic. */
+  z.object({
+    ...chaosBase,
+    kind: z.literal('hotKey'),
+    nodeId: idSchema('node'),
+    share: RatioSchema,
+  }),
+  /** The node itself works `factor`× slower (GC pauses, noisy neighbour, slow disk): capacity drops. */
+  z.object({
+    ...chaosBase,
+    kind: z.literal('dependencySlow'),
+    nodeId: idSchema('node'),
+    factor: PositiveNumberSchema,
+  }),
+  /** Writes to the node fail; reads still work. */
+  z.object({ ...chaosBase, kind: z.literal('diskFull'), nodeId: idSchema('node') }),
+  /**
+   * Instances restart cold (deploy, scale-from-zero): each request pays `addedMs` (default: the
+   * component's `coldStartMs`, else 1 s), fading out over the event's duration (default 30 s).
+   * No `nodeId` = every compute node.
+   */
+  z.object({
+    ...chaosBase,
+    kind: z.literal('coldStartBurst'),
+    nodeId: idSchema('node').optional(),
+    addedMs: PositiveNumberSchema.optional(),
+  }),
 ]);
 export type ChaosEvent = z.infer<typeof ChaosEventSchema>;
 export type ChaosEventKind = ChaosEvent['kind'];
+export const CHAOS_EVENT_KINDS = ChaosEventSchema.options.map(
+  (o) => o.shape.kind.value,
+) as readonly ChaosEventKind[];
 
 export const ScenarioSchema = z.object({
   /** Concurrent users per user region. */

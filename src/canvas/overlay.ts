@@ -1,5 +1,5 @@
 /** Pure helpers for the performance overlays (S08). Numbers come from SimResult; nothing is computed here but view scaling. */
-import { utilizationLevel, type EdgeMetrics, type UtilizationLevel } from '@/store';
+import { formatPercent, utilizationLevel, type EdgeTick, type UtilizationLevel } from '@/store';
 
 export const EDGE_WIDTH = { min: 1.5, max: 8 } as const;
 
@@ -14,7 +14,7 @@ export function edgeStrokeWidth(rps: number, maxRps: number): number {
 }
 
 /** The busiest edge's rps (0 when there is no result). */
-export function maxEdgeRps(perEdge: Readonly<Record<string, EdgeMetrics>> | undefined): number {
+export function maxEdgeRps(perEdge: Readonly<Record<string, { rps: number }>> | undefined): number {
   if (!perEdge) return 0;
   let max = 0;
   for (const m of Object.values(perEdge)) if (m.rps > max) max = m.rps;
@@ -38,3 +38,16 @@ export const LEVEL_STYLES: Record<UtilizationLevel, { border: string; pill: stri
 };
 
 export { utilizationLevel };
+
+/**
+ * Edge look at one timeline tick (S11): an open circuit breaker is dashed red with "breaker
+ * open"; an edge where ≥ 50 % of calls fail is red with its failure share. Text, not colour alone.
+ */
+export function tickEdgeStyle(t: EdgeTick): { stroke?: string; dashed: boolean; badge?: string } {
+  if (t.breaker === 'open') return { stroke: '#dc2626', dashed: true, badge: 'breaker open' };
+  if (t.breaker === 'half-open')
+    return { stroke: '#d97706', dashed: true, badge: 'breaker half-open' };
+  if (t.errorRate >= 0.5)
+    return { stroke: '#dc2626', dashed: false, badge: `${formatPercent(t.errorRate)} fail` };
+  return { dashed: false };
+}

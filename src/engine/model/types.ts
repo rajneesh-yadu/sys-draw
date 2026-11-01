@@ -2,6 +2,7 @@
 import type {
   Autoscale,
   ComponentDefinition,
+  EdgeConfig,
   Finding,
   FlowStep,
   Graph,
@@ -32,6 +33,10 @@ export interface EngineOptions {
   maxBranches: number;
   /** Safety budget for graph walks when inferring a flow (very deep fan-in/fan-out graphs). */
   maxVisits: number;
+  /** S11: run the time-stepped chaos timeline when the scenario has events. */
+  timeline: boolean;
+  /** S11: at most this many ticks; longer runs use ⌈duration / max⌉-second ticks. */
+  maxTimelineTicks: number;
 }
 
 export const DEFAULT_ENGINE_OPTIONS: Readonly<EngineOptions> = Object.freeze({
@@ -40,6 +45,8 @@ export const DEFAULT_ENGINE_OPTIONS: Readonly<EngineOptions> = Object.freeze({
   rhoCap: 0.99,
   maxBranches: 32,
   maxVisits: 20_000,
+  timeline: true,
+  maxTimelineTicks: 600,
 });
 
 /** `source` = clients (they generate traffic, no queue); `unknown` = defId not in the registry. */
@@ -81,6 +88,8 @@ export interface CompiledEdge {
   target: string;
   sync: boolean;
   protocolStack: readonly string[];
+  /** Timeouts, retries, backoff, circuit breaker (S11). */
+  config: Readonly<EdgeConfig>;
   index: number;
 }
 

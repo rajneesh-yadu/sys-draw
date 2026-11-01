@@ -111,6 +111,7 @@ export function compile(graph: Graph, registry: ComponentSource): Model {
       target: e.target,
       sync: e.sync,
       protocolStack: e.protocolStack,
+      config: e.config,
       index,
     };
     edges.set(e.id, ce);

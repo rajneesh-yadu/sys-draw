@@ -34,6 +34,16 @@ const EDGE_OVERRIDES: FieldOverrides = {
     advanced: true,
     help: 'Connections kept open to the target',
   },
+  breakerErrorThreshold: {
+    label: 'Circuit breaker: open at failure ratio',
+    advanced: true,
+    help: 'Open when this share of calls failed over the last 10 s (e.g. 0.5); empty = no breaker',
+  },
+  breakerOpenSec: {
+    label: 'Circuit breaker: open for (s)',
+    advanced: true,
+    help: 'Fail fast this long before letting a trial through (default 30 s)',
+  },
 };
 
 const protoName = (id: string) => registry.get(id, 'protocol')?.name ?? id;

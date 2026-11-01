@@ -114,3 +114,35 @@ export {
   type GeoModel,
 } from './geo/places';
 export { placeOf, selectCalls, type GeoWalk, type CallOption } from './geo/routing';
+// S11 — failures over time
+export {
+  evaluate,
+  expectedAttempts,
+  retrySuccess,
+  timeoutProbability,
+  RETRY_BACKOFF_BASE_MS,
+  type Perturbation,
+  type Evaluation,
+  type EdgeAttempts,
+} from './model/evaluate';
+export { runTimeline, type TimelineInput, type TimelineResult } from './chaos/timeline';
+export {
+  eventWindow,
+  isActive,
+  eventLabel,
+  packetLossDelayMs,
+  packetLossExplain,
+  nodesInGroup,
+  healthCheckDelaySec,
+  dnsTtlSec,
+  DEFAULT_COLD_START_WINDOW_SEC,
+  DEFAULT_COLD_START_MS,
+  DEFAULT_HEALTH_CHECK_INTERVAL_SEC,
+  DEFAULT_UNHEALTHY_THRESHOLD,
+  DEFAULT_DNS_TTL_SEC,
+  TCP_MIN_RTO_MS,
+  TCP_MSS_BYTES,
+  BREAKER_WINDOW_SEC,
+  DEFAULT_BREAKER_OPEN_SEC,
+  SCALE_IN_COOLDOWN_SEC,
+} from './chaos/events';

@@ -49,6 +49,13 @@ export const EdgeConfigSchema = z.object({
   retries: NonNegativeIntSchema.optional(),
   backoff: z.enum(BACKOFF_KINDS).optional(),
   poolSize: PositiveIntSchema.optional(),
+  /**
+   * Circuit breaker (S11): opens when the share of failed calls over the last 10 s reaches this
+   * ratio; while open, calls fail fast without reaching the target. Omit = no breaker.
+   */
+  breakerErrorThreshold: RatioSchema.refine((v) => v > 0, 'Must be > 0').optional(),
+  /** Seconds the breaker stays open before letting a trial tick through (default 30). */
+  breakerOpenSec: z.number().finite().positive().optional(),
 });
 export type EdgeConfig = z.infer<typeof EdgeConfigSchema>;
 

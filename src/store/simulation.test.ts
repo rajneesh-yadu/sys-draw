@@ -122,3 +122,71 @@ describe('formatters', () => {
     expect(formatUsd(1_250_000)).toBe('$1.3M');
   });
 });
+
+describe('timeline playback (S11)', () => {
+  const point = (tSec: number) => ({
+    tSec,
+    rps: 1,
+    p50Ms: 1,
+    p99Ms: 2,
+    errorRate: 0,
+    availability: 1,
+  });
+  const withTimeline = (n: number): SimResult => ({
+    ...result(1),
+    timeline: Array.from({ length: n }, (_, i) => point(i)),
+  });
+  const ready = (n: number) => {
+    const s = createSimulationStore();
+    s.getState().finish(s.getState().start(), 'board_a', withTimeline(n));
+    return s;
+  };
+
+  it('starts in steady-state view and clamps scrubbing to the timeline', async () => {
+    const { playbackPoint } = await import('./simulation');
+    const s = ready(10);
+    expect(s.getState().playback).toEqual({ tick: null, playing: false });
+    s.getState().setTick(42);
+    expect(s.getState().playback.tick).toBe(9);
+    expect(playbackPoint(s.getState().result, s.getState().playback)?.tSec).toBe(9);
+    s.getState().setTick(-3);
+    expect(s.getState().playback.tick).toBe(0);
+    s.getState().setTick(null);
+    expect(playbackPoint(s.getState().result, s.getState().playback)).toBeUndefined();
+  });
+
+  it('plays tick by tick and stops at the end; play at the end restarts', () => {
+    const s = ready(3);
+    s.getState().play();
+    expect(s.getState().playback).toEqual({ tick: 0, playing: true });
+    s.getState().advance();
+    s.getState().advance();
+    expect(s.getState().playback).toEqual({ tick: 2, playing: false });
+    s.getState().advance();
+    expect(s.getState().playback.tick).toBe(2);
+    s.getState().play();
+    expect(s.getState().playback.tick).toBe(0);
+    s.getState().pause();
+    expect(s.getState().playback.playing).toBe(false);
+  });
+
+  it('keeps the tick across re-runs (clamped) and resets without a timeline or on clear', () => {
+    const s = ready(10);
+    s.getState().setTick(8);
+    s.getState().finish(s.getState().start(), 'board_a', withTimeline(5));
+    expect(s.getState().playback.tick).toBe(4);
+    s.getState().finish(s.getState().start(), 'board_a', result(1));
+    expect(s.getState().playback.tick).toBeNull();
+    s.getState().finish(s.getState().start(), 'board_a', withTimeline(5));
+    s.getState().setTick(2);
+    s.getState().clear();
+    expect(s.getState().playback.tick).toBeNull();
+  });
+
+  it('does nothing without a timeline', () => {
+    const s = createSimulationStore();
+    s.getState().play();
+    s.getState().setTick(3);
+    expect(s.getState().playback).toEqual({ tick: null, playing: false });
+  });
+});

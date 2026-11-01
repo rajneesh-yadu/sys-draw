@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { distMean, fixedDist, mixDist, quantile, stageDist, sumDist, ZERO_DIST } from './latency';
+import {
+  distMean,
+  fixedDist,
+  mixDist,
+  quantile,
+  stageDist,
+  sumDist,
+  ZERO_DIST,
+  type Branch,
+  type Dist,
+} from './latency';
 
 describe('latency composition', () => {
   it('one exponential stage is exact', () => {
@@ -47,5 +57,59 @@ describe('latency composition', () => {
 
   it('zero distribution', () => {
     expect(quantile(ZERO_DIST, 0.99)).toBe(0);
+  });
+});
+
+describe('branch compaction (S11 heap merge)', () => {
+  /** The S07 reference: scan for the closest adjacent pair on every merge. */
+  function reference(parts: { p: number; dist: Dist }[], max: number): Dist {
+    const byKey = new Map<string, Branch>();
+    for (const { p, dist } of parts)
+      for (const b0 of dist) {
+        const b = { ...b0, p: b0.p * p };
+        if (b.p <= 0) continue;
+        const key = `${b.mean.toPrecision(12)}|${b.sq.toPrecision(12)}|${b.fixed.toPrecision(12)}`;
+        const prev = byKey.get(key);
+        if (prev) prev.p += b.p;
+        else byKey.set(key, { ...b });
+      }
+    const list = [...byKey.values()].sort((x, y) => x.fixed + x.mean - (y.fixed + y.mean));
+    while (list.length > max) {
+      let best = 0;
+      let bestGap = Infinity;
+      for (let i = 0; i + 1 < list.length; i++) {
+        const gap = list[i + 1]!.fixed + list[i + 1]!.mean - (list[i]!.fixed + list[i]!.mean);
+        if (gap < bestGap) {
+          bestGap = gap;
+          best = i;
+        }
+      }
+      const a = list[best]!;
+      const b = list[best + 1]!;
+      const p = a.p + b.p;
+      list.splice(best, 2, {
+        p,
+        mean: (a.p * a.mean + b.p * b.mean) / p,
+        sq: (a.p * a.sq + b.p * b.sq) / p,
+        fixed: (a.p * a.fixed + b.p * b.fixed) / p,
+      });
+    }
+    return list;
+  }
+
+  it('gives exactly the same branches as the linear-scan merge (random mixtures, ties included)', () => {
+    let seed = 7;
+    const rnd = () => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
+    for (let trial = 0; trial < 200; trial++) {
+      const n = 2 + Math.floor(rnd() * 120);
+      const parts = Array.from({ length: n }, () => {
+        // Coarse values create equal totals (ties) on purpose.
+        const m = Math.round(rnd() * 20);
+        const f = Math.round(rnd() * 10);
+        return { p: 1 / n, dist: sumDist(stageDist(m), fixedDist(f), 32) };
+      });
+      const max = 1 + Math.floor(rnd() * 32);
+      expect(mixDist(parts, max)).toEqual(reference(parts, max));
+    }
   });
 });

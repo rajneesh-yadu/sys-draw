@@ -6,6 +6,22 @@
 export { MetricsDrawer } from './MetricsDrawer';
 export { NodeDetail, LatencyChart, UtilizationMeter } from './NodeDetail';
 export { FormulaValue } from './FormulaValue';
+// S11 — failures over time
+export { FailuresPanel } from './FailuresPanel';
+export {
+  CHAOS_KIND_META,
+  boardRegions,
+  buildChaosEvent,
+  chaosEventLabel,
+  chaosWhen,
+  emptyDraft,
+  eventSpans,
+  PLAYBACK_MS_PER_TICK,
+  type ChaosDraft,
+  type ChaosKindMeta,
+  type ChaosParam,
+  type ChaosTarget,
+} from './chaos';
 export {
   bottleneckRows,
   flowFormula,

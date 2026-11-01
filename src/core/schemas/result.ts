@@ -79,6 +79,27 @@ export const FindingSchema = z.object({
 });
 export type Finding = z.infer<typeof FindingSchema>;
 
+/** S11: a node's state at one tick of a time-stepped run. */
+export const NODE_TICK_STATES = ['up', 'degraded', 'down'] as const;
+export const NodeTickSchema = z.object({
+  utilization: NonNegativeNumberSchema,
+  rpsIn: NonNegativeNumberSchema,
+  errorRate: RatioSchema,
+  p99Ms: NonNegativeNumberSchema,
+  /** Replicas taking traffic (autoscaling changes it over time). */
+  replicas: NonNegativeNumberSchema,
+  state: z.enum(NODE_TICK_STATES),
+});
+export type NodeTick = z.infer<typeof NodeTickSchema>;
+
+export const BREAKER_STATES = ['closed', 'open', 'half-open'] as const;
+export const EdgeTickSchema = z.object({
+  rps: NonNegativeNumberSchema,
+  errorRate: RatioSchema,
+  breaker: z.enum(BREAKER_STATES).optional(),
+});
+export type EdgeTick = z.infer<typeof EdgeTickSchema>;
+
 export const TimePointSchema = z.object({
   tSec: NonNegativeNumberSchema,
   rps: NonNegativeNumberSchema,
@@ -86,8 +107,34 @@ export const TimePointSchema = z.object({
   p99Ms: NonNegativeNumberSchema,
   errorRate: RatioSchema,
   availability: RatioSchema,
+  // S11 (optional, so older results still validate):
+  nodes: z.record(z.string(), NodeTickSchema).optional(),
+  edges: z.record(z.string(), EdgeTickSchema).optional(),
+  /** Chaos events in effect at this tick. */
+  activeEventIds: z.array(z.string()).optional(),
 });
 export type TimePoint = z.infer<typeof TimePointSchema>;
+
+/** S11: something worth a marker on the timeline chart. */
+export const TIMELINE_MARKER_KINDS = [
+  'chaos-start',
+  'chaos-end',
+  'detected',
+  'failover',
+  'breaker-open',
+  'breaker-close',
+  'scale-out',
+  'scale-in',
+] as const;
+export const TimelineMarkerSchema = z.object({
+  tSec: NonNegativeNumberSchema,
+  kind: z.enum(TIMELINE_MARKER_KINDS),
+  label: NonEmptyStringSchema,
+  targetIds: z.array(z.string()),
+  /** The chaos event this marker belongs to, when there is one. */
+  eventId: z.string().optional(),
+});
+export type TimelineMarker = z.infer<typeof TimelineMarkerSchema>;
 
 export const SimResultSchema = z.object({
   perNode: z.record(z.string(), NodeMetricsSchema),
@@ -103,5 +150,7 @@ export const SimResultSchema = z.object({
   }),
   findings: z.array(FindingSchema),
   timeline: z.array(TimePointSchema).optional(),
+  /** S11: markers for the timeline (chaos events, health-check removals, breakers, autoscaling). */
+  timelineEvents: z.array(TimelineMarkerSchema).optional(),
 });
 export type SimResult = z.infer<typeof SimResultSchema>;

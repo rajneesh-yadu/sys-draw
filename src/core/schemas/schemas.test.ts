@@ -258,3 +258,72 @@ describe('SimResult', () => {
     expect(errorsOf(BoardSchema, { ...sampleBoard, lastResult: result })).toEqual([]);
   });
 });
+
+describe('S11 — chaos events, breakers and timelines', () => {
+  const base = { id: 'evt_x', atSec: 10 };
+  it('accepts the new chaos event kinds and lists every kind', async () => {
+    const { ChaosEventSchema, CHAOS_EVENT_KINDS } = await import('./index');
+    const db = SAMPLE_IDS.db;
+    for (const ev of [
+      { ...base, kind: 'hotKey', nodeId: db, share: 0.3 },
+      { ...base, kind: 'dependencySlow', nodeId: db, factor: 5 },
+      { ...base, kind: 'diskFull', nodeId: db, durationSec: 20 },
+      { ...base, kind: 'coldStartBurst' },
+      { ...base, kind: 'coldStartBurst', nodeId: db, addedMs: 800 },
+    ]) {
+      expect(errorsOf(ChaosEventSchema, ev)).toEqual([]);
+    }
+    expect(
+      errorsOf(ChaosEventSchema, { ...base, kind: 'hotKey', nodeId: db, share: 2 }),
+    ).not.toEqual([]);
+    expect(CHAOS_EVENT_KINDS).toContain('nodeOutage');
+    expect(CHAOS_EVENT_KINDS).toContain('coldStartBurst');
+    expect(CHAOS_EVENT_KINDS).toHaveLength(11);
+  });
+
+  it('checks that new events point at nodes on the board', () => {
+    const board = clone(sampleBoard);
+    board.scenario.events = [{ ...base, kind: 'diskFull', nodeId: 'node_missing' }];
+    expect(errorsOf(BoardSchema, board).join(' ')).toMatch(/unknown node "node_missing"/);
+  });
+
+  it('accepts circuit-breaker settings on an edge and rejects a 0 threshold', () => {
+    const g = clone(sampleBoard.graph);
+    const e = g.edges[0]!;
+    e.config = { ...e.config, breakerErrorThreshold: 0.5, breakerOpenSec: 20 };
+    expect(errorsOf(GraphSchema, g)).toEqual([]);
+    e.config = { ...e.config, breakerErrorThreshold: 0 };
+    expect(errorsOf(GraphSchema, g)).not.toEqual([]);
+  });
+
+  it('parses a timeline with per-tick nodes, edges and markers (old results still parse)', () => {
+    const r = {
+      perNode: {},
+      perEdge: {},
+      perFlow: {},
+      system: { rps: 1, availability: 1, costPerMonth: 0, bottlenecks: [] },
+      findings: [],
+      timeline: [
+        { tSec: 0, rps: 1, p50Ms: 1, p99Ms: 2, errorRate: 0, availability: 1 },
+        {
+          tSec: 1,
+          rps: 1,
+          p50Ms: 1,
+          p99Ms: 2,
+          errorRate: 0.5,
+          availability: 0.5,
+          nodes: {
+            n: { utilization: 0, rpsIn: 0, errorRate: 1, p99Ms: 0, replicas: 1, state: 'down' },
+          },
+          edges: { e: { rps: 1, errorRate: 1, breaker: 'open' } },
+          activeEventIds: ['evt_x'],
+        },
+      ],
+      timelineEvents: [{ tSec: 1, kind: 'chaos-start', label: 'DB down', targetIds: ['n'] }],
+    };
+    expect(errorsOf(SimResultSchema, r)).toEqual([]);
+    const bad = clone(r);
+    (bad.timeline[1]!.nodes!.n as { state: string }).state = 'melting';
+    expect(errorsOf(SimResultSchema, bad)).not.toEqual([]);
+  });
+});

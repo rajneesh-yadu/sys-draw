@@ -19,24 +19,12 @@ import { compile, isDataStore, type ComponentSource } from './model/compile';
 import { engineFinding } from './model/findings';
 import { type Expr, isEmpty } from './model/expr';
 import { fmt } from './model/format';
-import {
-  type Dist,
-  fixedDist,
-  mixDist,
-  percentiles,
-  stageDist,
-  sumDist,
-  ZERO_DIST,
-} from './model/latency';
+import { percentiles } from './model/latency';
 import { generateLoad, inferFlow } from './model/load';
 import { route } from './model/route';
-import {
-  DEFAULT_ENGINE_OPTIONS,
-  type EngineOptions,
-  type NodeStats,
-  type SimInput,
-} from './model/types';
-import { nodeQueueing } from './queueing/node';
+import { DEFAULT_ENGINE_OPTIONS, type EngineOptions, type SimInput } from './model/types';
+import { evaluate, mixUnits } from './model/evaluate';
+import { runTimeline } from './chaos/timeline';
 import { expQuantileFactor } from './queueing/mmc';
 import { FALLBACK_PRICING, nodeCost, SECONDS_PER_MONTH, type Pricing } from './cost/cost';
 import type { RoutedFlow } from './model/route';
@@ -46,102 +34,6 @@ export const INTER_REGION_PRICE_FACTOR = 0.25;
 
 /** Nodes at or above this utilisation are listed as bottlenecks. */
 export const BOTTLENECK_UTILIZATION = 0.85;
-
-type Rps = { read: number; write: number };
-
-function propagate(
-  e: Expr,
-  lambda: number,
-  nodeRps: Map<string, Rps>,
-  edgeRps: Map<string, number>,
-  errors: ReadonlyMap<string, number>,
-): void {
-  if (lambda <= 0) return;
-  switch (e.k) {
-    case 'visit': {
-      const r = nodeRps.get(e.nodeId);
-      if (r) r[e.op] += lambda;
-      if (e.edgeId !== undefined) edgeRps.set(e.edgeId, (edgeRps.get(e.edgeId) ?? 0) + lambda);
-      propagate(e.then, lambda * (1 - (errors.get(e.nodeId) ?? 0)), nodeRps, edgeRps, errors);
-      return;
-    }
-    case 'seq':
-      for (const item of e.items) propagate(item, lambda, nodeRps, edgeRps, errors);
-      return;
-    case 'choice':
-      for (const o of e.options) propagate(o.expr, lambda * o.p, nodeRps, edgeRps, errors);
-      return;
-    case 'async':
-      propagate(e.expr, lambda, nodeRps, edgeRps, errors);
-      return;
-    case 'empty':
-      return;
-  }
-}
-
-/** Probability a request succeeds; async work does not fail the caller. */
-function successOf(e: Expr, errors: ReadonlyMap<string, number>): number {
-  switch (e.k) {
-    case 'visit':
-      return (1 - (errors.get(e.nodeId) ?? 0)) * successOf(e.then, errors);
-    case 'seq':
-      return e.items.reduce((s, item) => s * successOf(item, errors), 1);
-    case 'choice':
-      return e.options.reduce((s, o) => s + o.p * successOf(o.expr, errors), 0);
-    case 'async':
-    case 'empty':
-      return 1;
-  }
-}
-
-function latencyOf(
-  e: Expr,
-  stats: ReadonlyMap<string, NodeStats>,
-  edgeLatencyMs: (edgeId: string) => number,
-  maxBranches: number,
-): Dist {
-  switch (e.k) {
-    case 'visit': {
-      const s = stats.get(e.nodeId);
-      let d: Dist = s && s.responseMs[e.op] > 0 ? stageDist(s.responseMs[e.op]) : ZERO_DIST;
-      const net = (e.edgeId !== undefined ? edgeLatencyMs(e.edgeId) : 0) + (e.net?.ms ?? 0);
-      if (net > 0) d = sumDist(d, fixedDist(net), maxBranches);
-      return sumDist(d, latencyOf(e.then, stats, edgeLatencyMs, maxBranches), maxBranches);
-    }
-    case 'seq':
-      return e.items.reduce<Dist>(
-        (acc, item) =>
-          sumDist(acc, latencyOf(item, stats, edgeLatencyMs, maxBranches), maxBranches),
-        ZERO_DIST,
-      );
-    case 'choice':
-      return mixDist(
-        e.options.map((o) => ({
-          p: o.p,
-          dist: latencyOf(o.expr, stats, edgeLatencyMs, maxBranches),
-        })),
-        maxBranches,
-      );
-    case 'async':
-    case 'empty':
-      return ZERO_DIST;
-  }
-}
-
-/** Mean network ms on the critical path (async work excluded). */
-function netMean(e: Expr): number {
-  switch (e.k) {
-    case 'visit':
-      return (e.net?.ms ?? 0) + netMean(e.then);
-    case 'seq':
-      return e.items.reduce((s, item) => s + netMean(item), 0);
-    case 'choice':
-      return e.options.reduce((s, o) => s + o.p * netMean(o.expr), 0);
-    case 'async':
-    case 'empty':
-      return 0;
-  }
-}
 
 /** Network hops of the most likely critical path, for explain strings. */
 function criticalHops(e: Expr): NetHop[] {
@@ -247,27 +139,6 @@ function collectNet(
   }
 }
 
-/** rps-weighted mixture of routed units (equal weights when nothing flows). */
-function mixUnits(
-  units: readonly { w: number; dist: Dist; errorRate: number; netMs: number }[],
-  maxBranches: number,
-): { dist: Dist; errorRate: number; netMs: number; w: number } {
-  const w = units.reduce((s, u) => s + u.w, 0);
-  const weight = (u: { w: number }) => (w > 0 ? u.w / w : 1 / units.length);
-  return {
-    w,
-    dist:
-      units.length === 1
-        ? (units[0] as { dist: Dist }).dist
-        : mixDist(
-            units.map((u) => ({ p: weight(u), dist: u.dist })),
-            maxBranches,
-          ),
-    errorRate: units.reduce((s, u) => s + weight(u) * u.errorRate, 0),
-    netMs: units.reduce((s, u) => s + weight(u) * u.netMs, 0),
-  };
-}
-
 /** The board provider's price table (falls back to generic list prices). */
 function pricingOf(registry: ComponentSource, providerId: string | undefined): Pricing {
   const p = registry.get(providerId ?? 'generic', 'provider');
@@ -288,25 +159,9 @@ export function simulate(
   const plan = route(loads, model, options, geo);
   const routed: RoutedFlow[] = plan.flows.map((f) => ({ ...f, rps: isEmpty(f.expr) ? 0 : f.rps }));
 
-  // Rejections upstream reduce load downstream: iterate until error rates settle (DAG ⇒ ≤ depth).
-  let errors: Map<string, number> = new Map();
-  let stats = new Map<string, NodeStats>();
-  let edgeRps = new Map<string, number>();
-  for (let iter = 0; iter < 64; iter++) {
-    const nodeRps = new Map<string, Rps>();
-    for (const id of model.nodes.keys()) nodeRps.set(id, { read: 0, write: 0 });
-    edgeRps = new Map();
-    for (const f of routed) propagate(f.expr, f.rps, nodeRps, edgeRps, errors);
-    stats = new Map();
-    for (const node of model.nodes.values()) {
-      const rps = nodeRps.get(node.id) ?? { read: 0, write: 0 };
-      stats.set(node.id, nodeQueueing(node, rps, options, scenario.durationSec));
-    }
-    const next = new Map([...stats].map(([id, s]) => [id, s.errorRate]));
-    const converged = [...next].every(([id, e]) => Math.abs(e - (errors.get(id) ?? 0)) < 1e-12);
-    errors = next;
-    if (converged) break;
-  }
+  // Queueing + retries/timeouts/rejections (fixed point) — shared with every timeline tick.
+  const ev = evaluate(model, routed, options, scenario.durationSec);
+  const { stats, errors, edgeRps } = ev;
 
   for (const node of model.nodes.values()) {
     const s = stats.get(node.id);
@@ -429,14 +284,7 @@ export function simulate(
     };
   }
 
-  // Each routed unit: its latency distribution, error rate and network share.
-  const units = routed.map((f) => ({
-    f,
-    w: f.rps,
-    dist: latencyOf(f.expr, stats, () => 0, options.maxBranches),
-    errorRate: Math.min(1, Math.max(0, 1 - successOf(f.expr, errors))),
-    netMs: netMean(f.expr),
-  }));
+  const units = ev.units;
 
   const perFlow: Record<string, FlowMetrics> = {};
   let totalRps = 0;
@@ -505,17 +353,30 @@ export function simulate(
     .sort((a, b) => b.utilization - a.utilization || a.node.index - b.node.index)
     .map((s) => s.node.id);
 
+  // S11: failures over time — only when the scenario has chaos events.
+  const tl =
+    options.timeline && scenario.events.length > 0
+      ? runTimeline({ model, graph, scenario, geo, loads, options })
+      : undefined;
+
   return {
     perNode,
     perEdge,
     perFlow,
     perRegion,
+    ...(tl ? { timeline: tl.timeline, timelineEvents: tl.markers } : {}),
     system: {
       rps: totalRps,
       availability: totalRps > 0 ? okRps / totalRps : 1,
       costPerMonth: systemCost,
       bottlenecks,
     },
-    findings: [...model.issues, ...geo.issues, ...plan.issues, ...geoFindings],
+    findings: [
+      ...model.issues,
+      ...geo.issues,
+      ...plan.issues,
+      ...geoFindings,
+      ...(tl?.findings ?? []),
+    ],
   };
 }
