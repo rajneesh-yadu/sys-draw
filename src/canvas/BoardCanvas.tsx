@@ -31,6 +31,7 @@ import {
 } from '@/store';
 import { useCanvasActions, useGroupRects } from './actions';
 import { useCanvasUi } from './context';
+import { useTraceStore, useTraceStoreApi } from './trace/context';
 import { decodePaletteItem, DND_MIME } from './dnd';
 import {
   findDropGroup,
@@ -441,6 +442,25 @@ function Toolbar(props: {
         <input type="checkbox" checked={ui.snap} onChange={(e) => ui.setSnap(e.target.checked)} />
         Snap
       </label>
+      <span className="mx-1 h-4 w-px bg-slate-200 dark:bg-slate-700" />
+      <TraceToggle />
     </div>
+  );
+}
+
+/** S15: opens/closes the request-trace panel. */
+function TraceToggle() {
+  const trace = useTraceStoreApi();
+  const open = useTraceStore((s) => s.open);
+  return (
+    <button
+      type="button"
+      className={`${btn} ${open ? 'bg-sky-50 text-sky-800 dark:bg-sky-950 dark:text-sky-200' : ''}`}
+      aria-pressed={open}
+      onClick={() => trace.getState().setOpen(!open)}
+      title="Follow one request end to end: DNS, handshakes, every hop and where the time goes"
+    >
+      Trace request
+    </button>
   );
 }

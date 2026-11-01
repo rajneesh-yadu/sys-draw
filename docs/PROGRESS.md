@@ -547,3 +547,38 @@ Known gaps / follow-ups:
 - A `.s14tmp/` folder (source and change tarballs) is left at the repo root because deletes are blocked; it is git-ignored and safe to delete, as are `.s10tmp`–`.s13tmp`.
 
 Next suggested session: S15 — Request trace view (animate DNS → TCP → TLS → HTTP per hop using `handshakeSequence` and edge `rttMs`; add a per-flow cold first-request latency).
+
+---
+
+## S15 — Animate one request end to end — 2026-11-01
+
+Status: done
+Changed: src/engine/trace/{trace.ts, trace.test.ts} (new), src/engine/{index.ts, client.ts, worker-api.ts, README.md}; src/canvas/trace/{trace-store.ts, context.ts, colors.ts, sequence.ts, TracePanel.tsx, trace.test.tsx} (new), src/canvas/{index.ts, CanvasProvider.tsx, BoardCanvas.tsx, edges/ProtocolEdge.tsx, nodes/ComponentNode.tsx, README.md}; src/app/trace/{runner.ts, runner.test.ts, useTraceRunner.ts} (new), src/app/{layout/AppShell.tsx, index.css, README.md}; src/network/README.md (one line); e2e/trace.spec.ts (new); docs/PROGRESS.md
+Public APIs added (all additive; nothing removed or renamed; `core`, `store`, `network` and `registry` code untouched; no saved-format change, no migration):
+
+- `engine`: `traceRequest(board, flowId | undefined, userRegionId | undefined, { warm?, cache?, registry?, engine? }) → RequestTrace`, `runTrace` (same, in the worker; in-thread without Workers), `traceRegions`, `TRACE_CATEGORIES`, `TRACE_CATEGORY_LABEL`, `TRACE_DNS_ID`, types `RequestTrace`, `TraceStep`, `TraceStepKind`, `TraceCategory`, `TraceParticipant`, `TraceDecision`, `TraceOptions`. `WorkerApi.trace`.
+- `canvas`: `TracePanel`, `createTraceStore`, `currentTraceStep`, `DEFAULT_TRACE_REQUEST`, `useTraceStore`, `useTraceStoreApi`, `traceColor`, `TRACE_COLOR_ORDER`, `sequenceLayout`, `breakdownShares`, `elapsedAt`, `tracedEdgeIds`, `PACKET_ANIMATION_MS`, `STEP_INTERVAL_MS`, types `TraceState`, `TraceStore`, `TraceStatus`, `TraceView`, `TraceViewStep`, `TraceViewSegment`, `TraceRequestSpec`, `TraceWarmth`. `CanvasProvider` takes an optional `traceStore` prop (creates its own otherwise).
+- `app`: internal `trace/` runner (`startTraceRunner`, `toTraceView`, `TRACE_DEBOUNCE_MS`, `useTraceRunner`).
+  Tests: 18 added (689 total), all passing; `pnpm build` (only the pre-existing chunk-size warning), `pnpm lint`, `prettier --check src e2e docs` green. e2e: 12/12 pass (new `trace.spec.ts`).
+
+Done-when — **F10 trace acceptance ("a trace animates DNS → TCP → TLS → HTTP for one request")**, `e2e/trace.spec.ts` (production build, real worker): client → app server in us-east, North America users, "Trace request" (cold by default). The sequence lists DNS query/answer, TCP SYN / SYN-ACK / ACK, TLS 1.3 ClientHello / ServerHello … Finished / Finished, then the HTTP/2 read request, queue, service and response, in that order. Stepping shows no packet for DNS (no edge), then a `tcp` packet travelling forward on the client → server edge, the SYN-ACK travelling back, a `tls` packet with SNI/ALPN in the headers, the request with "Port 443"; the packet's position changes during the animation; Play runs to "Step n / n". Where time goes: DNS 15 ms, TCP ≈ 1 RTT (35–42 ms), TLS ≈ 1 RTT; switching to Warm removes DNS/TCP/TLS rows and the total drops by 15 ms + 2 RTT (±1.5 ms).
+Unit (`engine/trace/trace.test.ts`, hand-computed, RTT 38.795 ms): warm = request RTT/2 + Wq 0.5 + S 2 + response RTT/2, equal to the simulation's RTT + node mean (p50 / ln 2); cold adds DNS 15 + TCP 1 RTT + TLS 1 RTT (ACK and Finished cost 0: same flight); HTTP/3 cold = QUIC 1 RTT; resumed = TCP only; India users (no users on the board) pay 218.17 ms; cache-aside miss/hit paths; LB pick listed; async calls flagged and off the critical path; explicit write flow; empty board; Σ breakdown = total; deterministic.
+
+Notes (decisions):
+
+- **Where the trace lives.** Trace generation needs routing, geo and queueing, so it is an engine function over the same routed expression tree as `simulate` (re-routed for the one user region, so any registry region works). It reuses `evaluate` for steady-state Wq/S, and the network module's `handshakeSequence`, `perRequestOverhead`, `stackPorts`, `stackLabel`.
+- **One branch.** Cache hit/miss follows the `cache` option (miss by default, so the whole path shows); other choices (LB targets, regions, several clients) take the most likely option, first on ties; each is listed under the sequence ("Cache miss (20% of reads, hit rate 80%)", `"lb" → "a1" (50%…)`).
+- **Timing model.** Means only. A message one way = RTT/2; a protocol layer's handshake costs exactly its `handshakeRtts` × RTT (messages beyond 2 × RTTs ride in the same flight at 0 ms), so cold − warm per hop = `connectionCost`. Cold = new connections on every hop (a note says pools normally keep internal hops warm; inside one region RTT ≈ 0 anyway) + one DNS lookup by the client = one last-mile RTT (answer assumed cached at the ISP resolver). Resumed = `resumedHandshakeRtts`, DNS cached. Node time = Wq for the op + response service time (S13 quorum/acks waits); data stores and caches count as "DB / cache". Async calls are listed (dashed arrows) but do not delay the caller; a queue's enqueue ack is waited for.
+- **UI state lives in canvas** (a canvas-owned zustand store provided by `CanvasProvider`), not `store`, so no other module's API changed; the app owns the runner (engine → store), like the simulation runner. The canvas view types mirror `RequestTrace` structurally (canvas may not import engine); `toTraceView` adds labelled breakdown segments, so TypeScript catches drift.
+- **Animation:** SMIL `animateMotion` on the edge's own bezier path (`begin="indefinite"` + `beginElement()` on mount, since a SMIL animation added to a running SVG with begin 0 would already be finished), 900 ms per packet, 1.2 s per step while playing; reversed key points for server → client messages. Node-local steps ring the node. Category colours: the reference categorical palette (validated, fixed order, dark steps via CSS variables); every coloured mark has a text label / legend row with values.
+
+Known gaps / follow-ups:
+
+- **ARCHITECTURE.md names a `trace-ui` owning module for F10;** the UI lives in `canvas/trace/` + `app/trace/` instead (no module-table change). An architecture session may split it out, and should record `traceRequest` in ENGINE.md / NETWORK-SECURITY.md.
+- Not in the trace: retries/timeouts/breakers and errors (a note flags overloaded nodes), packet loss, TCP slow start / serialisation of large responses, DNS resolver misses (root → TLD → authoritative), the classic PostgreSQL `SSLRequest` RTT, chaos-timeline ticks (steady state only), percentiles (means only). HTTP/2's SETTINGS exchange (0 RTT) is not listed because `handshakeSequence` skips 0-RTT layers.
+- React Flow draws no edges in jsdom, so the packet itself is covered only by e2e (unit tests cover the store, panel and node markers).
+- The panel (w-96) narrows the canvas while open; a resizable/dockable panel would help. The canvas toolbar wraps on narrow screens.
+- Tests, build and e2e ran on a Linux copy of the repo (macOS-native `node_modules`); e2e used a local Playwright config pointing at the sandbox's Chromium (not committed). No new dependencies.
+- A `.s15tmp/` folder (source tarball) is left at the repo root because deletes are blocked; git-ignored and safe to delete, as are `.s10tmp`–`.s14tmp`.
+
+Next suggested session: S16 — Security layer (zones, controls, threat checks); the trace can then show which hops cross a zone boundary and where TLS terminates.

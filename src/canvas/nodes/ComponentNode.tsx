@@ -14,6 +14,8 @@ import {
 import { LEVEL_STYLES, utilizationLevel } from '../overlay';
 import type { ComponentFlowNode, PortView } from '../to-flow';
 import { RegistryIcon } from './RegistryIcon';
+import { useTraceStore } from '../trace/context';
+import { currentTraceStep } from '../trace/trace-store';
 
 function portTop(i: number, n: number) {
   return `${((i + 1) / (n + 1)) * 100}%`;
@@ -156,13 +158,25 @@ export const ComponentNode = memo(function ComponentNode({
         ? `border-2 ${LEVEL_STYLES[level].border}`
         : 'border-slate-300 dark:border-slate-700';
   const replicas = tick && tick.state !== 'down' ? tick.replicas : data.replicas;
+  // S15: the traced request is at this node (queue/service) or arriving at it.
+  const traceHere = useTraceStore((s) => {
+    const st = s.open ? currentTraceStep(s) : undefined;
+    if (!st) return undefined;
+    if (st.from === id && st.to === id) return st.kind;
+    return st.to === id ? 'arriving' : undefined;
+  });
   return (
     <div
       data-testid="component-node"
       data-level={level}
       data-state={tick?.state}
+      data-trace={traceHere}
       className={`relative flex h-full w-full items-center gap-2.5 rounded-lg border bg-white px-3 shadow-sm dark:bg-slate-900 ${border} ${
-        selected ? 'ring-2 ring-sky-500/60 ring-offset-1 dark:ring-offset-slate-950' : ''
+        selected
+          ? 'ring-2 ring-sky-500/60 ring-offset-1 dark:ring-offset-slate-950'
+          : traceHere === 'queue' || traceHere === 'service'
+            ? 'ring-4 ring-sky-500/70 ring-offset-1 dark:ring-offset-slate-950'
+            : ''
       }`}
     >
       <PortHandles ports={data.ports} />

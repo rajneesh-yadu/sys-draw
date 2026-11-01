@@ -1,5 +1,5 @@
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from '@xyflow/react';
-import { memo } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import {
   formatMs,
   formatPercent,
@@ -9,6 +9,10 @@ import {
   useSimulationStore,
 } from '@/store';
 import { edgeStrokeWidth, maxEdgeRps, tickEdgeStyle } from '../overlay';
+import { traceColor } from '../trace/colors';
+import { useTraceStore } from '../trace/context';
+import { PACKET_ANIMATION_MS } from '../trace/sequence';
+import { currentTraceStep, type TraceViewStep } from '../trace/trace-store';
 import type { FlowEdge } from '../to-flow';
 
 /**
@@ -35,6 +39,14 @@ export const ProtocolEdge = memo(function ProtocolEdge({
   const tick = useSimulationStore((s) => playbackPoint(s.result, s.playback)?.edges?.[id]);
   const tickMax = useSimulationStore((s) => maxEdgeRps(playbackPoint(s.result, s.playback)?.edges));
   const tickStyle = tick ? tickEdgeStyle(tick) : undefined;
+  // S15: the request trace's packet on this edge, and whether the traced request uses it.
+  const packet = useTraceStore((s) => {
+    const st = s.open ? currentTraceStep(s) : undefined;
+    return st?.edgeId === id ? st : undefined;
+  });
+  const traced = useTraceStore(
+    (s) => s.open && (s.trace?.steps.some((x) => x.edgeId === id && !x.async) ?? false),
+  );
   const [path, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -72,9 +84,11 @@ export const ProtocolEdge = memo(function ProtocolEdge({
           strokeWidth: width,
           ...(tickStyle?.stroke ? { stroke: tickStyle.stroke } : {}),
           ...(tickStyle?.dashed ? { strokeDasharray: '6 4' } : {}),
+          ...(traced ? { stroke: '#0ea5e9', strokeDasharray: '4 3' } : {}),
           ...(selected ? { stroke: '#0ea5e9' } : {}),
         }}
       />
+      {packet && <TracePacket key={packet.index} edgeId={id} path={path} step={packet} />}
       {(text || metrics) && (
         <EdgeLabelRenderer>
           <div
@@ -104,3 +118,47 @@ export const ProtocolEdge = memo(function ProtocolEdge({
     </>
   );
 });
+
+/**
+ * S15: one packet of the traced request travelling along the edge (forward = source → target).
+ * SMIL `animateMotion` begins on mount (an animation added to a running SVG with begin="0s" would
+ * already be over), so each step replays from the start.
+ */
+function TracePacket({
+  edgeId,
+  path,
+  step,
+}: {
+  edgeId: string;
+  path: string;
+  step: TraceViewStep;
+}) {
+  const anim = useRef<SVGAnimateMotionElement>(null);
+  useEffect(() => {
+    anim.current?.beginElement?.();
+  }, []);
+  return (
+    <g
+      data-testid="trace-packet"
+      data-edge-id={edgeId}
+      data-direction={step.direction}
+      data-step={step.index}
+      data-category={step.category}
+      pointerEvents="none"
+    >
+      <title>{`${step.layer}: ${step.message}`}</title>
+      <circle r={7} fill={traceColor(step.category)} stroke="#ffffff" strokeWidth={2}>
+        <animateMotion
+          ref={anim}
+          begin="indefinite"
+          dur={`${PACKET_ANIMATION_MS}ms`}
+          fill="freeze"
+          path={path}
+          keyPoints={step.direction === 'back' ? '1;0' : '0;1'}
+          keyTimes="0;1"
+          calcMode="linear"
+        />
+      </circle>
+    </g>
+  );
+}

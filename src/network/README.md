@@ -16,7 +16,7 @@ Protocol stacks: handshake, overhead and loss math, and the inspector's views (O
 
 ## Not modelled (yet)
 
-- Head-of-line blocking is explained and warned about, not added to latency; TCP slow start (multi-RTT large responses), bandwidth/serialisation time and DNS lookups are not in the numbers. Request traces (S15) build on `handshakeSequence`.
+- Head-of-line blocking is explained and warned about, not added to latency; TCP slow start (multi-RTT large responses), bandwidth/serialisation time and DNS lookups are not in the numbers. The S15 request trace (engine `traceRequest`) uses `handshakeSequence`, `perRequestOverhead`, `stackPorts` and `stackLabel` per hop.
 
 ## Extension points
 

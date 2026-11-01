@@ -15,6 +15,8 @@ React Flow rendering of the board: palette, component and group nodes, edge draw
 - Region groups (S10) show their real cloud region id in the header (name in the tooltip), or an amber "Pick a region" when unset/unknown.
 - Pure helpers: `computeGroupRects`, `findDropGroup`, `NODE_WIDTH`/`NODE_HEIGHT`/`GRID`, `computeAutoLayout` (ELK, lazy-loaded), `shortcutFor`, `SHORTCUT_HELP`.
 
+- Request trace (S15, `trace/`): `createTraceStore` (open, request = flow / user region / `warm` false·'resumed'·true / cache branch, `trace: TraceView`, `step`, `playing`; `start`/`finish`/`fail` drop stale runs), provided by `<CanvasProvider traceStore?>` (`useTraceStore`, `useTraceStoreApi`). `<TracePanel />` = options, step controls (reset / prev / play / next), "Where time goes" bar + table, current-step card (layer, headers, explain), sequence diagram (click a row to jump). Edges draw the current step's packet (`data-testid="trace-packet"`, SMIL `animateMotion`, reversed for responses) and dash the traced path; nodes get `data-trace` (arriving / queue / service). Toolbar "Trace request" toggles it. View types mirror the engine's `RequestTrace` (the app maps it); colours `traceColor` (`--trace-<category>` in app/index.css).
+
 ## Behaviour
 
 - Connections are validated by `store.checkConnection` (ports + shared protocol) while dragging.

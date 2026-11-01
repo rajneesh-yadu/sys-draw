@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
-import { BoardCanvas, CanvasProvider, Palette } from '@/canvas';
+import { useEffect, useState } from 'react';
+import { BoardCanvas, CanvasProvider, createTraceStore, Palette, TracePanel } from '@/canvas';
 import { Inspector } from '@/inspector';
 import { MetricsDrawer } from '@/metrics-ui';
 import type { Autosave } from '@/persistence';
 import { projectOfBoard, useWorkspaceStore } from '@/store';
 import { useSimulationRunner } from '../simulation/useSimulationRunner';
+import { useTraceRunner } from '../trace/useTraceRunner';
 import {
   BoardTabs,
   NoticeProvider,
@@ -25,6 +26,9 @@ export function AppShell({
   simulate = true,
 }: { autosave?: Autosave; simulate?: boolean } = {}) {
   useSimulationRunner(simulate);
+  // S15: request trace — the canvas shows it, this runner fills it from the engine.
+  const [traceStore] = useState(createTraceStore);
+  useTraceRunner(traceStore);
 
   // Ctrl/Cmd+S saves now instead of opening the browser's "Save page" dialog.
   useEffect(() => {
@@ -41,7 +45,7 @@ export function AppShell({
 
   return (
     <NoticeProvider>
-      <CanvasProvider>
+      <CanvasProvider traceStore={traceStore}>
         <div className="flex h-screen flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
           <TopBar autosave={autosave} />
 
@@ -65,14 +69,17 @@ export function AppShell({
 
             <div className="flex min-w-0 flex-1 flex-col">
               <BoardTabs />
-              <main
-                id="board-canvas-region"
-                aria-label="Design canvas"
-                data-testid="region-canvas"
-                className="relative min-h-0 flex-1"
-              >
-                <BoardCanvas />
-              </main>
+              <div className="flex min-h-0 flex-1">
+                <main
+                  id="board-canvas-region"
+                  aria-label="Design canvas"
+                  data-testid="region-canvas"
+                  className="relative min-h-0 min-w-0 flex-1"
+                >
+                  <BoardCanvas />
+                </main>
+                <TracePanel />
+              </div>
 
               <section
                 aria-label="Metrics"

@@ -162,3 +162,19 @@ export {
   DEFAULT_BREAKER_OPEN_SEC,
   SCALE_IN_COOLDOWN_SEC,
 } from './chaos/events';
+// S15 — one request end to end
+export {
+  traceRequest,
+  traceRegions,
+  TRACE_CATEGORIES,
+  TRACE_CATEGORY_LABEL,
+  TRACE_DNS_ID,
+  type RequestTrace,
+  type TraceStep,
+  type TraceStepKind,
+  type TraceCategory,
+  type TraceParticipant,
+  type TraceDecision,
+  type TraceOptions,
+} from './trace/trace';
+export { runTrace } from './client';

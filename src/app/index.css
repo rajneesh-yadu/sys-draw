@@ -18,3 +18,28 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+/* S15: request-trace category colours (canvas/trace/colors.ts): reference categorical palette,
+   light steps; dark mode uses the same hues stepped for the dark surface. */
+:root {
+  --trace-dns: #2a78d6;
+  --trace-tcp: #eb6834;
+  --trace-tls: #1baf7a;
+  --trace-handshake: #eda100;
+  --trace-network: #e87ba4;
+  --trace-queue: #008300;
+  --trace-service: #6250d6;
+  --trace-db: #e34948;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --trace-dns: #3987e5;
+    --trace-tcp: #d95926;
+    --trace-tls: #199e70;
+    --trace-handshake: #c98500;
+    --trace-network: #d55181;
+    --trace-queue: #008300;
+    --trace-service: #9085e9;
+    --trace-db: #e66767;
+  }
+}
