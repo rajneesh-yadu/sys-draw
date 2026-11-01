@@ -16,6 +16,10 @@ Schema-driven forms for the selected node, edge, group, or (nothing selected) th
 
 Node panel → Scaling: +1 replica, Size up/down (same instance family, by vCPU), Add read replica, Shard ×2 — each one store command; fields found via registry `.meta({ scaling })` roles; unavailable actions are disabled with a reason (`panels/scale-actions.ts`).
 
+## Scenario editor (S10)
+
+Board panel → Users: world map (`geo/world-land.ts`, static Natural Earth outline; `geo/users-model.ts` projection) with one marker per registry `USER_REGIONS` entry (area ∝ share, click = edit) and the board's Region-group cloud regions; one number input per region ("<Name> users"; 0 removes it). Daily cycle and peak multiplier stay in the schema form. Each edit = one `updateScenario`.
+
 ## Field kinds
 
 number (unit from `.meta({unit})` or key suffix `Ms`/`Sec`/`Gb`/`Bytes`…, min/max/int), enum (select), boolean (switch), string, nested object (optional ⇒ on/off switch), array (add/remove), record (key/value rows). Anything else renders as "not editable here yet".

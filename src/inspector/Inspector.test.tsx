@@ -51,22 +51,47 @@ describe('Inspector — board scenario', () => {
     expect(screen.getByLabelText(/Peak multiplier/)).toHaveValue(2);
   });
 
-  it('edits users by region (record) and nested payload sizes', () => {
+  it('edits users per region on the map editor (S10) and nested payload sizes', () => {
     const store = setup();
-    fireEvent.click(screen.getByRole('button', { name: '+ Add entry' }));
-    expect(Object.keys(store.getState().doc.scenario.usersByRegion)).toEqual([
-      'north-america',
-      'key-2',
-    ]);
-    typeCommit(screen.getByDisplayValue('key-2'), 'europe');
+    const map = screen.getByTestId('users-map');
+    // Every user region has a row; the default scenario has 1000 users in North America.
+    expect(within(map).getByLabelText('North America users')).toHaveValue(1000);
+    expect(within(map).getAllByRole('listitem')).toHaveLength(9);
+    typeCommit(within(map).getByLabelText('India & South Asia users'), '1500');
     expect(store.getState().doc.scenario.usersByRegion).toEqual({
       'north-america': 1000,
-      europe: 1000,
+      india: 1500,
     });
-    typeCommit(screen.getByDisplayValue('europe'), 'Not A Region');
-    expect(screen.getByRole('alert').textContent).toMatch(/region id/);
+    expect(history(store)).toEqual(['Change scenario']);
+    expect(within(map).getByText('60%')).toBeInTheDocument();
+    // Clicking a map marker focuses that region's input.
+    const marker = map.querySelector('[data-testid="map-user-region"][data-region-id="europe"]')!;
+    fireEvent.click(marker);
+    expect(within(map).getByLabelText('Europe users')).toHaveFocus();
+    // Invalid values are blocked with a reason; 0 removes the region.
+    typeCommit(within(map).getByLabelText('Europe users'), '-5');
+    expect(within(map).getByRole('alert')).toHaveTextContent('Must be ≥ 0');
+    expect(history(store)).toHaveLength(1);
+    typeCommit(within(map).getByLabelText('North America users'), '0');
+    expect(store.getState().doc.scenario.usersByRegion).toEqual({ india: 1500 });
+
     typeCommit(screen.getByLabelText(/^Request/), '2048');
     expect(store.getState().doc.scenario.payloadBytes.req).toBe(2048);
+  });
+
+  it('shows the board’s Region groups on the map', () => {
+    const store = setup();
+    act(() => {
+      store.getState().dispatch({ type: 'group', kind: 'region', memberIds: ['node_2'] });
+    });
+    const gid = store.getState().doc.graph.groups.find((g) => g.kind === 'region')!.id;
+    act(() => {
+      store.getState().dispatch({ type: 'updateGroup', groupId: gid, regionId: 'ap-south' });
+      store.getState().setSelection([]);
+    });
+    const placed = screen.getByTestId('map-cloud-region');
+    expect(placed).toHaveAttribute('data-region-id', 'ap-south');
+    expect(screen.getByRole('group', { name: /servers in ap-south/ })).toBeInTheDocument();
   });
 
   it('shows the provider docs on the Docs tab', () => {

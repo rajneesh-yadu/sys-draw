@@ -7,6 +7,9 @@
  */
 import type { Finding, Flow } from '@/core';
 import { behaviorsOf, type Call } from '../behaviors';
+import { netBetween, type Place } from '../geo/distance';
+import { userPlace, type GeoModel } from '../geo/places';
+import { placeOf, selectCalls, type GeoWalk } from '../geo/routing';
 import { hasBehavior, isDataStore } from './compile';
 import { asyncExpr, choice, EMPTY, type Expr, seq, visit } from './expr';
 import { engineFinding } from './findings';
@@ -16,6 +19,11 @@ import type { CompiledNode, EngineOptions, Model, Op } from './types';
 export interface RoutedFlow {
   flowId: string;
   name: string;
+  /**
+   * S10: with geo active, one routed flow per (flow, user region); otherwise one per flow for all
+   * regions (`regionId` undefined).
+   */
+  regionId?: string | undefined;
   rps: number;
   expr: Expr;
   /** True when the route was inferred from the graph (empty path). */
@@ -28,15 +36,46 @@ export interface RoutePlan {
   issues: Finding[];
 }
 
-export function route(loads: readonly FlowLoad[], model: Model, options: EngineOptions): RoutePlan {
+export function route(
+  loads: readonly FlowLoad[],
+  model: Model,
+  options: EngineOptions,
+  geo?: GeoModel,
+): RoutePlan {
   const issues: Finding[] = [];
-  const flows = loads.map(({ flow, rps, explain }) => {
+  const geoIssues: Finding[] = [];
+  const routeOne = (flow: Flow, ctx: GeoWalk | undefined, sink: Finding[]) =>
+    flow.path.length === 0
+      ? graphRoute(model, 'read', options, sink, ctx)
+      : pathRoute(flow, model, options, ctx);
+  const flows: RoutedFlow[] = [];
+  for (const { flow, rps, explain, byRegion } of loads) {
     const inferred = flow.path.length === 0;
-    const expr = inferred
-      ? graphRoute(model, 'read', options, issues)
-      : pathRoute(flow, model, options);
-    return { flowId: flow.id, name: flow.name, rps, expr, inferred, explain };
-  });
+    const base = { flowId: flow.id, name: flow.name, inferred };
+    if (!geo?.active || byRegion.length === 0) {
+      flows.push({ ...base, rps, expr: routeOne(flow, undefined, issues), explain });
+      continue;
+    }
+    byRegion.forEach((r, i) => {
+      const ctx: GeoWalk = { geo, user: userPlace(r.regionId), issues: geoIssues };
+      // Graph-shape findings are the same for every region: keep the first region's only.
+      const sink = i === 0 ? issues : [];
+      flows.push({
+        ...base,
+        regionId: r.regionId,
+        rps: r.rps,
+        expr: routeOne(flow, ctx, sink),
+        explain: r.explain,
+      });
+    });
+  }
+  const seen = new Set<string>();
+  for (const f of geoIssues) {
+    const key = `${f.title}|${f.message}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    issues.push(f);
+  }
   return { flows, issues };
 }
 
@@ -88,7 +127,18 @@ export function combineCalls(calls: readonly Call[], op: Op, options: EngineOpti
   return seq(items);
 }
 
-function graphRoute(model: Model, op: Op, options: EngineOptions, issues: Finding[]): Expr {
+/** Data store → data store edges carry replication (writes), not reads. */
+function isReplication(from: CompiledNode, to: CompiledNode): boolean {
+  return isDataStore(from) && isDataStore(to);
+}
+
+function graphRoute(
+  model: Model,
+  op: Op,
+  options: EngineOptions,
+  issues: Finding[],
+  geo?: GeoWalk,
+): Expr {
   const all = [...model.nodes.values()];
   let entries = all.filter((n) => n.kind === 'source');
   if (entries.length === 0) {
@@ -127,8 +177,14 @@ function graphRoute(model: Model, op: Op, options: EngineOptions, issues: Findin
   const cycleEdges = new Set<string>();
   const stack = new Set<string>();
 
-  const walk = (node: CompiledNode, edgeId: string | undefined): Expr => {
+  const walk = (
+    node: CompiledNode,
+    edgeId: string | undefined,
+    caller: Place | undefined,
+  ): Expr => {
     visits++;
+    const here = geo ? placeOf(node, caller, geo) : undefined;
+    const net = geo && edgeId !== undefined ? netBetween(caller, here) : undefined;
     const calls: Call[] = [];
     if (visits <= options.maxVisits) {
       stack.add(node.id);
@@ -139,22 +195,31 @@ function graphRoute(model: Model, op: Op, options: EngineOptions, issues: Findin
           cycleEdges.add(e.id);
           continue;
         }
-        calls.push({ edge: e, target, expr: walk(target, e.id) });
+        if (op === 'read' && isReplication(node, target)) continue;
+        calls.push({ edge: e, target, expr: walk(target, e.id, here) });
       }
       stack.delete(node.id);
     } else {
       budgetHit = true;
     }
     const combine = (cs: readonly Call[]) => combineCalls(cs, op, options);
-    let then: Expr | undefined;
-    for (const b of behaviorsOf(node.behaviors)) {
-      then = b.routeOut?.({ node, op, calls, model, options, combine });
-      if (then !== undefined) break;
-    }
-    return visit(node.id, op, then ?? combine(calls), edgeId);
+    const finish = (cs: readonly Call[]): Expr => {
+      for (const b of behaviorsOf(node.behaviors)) {
+        const then = b.routeOut?.({ node, op, calls: cs, model, options, combine });
+        if (then !== undefined) return then;
+      }
+      return combine(cs);
+    };
+    const picks = geo ? selectCalls(node, here, op, calls, geo) : undefined;
+    const then = picks
+      ? choice(picks.map((o) => ({ p: o.p, expr: finish(o.calls) })))
+      : finish(calls);
+    return visit(node.id, op, then, edgeId, net);
   };
 
-  const expr = choice(entries.map((n) => ({ p: 1 / entries.length, expr: walk(n, undefined) })));
+  const expr = choice(
+    entries.map((n) => ({ p: 1 / entries.length, expr: walk(n, undefined, undefined) })),
+  );
   if (cycleEdges.size > 0) {
     issues.push(
       engineFinding(
@@ -180,8 +245,17 @@ function graphRoute(model: Model, op: Op, options: EngineOptions, issues: Findin
   return expr;
 }
 
-function pathRoute(flow: Flow, model: Model, options: EngineOptions): Expr {
+function pathRoute(flow: Flow, model: Model, options: EngineOptions, geo?: GeoWalk): Expr {
   const steps = flow.path.filter((s) => model.nodes.has(s.nodeId));
+  // Places along the path, forward (an unplaced step is where the previous step is).
+  const places: (Place | undefined)[] = [];
+  if (geo) {
+    let prev: Place | undefined;
+    for (const st of steps) {
+      prev = placeOf(model.nodes.get(st.nodeId) as CompiledNode, prev, geo);
+      places.push(prev);
+    }
+  }
   let rest: Expr = EMPTY;
   for (let i = steps.length - 1; i >= 0; i--) {
     const step = steps[i];
@@ -196,7 +270,8 @@ function pathRoute(flow: Flow, model: Model, options: EngineOptions): Expr {
       then = b.routeRest?.({ node, op: step.op, step, rest, options });
       if (then !== undefined) break;
     }
-    rest = visit(node.id, step.op, then ?? rest, edge?.id);
+    const net = geo && i > 0 ? netBetween(places[i - 1], places[i]) : undefined;
+    rest = visit(node.id, step.op, then ?? rest, edge?.id, net);
     if (edge && !edge.sync && !hasBehavior(node, 'queue')) rest = asyncExpr(rest);
   }
   return rest;

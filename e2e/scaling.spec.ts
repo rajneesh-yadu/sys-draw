@@ -51,7 +51,7 @@ test('F6: +1 replica halves utilisation; size up raises capacity and cost', asyn
 
   // 30 000 users × 0.1 rps × peak 2 = 6 000 rps vs 10 000 rps on one small app server ⇒ 60 %.
   await page.keyboard.press('Escape');
-  const users = page.getByRole('spinbutton', { name: /^north-america/ });
+  const users = page.getByRole('spinbutton', { name: 'North America users' });
   await users.fill('30000');
   await users.press('Enter');
   await done(page);

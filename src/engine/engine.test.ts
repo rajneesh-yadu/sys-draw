@@ -36,8 +36,8 @@ const g: Graph = {
 };
 
 describe('engine public API', () => {
-  it('ships the three S07 behaviors', () => {
-    expect([...BEHAVIORS.keys()].sort()).toEqual(['cache', 'loadBalancer', 'queue']);
+  it('ships the S07 behaviors plus the S10 geo ones (cdn, dns)', () => {
+    expect([...BEHAVIORS.keys()].sort()).toEqual(['cache', 'cdn', 'dns', 'loadBalancer', 'queue']);
   });
 
   it('compiles real components and attaches regions', () => {

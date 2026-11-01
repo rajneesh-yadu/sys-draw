@@ -94,6 +94,33 @@ describe('toFlowNodes / toFlowEdges', () => {
     expect(nodes.find((n) => n.id === 'node_b')!.parentId).toBeUndefined();
   });
 
+  it('maps region groups to real regions (S10): name when known, null to prompt a pick', () => {
+    const generic: BoardDoc = { ...emptyBoardDoc('generic'), graph: nested };
+    const withRegion = (regionId: string | undefined) =>
+      toFlowNodes(
+        {
+          ...generic,
+          graph: {
+            ...nested,
+            groups: nested.groups.map((g) =>
+              g.id === 'grp_region' ? { ...g, ...(regionId ? { regionId } : {}) } : g,
+            ),
+          },
+        },
+        rects,
+        new Set(),
+        registry,
+      );
+    const pick = (ns: ReturnType<typeof toFlowNodes>, id: string) =>
+      ns.find((n) => n.id === id)!.data as { region?: unknown };
+    expect(pick(withRegion('ap-south'), 'grp_region').region).toEqual({
+      id: 'ap-south',
+      name: 'Asia Pacific (Mumbai)',
+    });
+    expect(pick(withRegion('nowhere-1'), 'grp_region').region).toBeNull();
+    expect(pick(withRegion(undefined), 'grp_vpc').region).toBeUndefined();
+  });
+
   it('labels nodes with the provider product name', () => {
     const lb = toFlowNodes(
       {

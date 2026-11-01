@@ -28,6 +28,7 @@ export default defineComponent({
     scaleCurve: 'linear',
     saturationBehavior: 'reject',
   },
+  behaviors: ['dns'],
   docs: {
     summary:
       'Turns a hostname into an IP address. The first step of every new connection, and the cheapest global traffic router you have.',

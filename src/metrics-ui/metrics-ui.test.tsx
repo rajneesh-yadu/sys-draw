@@ -9,7 +9,15 @@ import {
   type NodeMetrics,
   type SimResult,
 } from '@/store';
-import { bottleneckRows, flowFormula, flowName, nodeFormula, systemFormulas } from './formulas';
+import {
+  bottleneckRows,
+  flowFormula,
+  flowName,
+  nodeFormula,
+  regionFormula,
+  regionRows,
+  systemFormulas,
+} from './formulas';
 import { MetricsDrawer } from './MetricsDrawer';
 
 const node = (utilization: number, extra: Partial<NodeMetrics> = {}): NodeMetrics => ({
@@ -29,12 +37,34 @@ const node = (utilization: number, extra: Partial<NodeMetrics> = {}): NodeMetric
   ...extra,
 });
 
+function region(name: string, users: number, rps: number, net: number, p50: number) {
+  return {
+    name,
+    users,
+    rps,
+    p50,
+    p95: p50 + 100,
+    p99: p50 + 160,
+    errorRate: 0,
+    networkMs: net,
+    servedFrom: 'us-east',
+    explain: {
+      networkMs: `Mean network time per request = ${net} ms. Main path: RTT ${name} → US East`,
+      servedFrom: 'Served from us-east 100%',
+    },
+  };
+}
+
 function resultFor(ids: { lb: string; app: string }): SimResult {
   return {
     perNode: { [ids.lb]: node(0.2), [ids.app]: node(1.6) },
     perEdge: {},
     perFlow: {
       flow_inferred: { p50: 35.84, p95: 151, p99: 231.5, rps: 200, errorRate: 0 },
+    },
+    perRegion: {
+      'north-america': region('North America', 600, 120, 38.8, 74.6),
+      india: region('India & South Asia', 400, 80, 218.2, 254),
     },
     system: { rps: 200, availability: 0.995, costPerMonth: 0, bottlenecks: [ids.app] },
     findings: [
@@ -69,7 +99,24 @@ describe('formulas', () => {
     expect(f.rps).toContain('1,000 users');
     expect(f.errorRate).toBe('error rate = 1 − availability = 1 − 99.5% = 0.5%');
     expect(f.availability).toContain('= 199 rps / 200 rps = 99.5%');
-    expect(f.costPerMonth).toContain('Cost model arrives with scaling (S09).');
+    expect(f.costPerMonth).toBe(
+      'Σ component cost per month = $0. Select a component to see its own formula.',
+    );
+    r.perEdge = {
+      e: {
+        rps: 1,
+        latencyMs: { p50: 1, p95: 1, p99: 1 },
+        handshakeMs: 0,
+        bytesPerSec: 1,
+        errorRate: 0,
+        costPerMonth: 30,
+        explain: {},
+      },
+    };
+    r.system.costPerMonth = 30;
+    expect(systemFormulas(r, scenario).costPerMonth).toContain(
+      'Σ component cost + Σ connection egress = $0 + $30 = $30',
+    );
   });
 
   it('sums several flows for throughput', () => {
@@ -89,6 +136,14 @@ describe('formulas', () => {
     expect(flowFormula('p99', { p50: 1, p95: 2, p99: 3, rps: 1, errorRate: 0 }, scenario)).toMatch(
       /^p99: .*shifted exponential/,
     );
+  });
+
+  it('per-region rows (most users first) use the engine explain', () => {
+    const r = resultFor({ lb: 'a', app: 'b' });
+    const rows = regionRows(r);
+    expect(rows.map((x) => x.id)).toEqual(['north-america', 'india']);
+    expect(regionFormula('networkMs', rows[1]!.m)).toContain('RTT India & South Asia');
+    expect(regionFormula('p99', rows[1]!.m)).toMatch(/1 request in 100/);
   });
 
   it('lists bottlenecks in result order with labels', () => {
@@ -151,6 +206,19 @@ describe('MetricsDrawer', () => {
     });
     expect(within(row).getByRole('button', { name: /^p99 of / })).toHaveTextContent('232 ms');
     expect(screen.getByText(/No client nodes/)).toBeInTheDocument();
+  });
+
+  it('shows latency by user region with where they are served from (S10)', () => {
+    const { publish } = setup();
+    publish();
+    const table = screen.getByTestId('region-table');
+    const india = within(table).getByRole('row', { name: /India & South Asia/ });
+    expect(within(india).getByRole('button', { name: /^Network for / })).toHaveTextContent(
+      '218 ms',
+    );
+    expect(within(india).getByRole('button', { name: /^p50 for / })).toHaveTextContent('254 ms');
+    expect(within(india).getByRole('button', { name: /^From for / })).toHaveTextContent('us-east');
+    expect(within(table).queryByRole('columnheader', { name: 'Errors' })).toBeNull();
   });
 
   it('shows a formula tooltip on focus and hides it on Escape', () => {

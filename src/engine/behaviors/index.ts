@@ -27,4 +27,11 @@ export function behaviorsOf(ids: readonly string[]): Behavior[] {
 }
 
 export { defineBehavior } from './types';
-export type { Behavior, Call, RouteOutContext, RouteRestContext, FinishContext } from './types';
+export type {
+  Behavior,
+  GeoPolicy,
+  Call,
+  RouteOutContext,
+  RouteRestContext,
+  FinishContext,
+} from './types';

@@ -64,6 +64,23 @@ export const GroupNode = memo(function GroupNode({
         <span className="truncate font-medium text-slate-700 dark:text-slate-200">
           {data.label}
         </span>
+        {data.region !== undefined && (
+          <span
+            data-testid="group-region"
+            className={`ml-auto shrink-0 truncate rounded px-1.5 py-0.5 ${
+              data.region
+                ? 'bg-violet-100/80 text-violet-800 dark:bg-violet-900/60 dark:text-violet-200'
+                : 'bg-amber-100/80 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200'
+            }`}
+            title={
+              data.region
+                ? `Runs in ${data.region.name}: distance to users and other regions is simulated from here.`
+                : 'No region set: select the group and pick its cloud region so distance is simulated.'
+            }
+          >
+            {data.region ? data.region.id : 'Pick a region'}
+          </span>
+        )}
       </div>
     </div>
   );

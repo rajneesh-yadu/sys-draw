@@ -4,9 +4,16 @@
  * See ./README.md.
  */
 export { runSimulation, disposeSimulationWorker } from './client';
-export { simulate, BOTTLENECK_UTILIZATION } from './simulate';
+export { simulate, BOTTLENECK_UTILIZATION, INTER_REGION_PRICE_FACTOR } from './simulate';
 export { compile, type ComponentSource } from './model/compile';
-export { generateLoad, inferFlow, totalUsers, INFERRED_FLOW_ID, type FlowLoad } from './model/load';
+export {
+  generateLoad,
+  inferFlow,
+  totalUsers,
+  INFERRED_FLOW_ID,
+  type FlowLoad,
+  type RegionLoad,
+} from './model/load';
 export { route, combineCalls, type RoutePlan, type RoutedFlow } from './model/route';
 export type { Expr } from './model/expr';
 export {
@@ -22,7 +29,7 @@ export {
 } from './model/latency';
 export { erlangB, erlangC, mmc, expQuantileFactor, type MmcResult } from './queueing/mmc';
 export { nodeQueueing } from './queueing/node';
-export { BEHAVIORS, defineBehavior, type Behavior } from './behaviors';
+export { BEHAVIORS, defineBehavior, type Behavior, type GeoPolicy } from './behaviors';
 export {
   DEFAULT_ENGINE_OPTIONS,
   type EngineOptions,
@@ -74,3 +81,36 @@ export {
   targetWeight,
   type LbAlgorithm,
 } from './behaviors/loadBalancer';
+// S10 — geography and real-world latency
+export {
+  haversineKm,
+  propagationRttMs,
+  netBetween,
+  measuredKey,
+  FIBRE_KM_PER_MS,
+  ROUTE_FACTOR,
+  PER_HOP_OVERHEAD_MS,
+  EARTH_RADIUS_KM,
+  MEASURED_RTT_MS,
+  type Place,
+  type NetHop,
+  type MeasuredRtt,
+} from './geo/distance';
+export {
+  DIURNAL_CURVE,
+  DIURNAL_MEAN,
+  DIURNAL_STEP_HOURS,
+  diurnalFactor,
+  diurnalPeak,
+  type DiurnalPeak,
+  type DiurnalRegion,
+} from './geo/diurnal';
+export {
+  buildGeoModel,
+  findCloudRegion,
+  cloudPlace,
+  userPlace,
+  edgePlace,
+  type GeoModel,
+} from './geo/places';
+export { placeOf, selectCalls, type GeoWalk, type CallOption } from './geo/routing';

@@ -4,7 +4,13 @@
  */
 import { z } from 'zod';
 import type { EdgeInstance, Flow, Graph, NodeInstance, Scenario } from '@/core';
-import { createRegistry, defineComponent, type Registry } from '@/registry';
+import {
+  createRegistry,
+  defineComponent,
+  registry as appRegistry,
+  USER_REGIONS,
+  type Registry,
+} from '@/registry';
 
 type Cat = Parameters<typeof defineComponent>[0]['category'];
 type Sat = 'queue' | 'reject' | 'degrade';
@@ -108,6 +114,23 @@ export const testRegistry: Registry = createRegistry(
     }),
   ].map((entry) => ({ kind: 'component' as const, entry, source: 'engine/test-fixtures.ts' })),
 );
+
+/** testRegistry's components plus the real generic provider (its cloud region table), for geo. */
+export const geoTestRegistry: Registry = createRegistry([
+  ...testRegistry
+    .list({ kind: 'component' })
+    .map((entry) => ({ kind: 'component' as const, entry, source: 'engine/test-fixtures.ts' })),
+  {
+    kind: 'provider' as const,
+    entry: appRegistry.require('generic', 'provider'),
+    source: 'engine/test-fixtures.ts',
+  },
+] as Parameters<typeof createRegistry>[0]);
+
+/** `users` spread evenly over every user region. */
+export function worldUsers(users: number): Record<string, number> {
+  return Object.fromEntries(USER_REGIONS.map((r) => [r.id, users / USER_REGIONS.length]));
+}
 
 export function node(
   id: string,

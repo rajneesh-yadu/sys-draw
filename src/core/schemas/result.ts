@@ -43,6 +43,26 @@ export const FlowMetricsSchema = z.object({
 });
 export type FlowMetrics = z.infer<typeof FlowMetricsSchema>;
 
+/**
+ * Per user region (S10): what users in one `Scenario.usersByRegion` area experience. Optional in
+ * SimResult, so results cached before S10 still validate.
+ */
+export const RegionMetricsSchema = z.object({
+  name: NonEmptyStringSchema,
+  users: NonNegativeNumberSchema,
+  rps: NonNegativeNumberSchema,
+  p50: NonNegativeNumberSchema,
+  p95: NonNegativeNumberSchema,
+  p99: NonNegativeNumberSchema,
+  errorRate: RatioSchema,
+  /** Mean network time per request on the critical path (propagation + last mile), ms. */
+  networkMs: NonNegativeNumberSchema,
+  /** Cloud region that serves most of this region's requests; absent when nothing is placed. */
+  servedFrom: z.string().optional(),
+  explain: ExplainSchema,
+});
+export type RegionMetrics = z.infer<typeof RegionMetricsSchema>;
+
 export const FINDING_SEVERITIES = ['info', 'warning', 'error', 'critical'] as const;
 export const FindingSeveritySchema = z.enum(FINDING_SEVERITIES);
 export type FindingSeverity = z.infer<typeof FindingSeveritySchema>;
@@ -73,6 +93,8 @@ export const SimResultSchema = z.object({
   perNode: z.record(z.string(), NodeMetricsSchema),
   perEdge: z.record(z.string(), EdgeMetricsSchema),
   perFlow: z.record(z.string(), FlowMetricsSchema),
+  /** Keyed by user region id (S10). */
+  perRegion: z.record(z.string(), RegionMetricsSchema).optional(),
   system: z.object({
     rps: NonNegativeNumberSchema,
     availability: RatioSchema,

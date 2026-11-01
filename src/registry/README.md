@@ -12,6 +12,7 @@ Loads, validates and looks up every registry entry (components, protocols, provi
 - `findUnresolvedReferences(registry)` — protocol `runsOn` and port protocol ids with no entry.
 - `createRegistry`, `discoverEntries`, `RegistryLoadError`, `REGISTRY_KINDS` — for tests and tooling.
 - Schemas + types for kinds core lacks: `ProviderDefinition`, `RuleDefinition` (+ `RuleContext`, `RuleCheck`), `LessonDefinition`, `RegistryProblemDefinition` (core problem with required `docs`).
+- Geo (S10): `USER_REGIONS` (9 user regions: lat/long, UTC offset, last-mile ms; `geo/user-regions.ts`), `userRegion(id)`, `UserRegionSchema`. Cloud regions live in each provider's `regions` (generic: 26).
 - `presets.ts` (internal): `GENERAL_PURPOSE_INSTANCES`, `MEMORY_OPTIMISED_INSTANCES` for component files.
 
 ## Layout

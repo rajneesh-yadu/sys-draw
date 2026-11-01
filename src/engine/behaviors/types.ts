@@ -45,9 +45,24 @@ export interface FinishContext {
   statsOf(nodeId: string): NodeStats | undefined;
 }
 
+/** DNS answer policy when several regions can serve a user (S10 geo). */
+export type GeoPolicy = 'latency' | 'geo' | 'failover' | 'weighted' | 'simple';
+
 export interface Behavior {
   /** Matches an id in ComponentDefinition.behaviors. */
   id: string;
+  /**
+   * Geo (S10): `edge` = the node runs at edge locations next to every user region (CDN, anycast
+   * DNS) instead of in its group's region.
+   */
+  placement?: 'edge' | undefined;
+  /**
+   * Geo (S10): when this node's targets sit in several cloud regions it sends each request to ONE
+   * region (nearest healthy by default) instead of calling them all. Clients always do (geo-DNS).
+   */
+  geoRoutes?: boolean | undefined;
+  /** Geo (S10): a DNS node's answer policy, used by the clients that query it. */
+  dnsPolicy?(node: CompiledNode): GeoPolicy | undefined;
   /** Inferred flows: how this node's downstream calls combine. `undefined` = default. */
   routeOut?(ctx: RouteOutContext): Expr | undefined;
   /** Explicit flow paths: transform the rest of the path after this step. `undefined` = keep. */

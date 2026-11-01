@@ -72,7 +72,7 @@ test('F7: performance overlays, per-flow p99, bottleneck focus and formulas', as
 
   // Overload the server: 400 000 users × 0.1 rps × peak 2 = 80 000 rps vs 10 000 rps capacity.
   await page.keyboard.press('Escape');
-  const users = page.getByRole('spinbutton', { name: /^north-america/ });
+  const users = page.getByRole('spinbutton', { name: 'North America users' });
   await users.fill('400000');
   await users.press('Enter');
   await done(page);

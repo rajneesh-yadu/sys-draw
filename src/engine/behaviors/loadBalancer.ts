@@ -47,6 +47,8 @@ export function targetWeight(algorithm: LbAlgorithm, target: CompiledNode): numb
 
 export const behavior = defineBehavior({
   id: 'loadBalancer',
+  // A load balancer with targets in several regions acts as a global LB: nearest healthy region.
+  geoRoutes: true,
   routeOut({ node, calls, combine }) {
     if (calls.length <= 1) return undefined;
     const alg = lbAlgorithm(node);

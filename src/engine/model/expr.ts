@@ -3,11 +3,22 @@
  * probability, and which parts are off the caller's critical path. Load, errors and latency are
  * all computed by folding over this tree.
  */
+import type { NetHop } from '../geo/distance';
 import type { Op } from './types';
 
 export type Expr =
-  /** Visit a node (reached over `edgeId`), then run `then` (its downstream calls). */
-  | { k: 'visit'; nodeId: string; op: Op; edgeId?: string | undefined; then: Expr }
+  /**
+   * Visit a node (reached over `edgeId`, paying `net` for the network hop: S10 geo), then run
+   * `then` (its downstream calls).
+   */
+  | {
+      k: 'visit';
+      nodeId: string;
+      op: Op;
+      edgeId?: string | undefined;
+      net?: NetHop | undefined;
+      then: Expr;
+    }
   /** Run each item one after another; latencies add. */
   | { k: 'seq'; items: readonly Expr[] }
   /** Exactly one option runs, with probability p (LB split, cache hit/miss). */
@@ -44,8 +55,9 @@ export function asyncExpr(expr: Expr): Expr {
   return isEmpty(expr) ? EMPTY : { k: 'async', expr };
 }
 
-export function visit(nodeId: string, op: Op, then: Expr, edgeId?: string): Expr {
-  return edgeId === undefined
-    ? { k: 'visit', nodeId, op, then }
-    : { k: 'visit', nodeId, op, edgeId, then };
+export function visit(nodeId: string, op: Op, then: Expr, edgeId?: string, net?: NetHop): Expr {
+  const e: Expr & { k: 'visit' } = { k: 'visit', nodeId, op, then };
+  if (edgeId !== undefined) e.edgeId = edgeId;
+  if (net !== undefined && net.ms > 0) e.net = net;
+  return e;
 }

@@ -13,7 +13,16 @@ import {
   type Scenario,
   type SimResult,
 } from '@/store';
-import { bottleneckRows, flowFormula, flowName, systemFormulas, type FlowField } from './formulas';
+import {
+  bottleneckRows,
+  flowFormula,
+  flowName,
+  regionFormula,
+  regionRows,
+  systemFormulas,
+  type FlowField,
+  type RegionField,
+} from './formulas';
 import { FormulaValue } from './FormulaValue';
 import { NodeDetail } from './NodeDetail';
 
@@ -106,6 +115,7 @@ function DrawerBody() {
         <section aria-label="System" className="space-y-3">
           <SystemKpis result={result} scenario={scenario} />
           <FlowTable result={result} scenario={scenario} />
+          <RegionTable result={result} />
         </section>
         <section aria-label="Bottlenecks" className="space-y-3">
           <Bottlenecks result={result} labelOf={labelOf} />
@@ -208,6 +218,87 @@ function FlowTable({ result, scenario }: { result: SimResult; scenario: Scenario
                     label={`${h} of ${name}`}
                     formula={flowFormula(field, f, scenario)}
                     className={field === 'p99' ? 'font-semibold' : ''}
+                  >
+                    {values[field]}
+                  </FormulaValue>
+                </td>
+              ))}
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+/**
+ * Per user region (S10): where they are served from, network time, p50/p99 — the place to see
+ * that far-away users pay the round trip.
+ */
+function RegionTable({ result }: { result: SimResult }) {
+  const rows = regionRows(result);
+  if (rows.length === 0) return null;
+  const showErrors = rows.some((r) => r.m.errorRate > 0);
+  const cols: [RegionField, string][] = [
+    ['rps', 'rps'],
+    ['servedFrom', 'From'],
+    ['networkMs', 'Network'],
+    ['p50', 'p50'],
+    ['p99', 'p99'],
+    ...(showErrors ? ([['errorRate', 'Errors']] as [RegionField, string][]) : []),
+  ];
+  return (
+    <table className="w-full text-xs" data-testid="region-table">
+      <caption className="mb-1 text-left text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
+        Latency by user region
+      </caption>
+      <thead>
+        <tr className="text-left text-[10px] tracking-wide text-slate-500 uppercase">
+          <th scope="col" className="py-0.5 font-medium">
+            Users in
+          </th>
+          {cols.map(([, h]) => (
+            <th key={h} scope="col" className="py-0.5 text-right font-medium">
+              {h}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map(({ id, m }) => {
+          const values: Record<RegionField, string> = {
+            rps: formatRps(m.rps).replace(' rps', ''),
+            servedFrom: m.servedFrom ?? '—',
+            networkMs: formatMs(m.networkMs),
+            p50: formatMs(m.p50),
+            p99: formatMs(m.p99),
+            errorRate: formatPercent(m.errorRate),
+          };
+          return (
+            <tr
+              key={id}
+              data-region-id={id}
+              className="border-t border-slate-100 dark:border-slate-800"
+            >
+              <th
+                scope="row"
+                className="max-w-0 truncate py-0.5 pr-2 text-left font-normal"
+                title={`${m.name}: ${m.users.toLocaleString('en-US')} users`}
+              >
+                {m.name}
+              </th>
+              {cols.map(([field, h]) => (
+                <td key={field} className="py-0.5 text-right" data-col={field}>
+                  <FormulaValue
+                    label={`${h} for ${m.name}`}
+                    formula={regionFormula(field, m)}
+                    className={
+                      field === 'p50'
+                        ? 'font-semibold'
+                        : field === 'errorRate' && m.errorRate > 0.001
+                          ? 'text-red-600 dark:text-red-400'
+                          : ''
+                    }
                   >
                     {values[field]}
                   </FormulaValue>

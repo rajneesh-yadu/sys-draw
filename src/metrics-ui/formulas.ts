@@ -42,13 +42,16 @@ export function systemFormulas(result: SimResult, scenario: Scenario): SystemFor
       ? `Σ flow rates = ${terms.join(' + ')} = ${formatRps(result.system.rps)}`
       : `Rate of the only flow = ${formatRps(result.system.rps)}`;
   const served = result.system.rps * result.system.availability;
-  const nodeCosts = Object.values(result.perNode);
-  const costNote = nodeCosts.find((m) => m.explain.costPerMonth)?.explain.costPerMonth;
+  const nodeCost = Object.values(result.perNode).reduce((s, m) => s + m.costPerMonth, 0);
+  const edgeCost = Object.values(result.perEdge).reduce((s, m) => s + m.costPerMonth, 0);
   return {
     rps: `${flows.length === 0 ? 'No flows: 0 rps' : sum} at peak (each flow: λ = users × rpsPerUser × share × peak, with ${totalUsers(scenario).toLocaleString('en-US')} users and peak × ${scenario.peakMultiplier}).`,
     errorRate: `error rate = 1 − availability = 1 − ${formatPercent(result.system.availability)} = ${formatPercent(1 - result.system.availability)}`,
     availability: `availability = successful rps / offered rps = Σ λ_flow × (1 − error_flow) / Σ λ_flow = ${formatRps(served)} / ${formatRps(result.system.rps)} = ${formatPercent(result.system.availability)}. A flow succeeds only if every component on its path does.`,
-    costPerMonth: `Σ component cost per month = ${formatUsd(result.system.costPerMonth)}${costNote ? `. ${costNote}` : ''}`,
+    costPerMonth:
+      edgeCost > 0
+        ? `Σ component cost + Σ connection egress = ${formatUsd(nodeCost)} + ${formatUsd(edgeCost)} = ${formatUsd(result.system.costPerMonth)} per month. Select a component or hover a connection for its own formula.`
+        : `Σ component cost per month = ${formatUsd(result.system.costPerMonth)}. Select a component to see its own formula.`,
   };
 }
 
@@ -128,4 +131,36 @@ export function bottleneckRows(
       },
     ];
   });
+}
+
+export type RegionMetrics = NonNullable<SimResult['perRegion']>[string];
+export type RegionField = 'rps' | 'servedFrom' | 'networkMs' | 'p50' | 'p99' | 'errorRate';
+
+/** Per-user-region formulas come from the engine's explain map (S10). */
+export function regionFormula(field: RegionField, m: RegionMetrics): string {
+  const e = m.explain;
+  switch (field) {
+    case 'rps':
+      return e.rps ?? 'λ = users × rpsPerUser × share × peak.';
+    case 'servedFrom':
+      return e.servedFrom ?? 'Cloud region that answers these users.';
+    case 'networkMs':
+      return (
+        e.networkMs ??
+        'Network time per request: RTT = 2 × 1.5 × distance / 200 km/ms + 1 ms per hop, + last mile.'
+      );
+    case 'p50':
+      return e.p50 ?? 'Half of this region’s requests finish faster (queueing + network).';
+    case 'p99':
+      return e.p99 ?? '1 request in 100 from this region is slower.';
+    case 'errorRate':
+      return e.errorRate ?? 'Share of this region’s requests that fail.';
+  }
+}
+
+/** Regions in result order, busiest first, with users > 0 or traffic. */
+export function regionRows(result: SimResult): { id: string; m: RegionMetrics }[] {
+  return Object.entries(result.perRegion ?? {})
+    .map(([id, m]) => ({ id, m }))
+    .sort((a, b) => b.m.users - a.m.users || a.id.localeCompare(b.id));
 }

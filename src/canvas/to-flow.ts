@@ -25,6 +25,11 @@ export interface GroupNodeData extends Record<string, unknown> {
   label: string;
   kind: GroupKind;
   kindLabel: string;
+  /**
+   * S10: the real cloud region a region-kind group maps to ("Asia Pacific (Mumbai) · ap-south"),
+   * `null` when a region group has none (or an unknown one), undefined for other kinds.
+   */
+  region?: { id: string; name: string } | null;
 }
 
 export type ComponentFlowNode = Node<ComponentNodeData, 'component'>;
@@ -45,6 +50,15 @@ export function toFlowNodes(
 ): FlowNode[] {
   const { graph } = doc;
   const depths = groupDepths(graph);
+  const provider = registry.get(doc.providerId, 'provider') ?? registry.get('generic', 'provider');
+  const regionOf = (
+    kind: GroupKind,
+    regionId: string | undefined,
+  ): Pick<GroupNodeData, 'region'> => {
+    const r = regionId === undefined ? undefined : provider?.regions.find((x) => x.id === regionId);
+    if (r) return { region: { id: r.id, name: r.name } };
+    return kind === 'region' || regionId !== undefined ? { region: null } : {};
+  };
   const rel = (abs: { x: number; y: number }, parentId: string | undefined) => {
     const p = parentId === undefined ? undefined : rects.get(parentId);
     return p ? { x: abs.x - p.x, y: abs.y - p.y } : { x: abs.x, y: abs.y };
@@ -66,7 +80,12 @@ export function toFlowNodes(
         zIndex: -100 + (depths.get(g.id) ?? 0),
         dragHandle: '.sd-group-header',
         selected: selection.has(g.id),
-        data: { label: g.label, kind: g.kind, kindLabel: groupKindLabel(g.kind) },
+        data: {
+          label: g.label,
+          kind: g.kind,
+          kindLabel: groupKindLabel(g.kind),
+          ...regionOf(g.kind, g.regionId),
+        },
       };
     });
 
