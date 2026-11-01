@@ -15,6 +15,7 @@ Composition root: app shell layout, routing, theme, keyboard shortcuts.
 - main.tsx — browser entry: `openWorkspace` (IndexedDB, migrations) before first render, flush on hide
 - workspace/ — ProjectSidebar, BoardTabs, SnapshotsPanel, SaveStatus, Menu/InlineEdit, notices, file download/upload, ProviderSwitcher (S12: top-bar picker; reviews `planProviderSwitch` then dispatches `setProvider`)
 - trace/ — `startTraceRunner` (engine `runTrace` ↔ canvas trace store while the panel is open: at once on request changes, 300 ms after board edits, stale runs dropped; `toTraceView`) + `useTraceRunner`; AppShell creates the trace store and mounts `<TracePanel />` beside the canvas (S15)
+- security/ — `startSecurityRunner` (S16: security `reviewSecurity` + `securityOverlay` → canvas security store on every graph/scenario change; registers the fix handler) + `useSecurityRunner`; `planToCommands` maps a `FixPlan` to board commands (new ids, moved nodes placed beside their old group), `applySecurityFix` dispatches it as one `batch`; AppShell mounts `<SecurityPanel />`
 - simulation/ — `startSimulationRunner` (engine ↔ store: debounced 300 ms on graph/scenario/provider change, immediate on board switch or Run, stale runs dropped) + `useSimulationRunner`
 - index.css — Tailwind entry + global styles
 - layout/ — AppShell (top bar, palette, canvas, inspector, metrics drawer)

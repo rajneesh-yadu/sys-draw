@@ -97,6 +97,31 @@ export const ChaosEventSchema = z.discriminatedUnion('kind', [
     nodeId: idSchema('node').optional(),
     addedMs: PositiveNumberSchema.optional(),
   }),
+  // S16 — attacks (NETWORK-SECURITY.md → Attack scenarios). Each is softened by the security
+  // controls the design has (WAF, DDoS shield, rate limits, TLS, IAM); see the engine's attacks.ts.
+  /** Flood of junk requests at the internet-facing entry points: `multiplier` × normal traffic. */
+  z.object({
+    ...chaosBase,
+    kind: z.literal('ddosAttack'),
+    multiplier: PositiveNumberSchema,
+  }),
+  /** Bots replay leaked passwords against the login path at `rps` attempts per second. */
+  z.object({
+    ...chaosBase,
+    kind: z.literal('credentialStuffing'),
+    rps: PositiveNumberSchema,
+  }),
+  /** An attacker on the path intercepts a connection (`edgeId`, or every plaintext edge). */
+  z.object({ ...chaosBase, kind: z.literal('mitm'), edgeId: idSchema('edge').optional() }),
+  /**
+   * A compromised service uses an over-permissive role to bulk-read a data store (`nodeId`, or
+   * every database / storage node).
+   */
+  z.object({
+    ...chaosBase,
+    kind: z.literal('dataExfiltration'),
+    nodeId: idSchema('node').optional(),
+  }),
 ]);
 export type ChaosEvent = z.infer<typeof ChaosEventSchema>;
 export type ChaosEventKind = ChaosEvent['kind'];

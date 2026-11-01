@@ -15,6 +15,7 @@ export default defineComponent({
     'sidecar',
     'kubernetes',
     'observability',
+    'control:mtls',
   ],
   icon: 'share-2',
   providerNames: {

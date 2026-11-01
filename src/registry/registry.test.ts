@@ -50,16 +50,49 @@ const S14_PROTOCOLS = [
   ...['udp', 'quic', 'ipv4', 'ipv6', 'icmp', 'anycast', 'ethernet', 'fibre'],
 ];
 
+const S16_COMPONENTS = [
+  'security.waf',
+  'security.ddos-shield',
+  'security.secrets-manager',
+  'security.kms',
+  'security.iam',
+  'security.bastion',
+  'security.auth-server',
+];
+const S16_RULES = [
+  'rule.db-internet-reachable',
+  'rule.plaintext-edge',
+  'rule.no-rate-limit-public-api',
+  'rule.single-region-data',
+  'rule.secrets-in-config',
+  'rule.missing-service-auth',
+  'rule.open-admin-ports',
+  'rule.security-group-blocks',
+];
+
 describe('seeded registry', () => {
   const all = registry.list();
 
-  it('loads the 14 generic + 15 S13 + 2 provider-only components, 33 protocols and 4 providers', () => {
+  it('loads the 14 generic + 15 S13 + 7 S16 security + 2 provider-only components, 33 protocols, 4 providers and 8 rules', () => {
     expect(
       registry
         .list({ kind: 'component' })
         .map((c) => c.id)
         .sort(),
-    ).toEqual([...SEEDED_COMPONENTS, ...S13_COMPONENTS, ...PROVIDER_ONLY_COMPONENTS].sort());
+    ).toEqual(
+      [
+        ...SEEDED_COMPONENTS,
+        ...S13_COMPONENTS,
+        ...S16_COMPONENTS,
+        ...PROVIDER_ONLY_COMPONENTS,
+      ].sort(),
+    );
+    expect(
+      registry
+        .list({ kind: 'rule' })
+        .map((r) => r.id)
+        .sort(),
+    ).toEqual([...S16_RULES].sort());
     expect(
       registry
         .list({ kind: 'protocol' })
@@ -72,7 +105,7 @@ describe('seeded registry', () => {
       'gcp',
       'generic',
     ]);
-    expect(registry.size).toBe(68);
+    expect(registry.size).toBe(83);
   });
 
   it('has unique ids across all kinds', () => {
@@ -161,7 +194,7 @@ describe('registry API', () => {
     const onAws = registry.list({ kind: 'component', provider: 'aws' }).map((c) => c.id);
     expect(onAws).toContain('storage.object');
     expect(onAws).toContain('client.app'); // provider-neutral
-    expect(registry.list({ kind: 'component', provider: 'generic' })).toHaveLength(29);
+    expect(registry.list({ kind: 'component', provider: 'generic' })).toHaveLength(36);
     expect(onAws).toContain('database.aurora');
     expect(onAws).not.toContain('database.spanner');
     expect(registry.list({ kind: 'provider', provider: 'aws' }).map((p) => p.id)).toEqual(['aws']);

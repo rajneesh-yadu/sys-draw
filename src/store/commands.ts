@@ -2,7 +2,7 @@
  * The command bus vocabulary. Every board edit is one of these plain-data commands; the store
  * applies it to an Immer draft and records the patches + inverse patches for undo/redo.
  */
-import { current, type Draft } from 'immer';
+import { current, isDraft, type Draft } from 'immer';
 import {
   EdgeConfigSchema,
   GROUP_KINDS,
@@ -189,6 +189,12 @@ export function commandLabel(cmd: BoardCommand): string {
 
 type D = Draft<BoardDoc>;
 
+/**
+ * Plain copy of a draft value. Objects added earlier in the same batch are not drafts yet, and
+ * immer's `current` throws on them (S16: `group` then `updateGroup` in one batch).
+ */
+const snapshot = <T>(v: T): T => (isDraft(v) ? current(v as Draft<T>) : v) as T;
+
 const findNode = (d: D, id: string) => d.graph.nodes.find((n) => n.id === id);
 const findGroup = (d: D, id: string) => d.graph.groups.find((g) => g.id === id);
 const requireGroup = (d: D, id: string) => findGroup(d, id) ?? fail(`Unknown group "${id}"`);
@@ -343,7 +349,7 @@ export function applyCommand(d: D, cmd: BoardCommand, ctx: CommandContext): void
       }
       if (cmd.scaling !== undefined) {
         const { autoscale, ...rest } = cmd.scaling;
-        const merged: Record<string, unknown> = { ...current(n.scaling), ...rest };
+        const merged: Record<string, unknown> = { ...snapshot(n.scaling), ...rest };
         if (autoscale === null) delete merged.autoscale;
         else if (autoscale !== undefined) merged.autoscale = autoscale;
         const res = safeParseReadable(NodeScalingSchema, merged);
@@ -387,7 +393,7 @@ export function applyCommand(d: D, cmd: BoardCommand, ctx: CommandContext): void
 
     case 'updateGroup': {
       const g = requireGroup(d, cmd.groupId);
-      const next: Record<string, unknown> = { ...current(g) };
+      const next: Record<string, unknown> = { ...snapshot(g) };
       if (cmd.label !== undefined) next.label = cmd.label.trim();
       if (cmd.kind !== undefined) next.kind = cmd.kind;
       if (cmd.regionId === null) delete next.regionId;
@@ -401,7 +407,7 @@ export function applyCommand(d: D, cmd: BoardCommand, ctx: CommandContext): void
     }
 
     case 'updateScenario': {
-      const merged = { ...current(d.scenario), ...cmd.patch };
+      const merged = { ...snapshot(d.scenario), ...cmd.patch };
       const res = safeParseReadable(ScenarioSchema, merged);
       if (!res.ok) return fail(`Invalid scenario: ${res.errors.join('; ')}`);
       d.scenario = res.value as Scenario;

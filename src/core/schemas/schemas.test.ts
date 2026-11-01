@@ -270,6 +270,11 @@ describe('S11 — chaos events, breakers and timelines', () => {
       { ...base, kind: 'diskFull', nodeId: db, durationSec: 20 },
       { ...base, kind: 'coldStartBurst' },
       { ...base, kind: 'coldStartBurst', nodeId: db, addedMs: 800 },
+      // S16 — attacks
+      { ...base, kind: 'ddosAttack', multiplier: 10 },
+      { ...base, kind: 'credentialStuffing', rps: 2000 },
+      { ...base, kind: 'mitm' },
+      { ...base, kind: 'dataExfiltration', nodeId: db },
     ]) {
       expect(errorsOf(ChaosEventSchema, ev)).toEqual([]);
     }
@@ -278,7 +283,7 @@ describe('S11 — chaos events, breakers and timelines', () => {
     ).not.toEqual([]);
     expect(CHAOS_EVENT_KINDS).toContain('nodeOutage');
     expect(CHAOS_EVENT_KINDS).toContain('coldStartBurst');
-    expect(CHAOS_EVENT_KINDS).toHaveLength(11);
+    expect(CHAOS_EVENT_KINDS).toHaveLength(15);
   });
 
   it('checks that new events point at nodes on the board', () => {

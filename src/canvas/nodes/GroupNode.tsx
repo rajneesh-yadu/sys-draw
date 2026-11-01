@@ -12,6 +12,26 @@ const KIND_STYLE: Record<GroupKind, string> = {
   cluster: 'border-slate-400 bg-slate-100/40 dark:bg-slate-800/20',
 };
 
+/** S16: zone badge (text + colour). */
+const ZONE_STYLE = {
+  public: 'bg-red-100/90 text-red-800 dark:bg-red-900/70 dark:text-red-100',
+  dmz: 'bg-amber-100/90 text-amber-900 dark:bg-amber-900/70 dark:text-amber-100',
+  private: 'bg-emerald-100/90 text-emerald-900 dark:bg-emerald-900/70 dark:text-emerald-100',
+  data: 'bg-indigo-100/90 text-indigo-900 dark:bg-indigo-900/70 dark:text-indigo-100',
+} as const;
+const ZONE_TEXT = {
+  public: 'Public zone',
+  dmz: 'DMZ',
+  private: 'Private zone',
+  data: 'Data zone',
+} as const;
+const ZONE_TITLE = {
+  public: 'Public zone: reachable from the internet. Only edge services belong here.',
+  dmz: 'DMZ: between the internet and the inside (load balancers, gateways, WAF, bastion).',
+  private: 'Private zone: no inbound internet access (application tier).',
+  data: 'Data zone: databases, caches and storage, reachable only from the app tier.',
+} as const;
+
 /** Region / AZ / VPC / subnet / cluster container. Drag it by the header; resize when selected. */
 export const GroupNode = memo(function GroupNode({
   id,
@@ -64,6 +84,16 @@ export const GroupNode = memo(function GroupNode({
         <span className="truncate font-medium text-slate-700 dark:text-slate-200">
           {data.label}
         </span>
+        {data.zone !== undefined && (
+          <span
+            data-testid="group-zone"
+            data-zone={data.zone}
+            className={`shrink-0 rounded px-1.5 py-0.5 font-semibold ${ZONE_STYLE[data.zone]}`}
+            title={ZONE_TITLE[data.zone]}
+          >
+            {ZONE_TEXT[data.zone]}
+          </span>
+        )}
         {data.region !== undefined && (
           <span
             data-testid="group-region"

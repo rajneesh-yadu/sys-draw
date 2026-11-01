@@ -32,6 +32,8 @@ export interface GroupNodeData extends Record<string, unknown> {
    * `null` when a region group has none (or an unknown one), undefined for other kinds.
    */
   region?: { id: string; name: string } | null;
+  /** S16: the group's own security zone ("public", "dmz", "private", "data"), if it sets one. */
+  zone?: 'public' | 'dmz' | 'private' | 'data';
 }
 
 export type ComponentFlowNode = Node<ComponentNodeData, 'component'>;
@@ -87,6 +89,9 @@ export function toFlowNodes(
           kind: g.kind,
           kindLabel: groupKindLabel(g.kind),
           ...regionOf(g.kind, g.regionId),
+          ...(g.security
+            ? { zone: g.security.zone ?? (g.security.public ? 'public' : 'private') }
+            : {}),
         },
       };
     });

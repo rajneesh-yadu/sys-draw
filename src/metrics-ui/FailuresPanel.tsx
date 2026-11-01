@@ -129,15 +129,18 @@ function ChaosEditor({ events, graph }: { events: readonly ChaosEvent[]; graph: 
         return edges;
       case 'node-or-edge?':
         return [...nodes, ...edges];
+      case 'none':
+        return [];
     }
   };
   const optional = meta.target.endsWith('?');
   const everything =
-    meta.target === 'region?'
+    meta.anyLabel ??
+    (meta.target === 'region?'
       ? 'All users'
       : meta.target === 'node?'
         ? 'All compute'
-        : 'Every connection';
+        : 'Every connection');
 
   return (
     <div className="space-y-2">
@@ -200,22 +203,24 @@ function ChaosEditor({ events, graph }: { events: readonly ChaosEvent[]; graph: 
           <p id={`${id}-help`} className="col-span-2 text-[10px] text-slate-500">
             {meta.help}
           </p>
-          <label className="col-span-2 text-[10px] text-slate-500">
-            {meta.target === 'region-pair' ? 'Region A' : 'Target'}
-            <select
-              className={input}
-              value={draft.target}
-              aria-describedby={`${id}-help`}
-              onChange={(e) => setDraft({ ...draft, target: e.target.value })}
-            >
-              <option value="">{optional ? everything : 'Choose…'}</option>
-              {targetOptions().map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          {meta.target !== 'none' && (
+            <label className="col-span-2 text-[10px] text-slate-500">
+              {meta.target === 'region-pair' ? 'Region A' : 'Target'}
+              <select
+                className={input}
+                value={draft.target}
+                aria-describedby={`${id}-help`}
+                onChange={(e) => setDraft({ ...draft, target: e.target.value })}
+              >
+                <option value="">{optional ? everything : 'Choose…'}</option>
+                {targetOptions().map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           {meta.target === 'region-pair' && (
             <label className="col-span-2 text-[10px] text-slate-500">
               Region B

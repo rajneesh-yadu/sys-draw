@@ -17,10 +17,19 @@ export const PLAYBACK_MS_PER_TICK = 150;
 
 /** Which board item an event points at. `?` = optional (empty = everything). */
 export type ChaosTarget =
-  'node' | 'node?' | 'group' | 'region' | 'region?' | 'edge?' | 'node-or-edge?' | 'region-pair';
+  | 'node'
+  | 'node?'
+  | 'group'
+  | 'region'
+  | 'region?'
+  | 'edge?'
+  | 'node-or-edge?'
+  | 'region-pair'
+  /** S16: no target (the attack picks the internet-facing entry points itself). */
+  | 'none';
 
 export interface ChaosParam {
-  key: 'multiplier' | 'lossRate' | 'addedMs' | 'share' | 'factor';
+  key: 'multiplier' | 'lossRate' | 'addedMs' | 'share' | 'factor' | 'rps';
   label: string;
   default?: number;
   min: number;
@@ -34,6 +43,8 @@ export interface ChaosKindMeta {
   help: string;
   target: ChaosTarget;
   params: ChaosParam[];
+  /** Label of the "no target" option of an optional target (default per target kind). */
+  anyLabel?: string;
 }
 
 export const CHAOS_KIND_META: Record<ChaosEventKind, ChaosKindMeta> = {
@@ -103,6 +114,33 @@ export const CHAOS_KIND_META: Record<ChaosEventKind, ChaosKindMeta> = {
     target: 'region-pair',
     params: [],
   },
+  // S16 — attacks; the design's security controls decide how much gets through.
+  ddosAttack: {
+    label: 'Attack: DDoS flood',
+    help: 'Junk traffic hits the internet-facing entry points. A DDoS shield, WAF or rate limit in front absorbs most of it.',
+    target: 'none',
+    params: [{ key: 'multiplier', label: 'Attack ×', default: 10, min: 1, step: 1 }],
+  },
+  credentialStuffing: {
+    label: 'Attack: credential stuffing',
+    help: 'Bots try leaked passwords on the login path. WAF bot rules and rate limits block most; an auth server with MFA stops takeovers.',
+    target: 'none',
+    params: [{ key: 'rps', label: 'Attempts / s', default: 2000, min: 1, step: 100 }],
+  },
+  mitm: {
+    label: 'Attack: man in the middle',
+    help: 'An attacker on the network path intercepts a connection. Plaintext edges are read and slowed by the relay; TLS stops it.',
+    target: 'edge?',
+    params: [],
+    anyLabel: 'Every plaintext edge',
+  },
+  dataExfiltration: {
+    label: 'Attack: data exfiltration',
+    help: 'A compromised service bulk-reads a data store through an over-permissive role. Least-privilege IAM stops it.',
+    target: 'node?',
+    params: [],
+    anyLabel: 'All data stores',
+  },
 };
 
 /** Cloud regions used on the board (Region groups with a region set), sorted. */
@@ -142,6 +180,14 @@ export function chaosEventLabel(ev: ChaosEvent, graph: Graph): string {
       return `${node(ev.nodeId)} disk full`;
     case 'coldStartBurst':
       return `Cold starts${ev.nodeId ? ` on ${node(ev.nodeId)}` : ''}`;
+    case 'ddosAttack':
+      return `DDoS ×${ev.multiplier}`;
+    case 'credentialStuffing':
+      return `Credential stuffing ${ev.rps}/s`;
+    case 'mitm':
+      return `MITM on ${ev.edgeId ? edge(ev.edgeId) : 'plaintext edges'}`;
+    case 'dataExfiltration':
+      return `Exfiltration from ${ev.nodeId ? node(ev.nodeId) : 'data stores'}`;
   }
 }
 
@@ -220,6 +266,8 @@ export function buildChaosEvent(
       if (t === d.target2.trim()) return { ok: false, reason: 'Pick two different regions.' };
       raw.regionA = t;
       raw.regionB = d.target2.trim();
+      break;
+    case 'none':
       break;
   }
   for (const p of meta.params) {

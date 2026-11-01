@@ -46,6 +46,7 @@ import { route, type RoutedFlow } from '../model/route';
 import type { CompiledEdge, CompiledNode, EngineOptions, Model } from '../model/types';
 import { effectiveReplicas } from '../queueing/node';
 import { expQuantileFactor } from '../queueing/mmc';
+import { attackEffects, attackFindings } from './attacks';
 import {
   BREAKER_WINDOW_SEC,
   coldStartMs,
@@ -143,6 +144,8 @@ export function runTimeline(input: TimelineInput): TimelineResult {
   const inRegion = (rid: string) =>
     [...model.nodes.values()].filter((n) => n.regionId === rid).map((n) => n.id);
   const allEdges = [...model.edges.keys()];
+  // S16: attacks scale with the board's normal traffic (credential stuffing adds rps to it).
+  const baselineRps = loads.reduce((s, l) => s + l.byRegion.reduce((a, r) => a + r.rps, 0), 0);
 
   const effectsAt = (t: number): Effects => {
     const fx: Effects = {
@@ -220,6 +223,17 @@ export function runTimeline(input: TimelineInput): TimelineResult {
             const n = model.nodes.get(id);
             if (n?.kind === 'service') add(fx.nodeAdded, id, coldStartMs(ev, n) * share);
           }
+          break;
+        }
+        case 'ddosAttack':
+        case 'credentialStuffing':
+        case 'mitm':
+        case 'dataExfiltration': {
+          // S16: what gets through the design's security controls (see attacks.ts).
+          const a = attackEffects(model, ev, baselineRps);
+          fx.spike *= a.spike;
+          for (const [id, ms] of a.edgeAddedMs) add(fx.edgeAdded, id, ms);
+          for (const [id, f] of a.slow) mul(fx.slow, id, f);
           break;
         }
       }
@@ -635,7 +649,16 @@ export function runTimeline(input: TimelineInput): TimelineResult {
   return {
     timeline,
     markers,
-    findings: timelineFindings(timeline, hitWhileDown, attemptsRatio, model, events, names),
+    findings: [
+      ...timelineFindings(timeline, hitWhileDown, attemptsRatio, model, events, names),
+      ...attackFindings(
+        model,
+        events,
+        baselineRps,
+        scenario.payloadBytes.res,
+        scenario.durationSec,
+      ),
+    ],
     tickSec,
   };
 }

@@ -5,7 +5,15 @@ export default defineComponent({
   id: 'network.api-gateway',
   name: 'API Gateway',
   category: 'network',
-  tags: ['api-gateway', 'auth', 'rate-limiting', 'routing', 'managed'],
+  tags: [
+    'api-gateway',
+    'auth',
+    'rate-limiting',
+    'routing',
+    'managed',
+    'control:rate-limit',
+    'control:auth',
+  ],
   icon: 'door-open',
   providerNames: { aws: 'API Gateway', gcp: 'API Gateway', azure: 'API Management' },
   ports: [

@@ -16,6 +16,9 @@ import {
   type ComponentDefinition,
   type Finding,
   type Graph,
+  type GroupKind,
+  type ProtocolDefinition,
+  type SecurityGroupSettings,
   type Scenario,
   type SimResult,
 } from '@/core';
@@ -212,8 +215,41 @@ export interface RuleContext {
   scenario?: Scenario;
   result?: SimResult;
   components: { get(defId: string): ComponentDefinition | undefined };
+  /** S16: protocol lookup (edge encryption, ports). Optional so older callers still type-check. */
+  protocols?: { get(id: string): ProtocolDefinition | undefined } | undefined;
 }
 export type RuleCheck = (ctx: RuleContext) => Finding[];
+
+/**
+ * S16: one step of a one-click fix, as plain data (the app turns it into undoable store
+ * commands). Ids in `groupId` may name a group created by an earlier `createGroup` step (`ref`).
+ */
+export type FixStep =
+  | { kind: 'setGroupSecurity'; groupId: string; security: SecurityGroupSettings }
+  | {
+      kind: 'createGroup';
+      /** Placeholder id later steps use; the app assigns the real id. */
+      ref: string;
+      groupKind: GroupKind;
+      label: string;
+      /** Nodes moved into the new group (out of their current group). */
+      memberIds: string[];
+      parentId?: string | undefined;
+      security: SecurityGroupSettings;
+    }
+  | { kind: 'setEdgeStack'; edgeId: string; protocolStack: string[] }
+  /** Put a new `defId` node in the middle of an edge (client → WAF → entry). */
+  | { kind: 'insertOnEdge'; edgeId: string; defId: string; label: string }
+  /** Add a `defId` node next to `near` and connect each of `connectFrom` to it. */
+  | { kind: 'addNode'; defId: string; label: string; near: string; connectFrom: string[] };
+
+export interface FixPlan {
+  /** Button / undo label, e.g. "Move Orders DB into a private data subnet". */
+  label: string;
+  steps: FixStep[];
+}
+/** Builds the one-click fix for one of the rule's findings (undefined = no automatic fix). */
+export type RuleFix = (ctx: RuleContext, finding: Finding) => FixPlan | undefined;
 
 export const RuleDefinitionSchema = z.strictObject({
   id: RegistryIdSchema, // 'rule.spof'
@@ -225,6 +261,12 @@ export const RuleDefinitionSchema = z.strictObject({
   check: z.custom<RuleCheck>((v) => typeof v === 'function', {
     message: 'check must be a function (ctx) => Finding[]',
   }),
+  /** S16: optional one-click fix for a finding. */
+  fix: z
+    .custom<RuleFix>((v) => typeof v === 'function', {
+      message: 'fix must be a function (ctx, finding) => FixPlan | undefined',
+    })
+    .optional(),
   docs: z.strictObject({
     summary: NonEmptyStringSchema,
     why: z.string(),

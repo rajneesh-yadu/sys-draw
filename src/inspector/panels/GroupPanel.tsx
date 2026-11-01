@@ -53,6 +53,16 @@ export function GroupPanel({
         defaultValue: { public: false, firewallRules: [] },
       },
       'security.public': { label: 'Public (reachable from the internet)' },
+      'security.zone': {
+        label: 'Zone',
+        help: 'Trust zone (S16): public = internet-facing, DMZ = edge services, private = app tier, data = databases. Empty = from the Public flag. Nested groups inherit it.',
+        options: [
+          { value: 'public', label: 'Public' },
+          { value: 'dmz', label: 'DMZ' },
+          { value: 'private', label: 'Private' },
+          { value: 'data', label: 'Data' },
+        ],
+      },
       'security.firewallRules': { label: 'Firewall rules' },
       'security.firewallRules.*': {
         defaultValue: {

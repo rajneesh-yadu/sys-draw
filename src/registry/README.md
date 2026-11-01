@@ -16,6 +16,8 @@ Loads, validates and looks up every registry entry (components, protocols, provi
 - Geo (S10): `USER_REGIONS` (9 user regions: lat/long, UTC offset, last-mile ms; `geo/user-regions.ts`), `userRegion(id)`, `UserRegionSchema`. Cloud regions live in each provider's `regions` (generic: 26).
 - `presets.ts` (internal): `GENERAL_PURPOSE_INSTANCES`, `MEMORY_OPTIMISED_INSTANCES` for component files.
 
+- Security (S16, `security-tools.ts`): zone/exposure/encryption/security-group helpers used by rules, the engine and `security` (see src/security/README.md). 7 security components (`security.*`: WAF, DDoS shield, secrets manager, KMS, IAM, bastion/VPN, auth server) and 8 security rules (`rules/`); `RuleDefinition.fix?` returns a `FixPlan`; `RuleContext.protocols?`. Controls are `control:<id>` tags (API gateway: rate-limit + auth; service mesh: mtls).
+
 ## Layout
 
 - components/<category>/<name>.ts — one entry per file; id = `<category>.<name>` (`clients` → `client.`)

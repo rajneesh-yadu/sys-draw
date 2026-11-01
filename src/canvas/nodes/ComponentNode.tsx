@@ -16,6 +16,8 @@ import type { ComponentFlowNode, PortView } from '../to-flow';
 import { RegistryIcon } from './RegistryIcon';
 import { useTraceStore } from '../trace/context';
 import { currentTraceStep } from '../trace/trace-store';
+import { useSecurityStore } from '../security/context';
+import { EXPOSURE_STYLE } from '../security/security-store';
 
 function portTop(i: number, n: number) {
   return `${((i + 1) / (n + 1)) * 100}%`;
@@ -150,13 +152,17 @@ export const ComponentNode = memo(function ComponentNode({
     tick && tSec !== undefined ? tickView(tick, tSec) : metrics ? steadyView(metrics) : undefined;
   const level = view ? utilizationLevel(view.utilization) : undefined;
   const down = tick?.state === 'down';
+  // S16: security overlay — border and badge by exposure (replaces the utilisation colour).
+  const sec = useSecurityStore((s) => (s.open ? s.view?.nodes[id] : undefined));
   const border = !data.known
     ? 'border-dashed border-red-400'
-    : down
-      ? 'border-2 border-dashed border-red-600 opacity-70 dark:border-red-500'
-      : level
-        ? `border-2 ${LEVEL_STYLES[level].border}`
-        : 'border-slate-300 dark:border-slate-700';
+    : sec
+      ? `border-2 ${EXPOSURE_STYLE[sec.exposure].border}`
+      : down
+        ? 'border-2 border-dashed border-red-600 opacity-70 dark:border-red-500'
+        : level
+          ? `border-2 ${LEVEL_STYLES[level].border}`
+          : 'border-slate-300 dark:border-slate-700';
   const replicas = tick && tick.state !== 'down' ? tick.replicas : data.replicas;
   // S15: the traced request is at this node (queue/service) or arriving at it.
   const traceHere = useTraceStore((s) => {
@@ -171,6 +177,7 @@ export const ComponentNode = memo(function ComponentNode({
       data-level={level}
       data-state={tick?.state}
       data-trace={traceHere}
+      data-exposure={sec?.exposure}
       className={`relative flex h-full w-full items-center gap-2.5 rounded-lg border bg-white px-3 shadow-sm dark:bg-slate-900 ${border} ${
         selected
           ? 'ring-2 ring-sky-500/60 ring-offset-1 dark:ring-offset-slate-950'
@@ -208,7 +215,16 @@ export const ComponentNode = memo(function ComponentNode({
           No {data.unavailableOn} equivalent
         </span>
       )}
-      {view && <MetricsOverlay v={view} />}
+      {sec && (
+        <span
+          data-testid="exposure-badge"
+          className={`absolute -bottom-2 left-2 rounded px-1 py-0.5 text-[10px] leading-none font-semibold ${EXPOSURE_STYLE[sec.exposure].pill}`}
+          title={sec.reason}
+        >
+          {sec.label}
+        </span>
+      )}
+      {view && !sec && <MetricsOverlay v={view} />}
     </div>
   );
 });

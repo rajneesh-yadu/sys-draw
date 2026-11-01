@@ -32,6 +32,7 @@ import {
 import { useCanvasActions, useGroupRects } from './actions';
 import { useCanvasUi } from './context';
 import { useTraceStore, useTraceStoreApi } from './trace/context';
+import { useSecurityStore, useSecurityStoreApi } from './security/context';
 import { decodePaletteItem, DND_MIME } from './dnd';
 import {
   findDropGroup,
@@ -444,7 +445,39 @@ function Toolbar(props: {
       </label>
       <span className="mx-1 h-4 w-px bg-slate-200 dark:bg-slate-700" />
       <TraceToggle />
+      <SecurityToggle />
     </div>
+  );
+}
+
+/** S16: shows the security overlay (edges by encryption, nodes by exposure) and the review. */
+function SecurityToggle() {
+  const sec = useSecurityStoreApi();
+  const open = useSecurityStore((s) => s.open);
+  const serious = useSecurityStore(
+    (s) =>
+      s.view?.findings.filter((f) => f.severity === 'critical' || f.severity === 'error').length ??
+      0,
+  );
+  return (
+    <button
+      type="button"
+      className={`${btn} ${open ? 'bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200' : ''}`}
+      aria-pressed={open}
+      onClick={() => sec.getState().setOpen(!open)}
+      title="Security overlay: edges by encryption, components by exposure, and the threat review"
+    >
+      Security
+      {serious > 0 && (
+        <span
+          data-testid="security-badge"
+          className="ml-1 rounded-full bg-red-600 px-1.5 text-[10px] font-semibold text-white"
+          aria-label={`${serious} critical or error findings`}
+        >
+          {serious}
+        </span>
+      )}
+    </button>
   );
 }
 

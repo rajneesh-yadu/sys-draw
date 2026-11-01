@@ -34,3 +34,21 @@ export {
   PACKET_ANIMATION_MS,
   STEP_INTERVAL_MS,
 } from './trace/sequence';
+// S16 — security overlay and threat review (the app fills the store and applies fixes)
+export { SecurityPanel } from './security/SecurityPanel';
+export { useSecurityStore, useSecurityStoreApi } from './security/context';
+export {
+  createSecurityStore,
+  severityCounts,
+  SEVERITY_ORDER,
+  EXPOSURE_STYLE,
+  ENCRYPTION_STROKE,
+  type SecurityState,
+  type SecurityStore,
+  type SecurityView,
+  type SecurityViewFinding,
+  type SecuritySeverity,
+  type SecurityExposure,
+  type SecurityEncryption,
+  type FixHandler,
+} from './security/security-store';

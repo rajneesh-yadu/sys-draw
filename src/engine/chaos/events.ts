@@ -127,5 +127,13 @@ export function eventLabel(
       return `${names.node(ev.nodeId)} disk full`;
     case 'coldStartBurst':
       return `Cold starts${ev.nodeId ? ` on ${names.node(ev.nodeId)}` : ''}`;
+    case 'ddosAttack':
+      return `DDoS ×${fmt(ev.multiplier)}`;
+    case 'credentialStuffing':
+      return `Credential stuffing ${fmt(ev.rps)}/s`;
+    case 'mitm':
+      return `MITM on ${ev.edgeId ? names.edge(ev.edgeId) : 'plaintext edges'}`;
+    case 'dataExfiltration':
+      return `Exfiltration from ${ev.nodeId ? names.node(ev.nodeId) : 'data stores'}`;
   }
 }

@@ -105,9 +105,28 @@ export const FirewallRuleSchema = z
   });
 export type FirewallRule = z.infer<typeof FirewallRuleSchema>;
 
+/**
+ * S16: trust zone of a group (NETWORK-SECURITY.md → Security model), least to most trusted:
+ * public (internet-facing), DMZ (edge services between internet and internal), private (app
+ * tier), data (databases, storage). Unset = derived: `public: true` ⇒ public, else private;
+ * a group with no `security` inherits its parent's zone.
+ */
+export const SECURITY_ZONES = ['public', 'dmz', 'private', 'data'] as const;
+export const SecurityZoneSchema = z.enum(SECURITY_ZONES);
+export type SecurityZone = z.infer<typeof SecurityZoneSchema>;
+
 export const GROUP_KINDS = ['region', 'az', 'vpc', 'subnet', 'cluster'] as const;
 export const GroupKindSchema = z.enum(GROUP_KINDS);
 export type GroupKind = z.infer<typeof GroupKindSchema>;
+
+/** A group's security settings (public flag, firewall rules, S16 zone). */
+export const SecurityGroupSettingsSchema = z.object({
+  public: z.boolean(),
+  firewallRules: z.array(FirewallRuleSchema),
+  /** S16 (optional, no migration): trust zone; see SECURITY_ZONES. */
+  zone: SecurityZoneSchema.optional(),
+});
+export type SecurityGroupSettings = z.infer<typeof SecurityGroupSettingsSchema>;
 
 export const GroupSchema = z.object({
   id: idSchema('group'),
@@ -115,9 +134,7 @@ export const GroupSchema = z.object({
   label: NonEmptyStringSchema,
   regionId: RegionIdSchema.optional(),
   parentId: idSchema('group').optional(),
-  security: z
-    .object({ public: z.boolean(), firewallRules: z.array(FirewallRuleSchema) })
-    .optional(),
+  security: SecurityGroupSettingsSchema.optional(),
 });
 export type Group = z.infer<typeof GroupSchema>;
 

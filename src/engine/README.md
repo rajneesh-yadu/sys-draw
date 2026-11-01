@@ -4,6 +4,8 @@ Analytical simulation: compile → load → route → M/M/c queueing → latency
 
 - **Depends on:** `core`, `registry`, `network` (S14) · **Built in:** S07 (scaling + cost: S09, geo: S10, failures over time: S11, provider prices/limits: S12, deep component behaviors + Zipf cache: S13, protocols: S14)
 
+- Attacks (S16, `chaos/attacks.ts`): `ddosAttack`, `credentialStuffing`, `mitm`, `dataExfiltration` chaos events; controls on the request path (nodes reachable from clients) block B = 1 − Π(1 − bᵢ) (DDoS: shield 99 %, WAF 90 %, rate limit 80 %; stuffing: WAF 90 %, rate limit 70 %); MITM +20 ms on plaintext edges; exfiltration = 2× slower data store without least-privilege IAM; one finding per attack.
+
 ## Public API (index.ts)
 
 - `runSimulation(board, options?) → Promise<SimResult>` — the UI entry point; runs in the worker (in-thread fallback without `Worker`). `disposeSimulationWorker()`.

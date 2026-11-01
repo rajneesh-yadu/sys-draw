@@ -1,11 +1,20 @@
 import { useEffect, useState } from 'react';
-import { BoardCanvas, CanvasProvider, createTraceStore, Palette, TracePanel } from '@/canvas';
+import {
+  BoardCanvas,
+  CanvasProvider,
+  createSecurityStore,
+  createTraceStore,
+  Palette,
+  SecurityPanel,
+  TracePanel,
+} from '@/canvas';
 import { Inspector } from '@/inspector';
 import { MetricsDrawer } from '@/metrics-ui';
 import type { Autosave } from '@/persistence';
 import { projectOfBoard, useWorkspaceStore } from '@/store';
 import { useSimulationRunner } from '../simulation/useSimulationRunner';
 import { useTraceRunner } from '../trace/useTraceRunner';
+import { useSecurityRunner } from '../security/useSecurityRunner';
 import {
   BoardTabs,
   NoticeProvider,
@@ -29,6 +38,9 @@ export function AppShell({
   // S15: request trace — the canvas shows it, this runner fills it from the engine.
   const [traceStore] = useState(createTraceStore);
   useTraceRunner(traceStore);
+  // S16: security overlay + threat review — the canvas shows it, this runner fills it.
+  const [securityStore] = useState(createSecurityStore);
+  useSecurityRunner(securityStore);
 
   // Ctrl/Cmd+S saves now instead of opening the browser's "Save page" dialog.
   useEffect(() => {
@@ -45,7 +57,7 @@ export function AppShell({
 
   return (
     <NoticeProvider>
-      <CanvasProvider traceStore={traceStore}>
+      <CanvasProvider traceStore={traceStore} securityStore={securityStore}>
         <div className="flex h-screen flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
           <TopBar autosave={autosave} />
 
@@ -79,6 +91,7 @@ export function AppShell({
                   <BoardCanvas />
                 </main>
                 <TracePanel />
+                <SecurityPanel />
               </div>
 
               <section
