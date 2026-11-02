@@ -805,6 +805,52 @@ sample exercises most available component categories without compromising the de
 efficiency or coherence.
 ```
 
+**Add an anti-pattern sample board**
+
+```markdown
+TASK — Add an anti-pattern sample board: <system name>.
+Read: docs/DATA-MODEL.md (Board, Graph, Scenario), docs/ARCHITECTURE.md,
+docs/NETWORK-SECURITY.md, src/registry/components/ (available definitions),
+src/registry/rules/ (available review rules), and the sample reference board as an
+example of the board loading mechanism.
+Build: one loadable, clearly labeled intentionally inefficient and insecure design for
+<system name>. It should teach by example: include realistic architecture and security
+mistakes that violate best practices, and make the resulting problems inspectable in the
+board's review/findings UI. Keep the flaws limited to this teaching fixture; do not
+introduce vulnerabilities into the application or its infrastructure. Include:
+- A coherent workload and scenario that exercise the flawed paths and produce meaningful
+  simulation metrics (latency, saturation, errors, or availability where supported).
+- Multiple distinct anti-patterns supported by existing components and review rules,
+  such as a public data store, plaintext sensitive traffic, missing authentication or
+  rate limiting, exposed admin access, a single point of failure, unbounded retries,
+  missing cache for a hot read path, or an overloaded single-instance service. Choose
+  flaws that fit the system; do not add arbitrary mistakes just to increase the count.
+- Enough deliberate issues to demonstrate security review and each supported finding
+  severity/category: ERROR, WARNING, and INFO (or the exact equivalent in the current
+  review model). Ensure at least one finding at each level is actually emitted by an
+  existing rule; do not fabricate findings or mislabel severity. If the product uses a
+  different severity vocabulary, preserve it and document the mapping in the sample
+  notes.
+- Clear labels or annotations that make this an intentionally broken learning example,
+  plus companion notes listing each intended issue, the rule/finding expected, its
+  severity, impact, and a practical remediation. Keep the initial board broken so users
+  can inspect the review; optionally include a corrected version or guided remediation
+  steps if the existing sample mechanism supports them.
+- A readable layout that makes risky trust boundaries, exposed components, dependencies,
+  and bottlenecks easy to trace. Use valid graph structure and supported protocols so
+  findings come from design choices rather than malformed data.
+Register or seed the board through the existing sample/reference-board mechanism. Reuse
+existing definitions and rules; do not weaken validation or change public APIs. If a
+needed finding rule does not exist, list it as a follow-up instead of implementing an
+unrelated broad review-system change.
+Out of scope: real exploit code, unsafe application defaults, new component types, or
+changes to the review engine beyond a narrowly required rule and its tests.
+Done when: users can load and simulate the intentionally flawed board, see security and
+design findings including ERROR, WARNING, and INFO (or documented equivalents), and use
+the notes to understand the risks and how to fix them; the board is valid and the
+application remains secure.
+```
+
 
 **Add a mode or review rule**
 

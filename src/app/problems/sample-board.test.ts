@@ -20,7 +20,7 @@ describe('S22 sample board — e-commerce storefront', () => {
   it('is discoverable in the problem library by its tag and title', () => {
     expect(sample).toBeDefined();
     const all = listProblems(registry);
-    expect(filterProblems(all, { tag: 'sample' }).map((p) => p.id)).toEqual([ID]);
+    expect(filterProblems(all, { tag: 'sample' }).map((p) => p.id)).toContain(ID);
     expect(filterProblems(all, { query: 'sample board' }).map((p) => p.id)).toContain(ID);
     expect(sample.title).toMatch(/^Sample board:/);
     expect(sample.docs?.summary).toBeTruthy();

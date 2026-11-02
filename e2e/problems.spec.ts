@@ -15,10 +15,10 @@ test('S17: browse → filter → start a problem → load its reference design',
   // Browse and filter.
   await page.getByTestId('open-problems').click();
   const browser = page.getByTestId('problem-browser');
-  await expect(browser.getByTestId('problem-count')).toHaveText('11 of 11 problems');
+  await expect(browser.getByTestId('problem-count')).toHaveText('12 of 12 problems');
   await browser.getByLabel('Company style').selectOption('meta');
   await browser.getByLabel('Level').selectOption('4');
-  await expect(browser.getByTestId('problem-count')).toHaveText('1 of 11 problems');
+  await expect(browser.getByTestId('problem-count')).toHaveText('1 of 12 problems');
   await browser.getByTestId('problem-item-problem.instagram').click();
   await expect(browser.getByTestId('problem-scale')).toContainText('500M');
 

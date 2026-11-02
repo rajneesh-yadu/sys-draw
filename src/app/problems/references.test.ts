@@ -33,8 +33,8 @@ const holds = (v: number, op: SloTarget['op'], t: number) =>
   op === 'lt' ? v < t : op === 'lte' ? v <= t : op === 'gt' ? v > t : v >= t;
 
 describe('F3 — practice problems', () => {
-  it('ships 10 problems plus the S22 sample board', () => {
-    expect(problems).toHaveLength(11);
+  it('ships 10 problems plus the S22 and S23 sample boards', () => {
+    expect(problems).toHaveLength(12);
   });
 
   describe.each(problems.map((p) => [p.title, p] as const))('%s', (_t, p) => {

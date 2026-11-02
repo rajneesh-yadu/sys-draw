@@ -18,10 +18,11 @@ const EXPECTED = [
   'problem.uber',
   'problem.payment-system',
   'problem.sample-ecommerce', // S22 sample reference board
+  'problem.antipattern-patient-portal', // S23 anti-pattern sample board
 ];
 
 describe('problem library content (S17)', () => {
-  it('ships the ten problems from basic to expert, plus the S22 sample board', () => {
+  it('ships the ten problems from basic to expert, plus the S22/S23 sample boards', () => {
     expect(problems.map((p) => p.id).sort()).toEqual([...EXPECTED].sort());
     const levels = new Set(problems.map((p) => p.level));
     expect([...levels].sort()).toEqual([1, 2, 3, 4, 5]);
@@ -40,7 +41,9 @@ describe('problem library content (S17)', () => {
       expect(p.hints.length).toBeGreaterThanOrEqual(4);
       expect(p.rubric.some((r) => r.slo)).toBe(true);
       expect(p.docs.summary.length).toBeGreaterThan(20);
-      expect(p.tags.some((t) => t.startsWith('company:'))).toBe(true);
+      // Anti-pattern samples carry no company style: a broken design must not be tied to a real company.
+      if (!p.tags.includes('anti-pattern'))
+        expect(p.tags.some((t) => t.startsWith('company:'))).toBe(true);
     });
 
     it('has a valid reference graph built from registry components', () => {
