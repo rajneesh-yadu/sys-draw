@@ -1031,3 +1031,73 @@ Known gaps / follow-ups (not fixed; out of scope):
 Next suggested step: a small registry session that adds `kafka-wire`, `amqp` and `tls13` to the compute input ports. Then update this sample's broker → consumer edges and its tests, which pin `['tcp']` on purpose so they flag the change.
 
 Files touched: `src/registry/problems/order-events-messaging/{index.ts, NOTES.md, notes.test.ts}` (new), `src/registry/problems/kit.ts`, `src/registry/README.md`, `src/app/problems/order-events-sample.test.ts` (new), `src/app/problems/references.test.ts`, `src/registry/problems/problems.test.ts`, `src/registry/registry.test.ts`, `src/problems/library.test.ts`, `src/problems/ProblemBrowser.test.tsx`, `e2e/problems.spec.ts`, `docs/PROGRESS.md`.
+
+## S25 — Sample workflow: Authentication, authorization & secrets — 2026-11-02
+
+What changed:
+
+- **One sample workflow, not three.** New registry entry `problem.sample-identity-access`, "Sample workflow: Authentication, authorization & secrets" (level 3; tags `sample`, `reference-board`, `security`, `identity`, `authentication`, `authorization`, `oauth2`, `oidc`, `jwt`, `iam`, `secrets`, `kms`, `mtls`, `company:shopify`). It uses the S22 sample mechanism: Problems → Tag "sample" (or any identity tag) → Start → "Reference solution". The lesson is how identity is handed from one piece to the next (auth server → gateway → API → service → IAM → secrets/KMS), so separate boards would have repeated the same gateway and services and hidden the hand-offs. No UI, engine, rule or schema code changed.
+- **Board:** 13 nodes, 17 edges, 8 groups, laid out left to right:
+  - customers (role `customer`) and support staff (role `support`) → API gateway in the DMZ (`authMode: jwt`, rate limits);
+  - an identity subnet on top (auth server: OIDC, MFA required, 15-min JWTs) with its own identity data subnet (users DB), so only the auth server can reach password hashes;
+  - a Kubernetes cluster in the middle (Orders API, which authorises user roles and ownership; Payments service, internal, reached only by Orders over mTLS);
+  - an app data subnet on the right (Orders DB, private SSE-KMS invoice bucket, Payments DB);
+  - managed security services at the bottom (IAM/STS with least privilege, secrets manager with 30-day rotation and a 5-min client cache, customer-managed KMS).
+  - Every edge is TLS or mTLS. Security-group ingress rules are set per subnet after `build()` (as in S23), and every zone crossing evaluates to "allow".
+- **Scenario, 7 flows at ≈ 20k rps peak:** sign-in and refresh (the only paths through the auth server), customer order reads, checkout (Orders → Payments over mTLS), support lookup + invoice, workload credential refresh (Orders → STS → secrets manager) and Payments' KMS data-key unwrap. The last two start at the workload and run at a token rate.
+- **Peak result (generic provider):**
+  - p99 is ≈ 95 ms for order reads, ≈ 163 ms for checkout and ≈ 122 ms for sign-in (rubric: < 150 / < 300 / < 400 ms).
+  - Every node is < 0.6 utilisation, with no engine findings. Availability ≈ 100 %, cost ≈ $27k/month.
+  - The design review reports only `rule.single-region-data` and, after a run, `rule.no-cache-hot-read` on the Orders DB. Both are deliberate scope cuts and documented. No security-rule findings.
+  - The attack events behave as intended:
+    - credential stuffing: rate limit blocks 70 %, and MFA means no takeovers;
+    - exfiltration of the Payments DB: denied by least-privilege IAM;
+    - MITM: stopped by TLS.
+- `NOTES.md` beside the entry is the companion. It covers:
+  - authentication vs authorization;
+  - the user and service identity paths step by step;
+  - a user roles vs workload roles table;
+  - why each component is there;
+  - a connections table: initiator → target, protocol, purpose, boundary / security group;
+  - the scenario and attacks to try, and use cases;
+  - known limits.
+  - It states explicitly that the vault is not a general database, that IAM does not replace end-user authorization, and that the auth server is not on API request paths (JWTs are verified locally with cached JWKS).
+
+Public APIs added: none. No existing API changed, no saved-format change, no migration. `kit.ts` is unchanged.
+
+Tests:
+
+- New `src/app/problems/identity-access-sample.test.ts` (13 checks):
+  - discoverable by `sample` and each identity tag;
+  - loads in one step with its 7 flows;
+  - every edge is legal, encrypted and sync, and every server-side edge has a timeout;
+  - authentication wiring: auth server reached only via the gateway, users DB only via the auth server, effective `jwt` / MFA `required`, and data flows never touch the auth server;
+  - authorization: two role populations, mTLS on gateway → Orders and Orders → Payments, each data store reached only by its owner;
+  - secrets wiring: IAM, secrets and KMS callers; no outgoing edges from them; least privilege, rotation, customer-managed key; no secret-looking strings;
+  - zones and security groups: exact crossing list, all "allow", nothing open to 0.0.0.0/0, internet only on 443;
+  - flows cover every node;
+  - peak SLOs, with auth load = sign-in + refresh only;
+  - review = the two documented rules;
+  - removing mTLS fires `rule.missing-service-auth`; removing the vault gives `rule.secrets-in-config` info; a config password gives error;
+  - attack events with and without MFA / least privilege;
+  - layout bands and non-overlapping sibling groups.
+- New `src/registry/problems/identity-access/notes.test.ts` (3 checks): required sections and the three "do not imply" statements; every flow id, node name and protocol named; modelling gaps recorded.
+- Count updates 13 → 14 problems (registry size 121 → 122) in `registry.test.ts`, `problems.test.ts` (+ id), `references.test.ts`, `library.test.ts`, `ProblemBrowser.test.tsx` and `e2e/problems.spec.ts`. The generic reference and problem-content suites run on the new entry too.
+- Results: 1218 tests pass. `tsc -b`, `eslint .`, `prettier --check src docs e2e` and `vite build` are green (pre-existing chunk-size and dynamic-import warnings only). This ran on a Linux copy (macOS-native `node_modules`). e2e and a browser check were not run (count change only).
+
+Known gaps / follow-ups (not fixed; out of scope):
+
+- **`rule.secrets-in-config` false positive:** it flags any non-empty string config field whose key contains `token` or `password`, so the auth server's own `tokenFormat: 'jwt'` and `passwordHash: 'argon2id'` trip it as "Secret stored in config" (error). The sample leaves both at their defaults (the same values) and a test asserts the effective values. Fix: skip enum-typed schema fields, or match on values rather than key names (small rule change + test).
+- **Roles and permissions are not modelled:** no field for JWT claims, per-route or per-object policies, IAM policy documents or mTLS allow-lists, and the engine never returns 403. They live in labels, hints and NOTES.md. `leastPrivilege` is one board-wide switch.
+- **Managed services have no out ports.** The model can't draw:
+  - secrets-manager rotation updating the DB password;
+  - secrets manager or bucket → KMS (encryption at rest);
+  - policy evaluation inside managed services;
+  - audit logs.
+    Postgres has no at-rest-encryption / KMS-key field.
+- One gateway → auth edge stands for both the forwarded OIDC routes and the cached JWKS fetch. `flow_secret` steps IAM → secrets manager without an edge (the pod calls both).
+- One region; no cache in front of the Orders DB.
+
+Next suggested step: fix the `rule.secrets-in-config` key-name false positive (narrow rule change + tests), then consider an authorization-policy field (per edge or node) that a rule and the exfiltration attack could read, so user roles and service allow-lists become data instead of labels.
+
+Files touched: `src/registry/problems/identity-access/{index.ts, NOTES.md, notes.test.ts}` (new), `src/app/problems/identity-access-sample.test.ts` (new), `src/registry/README.md`, `src/registry/registry.test.ts`, `src/registry/problems/problems.test.ts`, `src/app/problems/references.test.ts`, `src/problems/library.test.ts`, `src/problems/ProblemBrowser.test.tsx`, `e2e/problems.spec.ts`, `docs/PROGRESS.md`.

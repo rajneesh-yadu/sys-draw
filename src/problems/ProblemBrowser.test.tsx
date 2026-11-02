@@ -43,8 +43,8 @@ describe('problem browser', () => {
   it('lists all problems (ten + the S22/S23/S24 sample boards) and filters by level, tag and company style', () => {
     const dlg = openBrowser();
     expect(dlg).toHaveAttribute('role', 'dialog');
-    expect(listed(dlg)).toHaveLength(13);
-    expect(within(dlg).getByTestId('problem-count')).toHaveTextContent('13 of 13 problems');
+    expect(listed(dlg)).toHaveLength(14);
+    expect(within(dlg).getByTestId('problem-count')).toHaveTextContent('14 of 14 problems');
 
     fireEvent.change(within(dlg).getByLabelText('Level'), { target: { value: '1' } });
     expect(listed(dlg)).toEqual(['rate-limiter', 'url-shortener']);
@@ -55,7 +55,7 @@ describe('problem browser', () => {
 
     fireEvent.change(within(dlg).getByLabelText('Tag'), { target: { value: 'cdn' } });
     expect(listed(dlg)).toEqual(['instagram']);
-    expect(within(dlg).getByTestId('problem-count')).toHaveTextContent('1 of 13 problems');
+    expect(within(dlg).getByTestId('problem-count')).toHaveTextContent('1 of 14 problems');
 
     fireEvent.change(within(dlg).getByLabelText('Tag'), { target: { value: 'video' } });
     expect(within(dlg).getByText('No problem matches these filters.')).toBeInTheDocument();
