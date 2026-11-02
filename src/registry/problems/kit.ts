@@ -36,6 +36,8 @@ export const STACK = {
   redis: ['tcp', 'tls13', 'resp'],
   cql: ['tcp', 'tls13', 'cql'],
   kafka: ['tcp', 'tls13', 'kafka-wire'],
+  /** Publisher → RabbitMQ (AMQPS). */
+  amqp: ['tcp', 'tls13', 'amqp'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type Stack = readonly string[];

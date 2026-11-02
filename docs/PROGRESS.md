@@ -968,3 +968,66 @@ Known gaps / follow-ups (engine semantics found during the audit; help describes
 Next suggested step: decide the engine semantics for the first four follow-ups (most likely: `scaling.replicas` fixed at 1 for single-writer, partitioned-managed and consensus components, with the config field as the only knob — a store/inspector + engine session with a migration for boards that set it), then update the matching help texts and tests.
 
 Files touched: `src/registry/scaling-help.ts` (new), `src/registry/scaling-help.test.ts` (new), all 38 `src/registry/components/*/*.ts`, `src/inspector/panels/scaling-help.ts` (new), `src/inspector/scaling-help.test.tsx` (new), `src/inspector/panels/NodePanel.tsx`, `src/registry/README.md`, `src/inspector/README.md`, `docs/PROGRESS.md`.
+
+## S24 (sample workflow) — Redis, Kafka, RabbitMQ & Kubernetes — 2026-11-02
+
+(Task id S24 is also used by the workspace-space session above; this entry is the messaging sample workflow.)
+
+What changed:
+
+- **One sample workflow, not four.** New registry entry `problem.sample-order-events`, "Sample workflow: Redis, Kafka & RabbitMQ on Kubernetes" (level 3; tags `sample`, `reference-board`, `kafka`, `rabbitmq`, `redis`, `kubernetes`, `messaging`, `event-driven`, `caching`, `work-queue`, `company:doordash`). It uses the S22 sample mechanism: open it with Problems → Tag "sample" (or any of the technology tags) → Start → "Reference solution". One food-order pipeline shows the four roles side by side, because the contrast is the lesson. Splitting them would have meant four near-duplicate boards with the same callers. No UI, engine, rule or schema code changed.
+- **Board:** 10 nodes, 10 edges, 6 groups. It reads left to right as a sandwich:
+  - customers → API gateway (DMZ);
+  - a `cluster` group in the middle row holding every workload (Orders API, order-status projector, notification dispatcher, receipt & push workers — all `compute.kubernetes` with autoscale);
+  - a data subnet above (Postgres HA, Redis);
+  - a private messaging subnet below (Kafka 3 brokers / 24 partitions / RF 3 / acks=all; RabbitMQ 3 nodes, quorum queue, persistent, publisher confirms, prefetch 20).
+- **Patterns shown:**
+  - Redis cache-aside for status polls, plus rate-limit counters.
+  - API commits to Postgres, then publishes `OrderPlaced` to Kafka (`kafka-wire`).
+  - Two Kafka consumer groups: a projector writes the status view into Redis; a dispatcher turns events into jobs on RabbitMQ (`amqp`), which competing workers drain.
+  - Kubernetes hosts and scales the stateless workloads and is explicitly not a request hop.
+- **Scenario, three flows:**
+  - status poll, 24k rps;
+  - place order through Kafka → dispatcher → RabbitMQ → workers, 3k rps;
+  - 2nd consumer group, projector → Redis, 3k events/s. This flow starts at the consumer: Kafka's lag model already gives every connected group every event, so routing it through Kafka would double-count there.
+- **Peak result (generic provider):**
+  - p99 is 94 ms for status and 123 ms for orders (rubric: < 150 / < 200 ms).
+  - Every node is ≤ 0.6 utilisation.
+  - Kafka has no lag in either group, and RabbitMQ has no backlog.
+  - Availability ≈ 99.999 %, cost ≈ $28k/month.
+  - The design review reports only `rule.single-region-data` and `rule.secrets-in-config` (info). Both are deliberate scope cuts, documented.
+- `NOTES.md` beside the entry is the companion. It covers:
+  - the main paths;
+  - one section per technology (why it's here, what connects with which protocol, key config, trade-offs and limits);
+  - a "Not interchangeable" table;
+  - known limits.
+- `problems/kit.ts`: `STACK.amqp` (additive; internal to the registry folder).
+
+Public APIs added: none. No existing API changed, no saved-format change, no migration.
+
+Tests:
+
+- New `src/app/problems/order-events-sample.test.ts` (8 checks):
+  - discoverable by `sample` and by each technology tag;
+  - loads in one step with its 3 flows;
+  - every edge legal with a valid stack;
+  - the four technologies are wired to real producers and consumers with the expected protocols (kafka-wire in, 2 consumer groups out; amqp in, one worker pool out; resp from API + projector);
+  - every compute node is Kubernetes inside the cluster group, with no compute → compute edge;
+  - flows walk the highlighted paths and cover every node;
+  - the peak run holds the SLOs with no broker backlog, both groups loaded and Redis hit rate > 0.9;
+  - the review reports exactly the two documented rules;
+  - the layout is legible (bands, no overlapping sibling group boxes).
+- New `src/registry/problems/order-events-messaging/notes.test.ts` (3 checks): section per technology, every flow id and application protocol named, TCP-only gap documented.
+- Count updates 12 → 13 problems (registry size 120 → 121) in `registry.test.ts`, `problems.test.ts` (+ id), `references.test.ts`, `library.test.ts`, `ProblemBrowser.test.tsx` and `e2e/problems.spec.ts`. The generic reference and problem-content suites run on the new entry too.
+- Results: 1194 tests pass. `tsc -b`, `eslint .`, `prettier --check src docs e2e` and `vite build` are green (pre-existing chunk-size and dynamic-import warnings only). This ran on a Linux copy (macOS-native `node_modules`). e2e and a browser check were not run (count change only).
+
+Known gaps / follow-ups (not fixed; out of scope):
+
+- **Broker → consumer edges carry only `tcp`.** `compute.kubernetes` (and `compute.app-server`) input ports don't list `kafka-wire`, `amqp` or `tls13`, so TCP is the only protocol shared with `messaging.kafka` / `messaging.rabbitmq` consumer ports, and the edge can't show SASL_SSL/AMQPS. Brokers and consumers share the private zone, so `rule.plaintext-edge` doesn't fire. Fix: add those protocols to the compute input ports (registry change + port tests), then switch these edges to `tcp/tls13/kafka-wire` and `tcp/tls13/amqp`.
+- **Kafka consumer parallelism uses the consumer node's replicas**, which for Kubernetes are worker nodes, not pods.
+- **A flow that passes through Kafka with op `read`** (a consumer-group fetch) is added to the queue's `servedRps`, so each group's lag is computed against produced + fetched messages. That's why the second group's flow starts at the consumer.
+- **Not modelled:** RabbitMQ dead-letter exchange / delayed retry, the outbox, and external e-mail/push providers.
+
+Next suggested step: a small registry session that adds `kafka-wire`, `amqp` and `tls13` to the compute input ports. Then update this sample's broker → consumer edges and its tests, which pin `['tcp']` on purpose so they flag the change.
+
+Files touched: `src/registry/problems/order-events-messaging/{index.ts, NOTES.md, notes.test.ts}` (new), `src/registry/problems/kit.ts`, `src/registry/README.md`, `src/app/problems/order-events-sample.test.ts` (new), `src/app/problems/references.test.ts`, `src/registry/problems/problems.test.ts`, `src/registry/registry.test.ts`, `src/problems/library.test.ts`, `src/problems/ProblemBrowser.test.tsx`, `e2e/problems.spec.ts`, `docs/PROGRESS.md`.

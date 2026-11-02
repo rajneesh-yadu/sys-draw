@@ -767,6 +767,88 @@ are clear per component, self-evident fields remain uncluttered, and existing be
 unchanged.
 ```
 
+**S24 · Focused messaging, cache, and Kubernetes workflows**
+
+```markdown
+TASK S24 — Create focused sample workflow(s) for Kafka, RabbitMQ, Redis, and Kubernetes.
+Read: docs/DATA-MODEL.md (Board, Graph, Scenario), docs/ARCHITECTURE.md,
+src/registry/components/{messaging,cache,compute}/, existing sample/reference boards, and
+the connection/protocol validation code.
+Build: the smallest useful set of loadable sample workflows that teaches how Kafka,
+RabbitMQ, Redis, and Kubernetes connect to other components and when each is used. Use one
+coherent workflow if it can show these roles clearly; split into multiple focused workflows
+when combining them would be artificial or obscure their distinct purposes. Center each
+workflow on the selected technologies rather than adding them as incidental nodes.
+Include realistic producers/callers and consumers/dependencies. Show practical patterns such
+as an application using Redis for low-latency cache or ephemeral state, publishing durable
+events to Kafka for independent consumer services, and sending work to RabbitMQ for competing
+workers/acknowledged task processing. Use Kubernetes where it meaningfully hosts or scales
+stateless application services or consumers, and make clear in the notes that it orchestrates
+workloads rather than acting as an ordinary request-processing dependency. Choose and explain
+the patterns that fit the sample workload; do not force every technology into every workflow.
+For each workflow, include concise companion notes that trace the main paths and explain why
+each focus component is present, what connects to it (and with which supported protocol),
+the use case, key configuration choices, and relevant trade-offs or limits. Explicitly teach
+the different roles of Kafka streams, RabbitMQ task queues, Redis, and Kubernetes; do not
+present them as interchangeable. Reuse existing component definitions and simulation
+behavior. Do not invent unsupported protocols, links, or behavior, and list missing support
+as a follow-up rather than broadening scope.
+Register the workflow(s) through the existing sample/reference-board mechanism so users can
+load and inspect them. Keep each graph valid, readable, and runnable with a scenario that
+exercises the highlighted paths.
+Tests: add or update focused coverage for sample registration, graph/protocol validity, and
+scenario execution. Run the relevant registry/sample checks, lint, and build.
+Out of scope: new component types, broad simulation changes, and redesigning existing sample
+boards or general sample-board templates.
+Done when: users can load the focused workflow(s), follow realistic connections into and out
+of each featured technology, understand its use case and trade-offs from the notes, and run
+the scenario successfully.
+```
+
+**S25 · Focused identity, access control, and secrets workflows**
+
+```markdown
+TASK S25 — Create focused sample workflow(s) for authentication, authorization, and secrets.
+Read: docs/DATA-MODEL.md (Board, Graph, Scenario), docs/NETWORK-SECURITY.md,
+docs/ARCHITECTURE.md, src/registry/components/security/, src/registry/components/network/,
+existing sample/reference boards, and the connection/protocol validation code.
+Build: the smallest useful set of loadable sample workflows that teaches how user
+authentication, service authorization/roles, an auth server, and secrets vaulting connect to
+the rest of an application. Use one coherent workflow if it explains the distinct roles
+clearly; split into multiple focused workflows if combining them would be artificial or
+confusing. Make identity and security the central teaching focus.
+Show a realistic user sign-in/token path through the auth server and API gateway to an
+application service, including where authentication happens and how services/gateways verify
+or use the resulting identity. Show authorization separately: explain how user roles or
+permissions govern access to application actions/data, and how workload IAM roles govern
+service-to-service access. Show secrets-manager/vault connections from workloads using their
+workload identity, and explain retrieval, rotation/audit where supported, and the role of KMS
+for encryption keys. Connect to representative protected resources (such as a database or
+internal service) so the access boundaries and purpose of each link are visible. Use only
+connections, protocols, and behaviors supported by the current registry and validation code.
+For each workflow, include concise companion notes tracing the user and service identity
+paths. Explain authentication vs authorization, user roles vs workload roles, why the auth
+server, gateway, IAM, secrets manager, and KMS are present, which component initiates each
+connection, and the key trust boundaries and practical use cases. Do not imply that a vault
+is a general database, that IAM replaces end-user authorization, or that every request must
+call the auth server if tokens can be verified locally. Use appropriate TLS/mTLS and security
+groups/zones where supported; do not include real credentials or secrets.
+Reuse existing component definitions and security review rules. Do not add new component
+types, unsupported behavior, or broad security-engine changes. If an important relationship
+cannot be represented in the current model, explain the limitation in the sample notes and
+record it as a follow-up rather than inventing semantics.
+Register the workflow(s) through the existing sample/reference-board mechanism. Keep graphs
+valid and readable, and provide a scenario that exercises the highlighted access paths.
+Tests: add or update focused coverage for sample registration, graph/protocol validity, and
+security findings or scenario behavior supported by the sample. Run relevant security,
+registry/sample checks, lint, and build.
+Out of scope: redesigning existing samples or templates, real credentials, and unrelated
+security or simulation features.
+Done when: users can load and run the sample workflow(s), trace how users and services get
+authenticated and authorized, understand how secrets are obtained and protected, and see
+which components connect at each boundary and why.
+```
+
 ## Templates
 
 Use these for everything after the 21 build sessions; each is a complete session prompt once the blanks are filled.

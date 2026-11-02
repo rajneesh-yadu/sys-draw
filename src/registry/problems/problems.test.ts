@@ -19,10 +19,11 @@ const EXPECTED = [
   'problem.payment-system',
   'problem.sample-ecommerce', // S22 sample reference board
   'problem.antipattern-patient-portal', // S23 anti-pattern sample board
+  'problem.sample-order-events', // S24 sample workflow (Redis, Kafka, RabbitMQ, Kubernetes)
 ];
 
 describe('problem library content (S17)', () => {
-  it('ships the ten problems from basic to expert, plus the S22/S23 sample boards', () => {
+  it('ships the ten problems from basic to expert, plus the S22/S23/S24 sample boards', () => {
     expect(problems.map((p) => p.id).sort()).toEqual([...EXPECTED].sort());
     const levels = new Set(problems.map((p) => p.level));
     expect([...levels].sort()).toEqual([1, 2, 3, 4, 5]);
