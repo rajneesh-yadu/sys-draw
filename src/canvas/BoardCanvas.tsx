@@ -3,6 +3,7 @@ import {
   Background,
   BackgroundVariant,
   ConnectionLineType,
+  ControlButton,
   Controls,
   MiniMap,
   Panel,
@@ -15,6 +16,7 @@ import {
   type OnNodeDrag,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { Map as MapIcon } from 'lucide-react';
 import './canvas.css';
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { registry } from '@/registry';
@@ -100,8 +102,26 @@ function applySelection(current: readonly string[], changes: readonly (NodeChang
   return touched ? [...sel] : null;
 }
 
-/** The interactive board: renders the store's graph and turns gestures into store commands. */
-export function BoardCanvas() {
+/**
+ * The interactive board: renders the store's graph and turns gestures into store commands.
+ *
+ * S24: the minimap can be hidden (toggle in the zoom controls, bottom-left; while hidden a
+ * "Show minimap" button sits where it was). Pass `minimap` + `onMinimapChange` to control (and
+ * persist) it; otherwise the canvas keeps its own state (shown by default).
+ */
+export function BoardCanvas({
+  minimap,
+  onMinimapChange,
+}: { minimap?: boolean; onMinimapChange?: (visible: boolean) => void } = {}) {
+  const [ownMinimap, setOwnMinimap] = useState(true);
+  const minimapVisible = minimap ?? ownMinimap;
+  const setMinimapVisible = useCallback(
+    (visible: boolean) => {
+      if (minimap === undefined) setOwnMinimap(visible);
+      onMinimapChange?.(visible);
+    },
+    [minimap, onMinimapChange],
+  );
   const store = useBoardStoreApi();
   const doc = useBoardStore((s) => s.doc);
   const selection = useBoardStore((s) => s.selection);
@@ -361,14 +381,50 @@ export function BoardCanvas() {
         fitViewOptions={FIT_VIEW_OPTIONS}
       >
         <CanvasBackground />
-        <Controls position="bottom-left" />
-        <MiniMap
-          position="bottom-right"
-          pannable
-          zoomable
-          nodeColor={(n) => (n.type === 'sdGroup' ? 'rgba(148,163,184,0.25)' : '#0ea5e9')}
-          nodeStrokeColor={(n) => (n.type === 'sdGroup' ? '#94a3b8' : '#0369a1')}
-        />
+        <Controls position="bottom-left">
+          <ControlButton
+            onClick={() => setMinimapVisible(!minimapVisible)}
+            aria-pressed={minimapVisible}
+            aria-controls={minimapVisible ? 'board-minimap' : undefined}
+            aria-label={minimapVisible ? 'Hide minimap' : 'Show minimap'}
+            title={minimapVisible ? 'Hide minimap' : 'Show minimap'}
+            data-testid="minimap-toggle"
+          >
+            {/* React Flow fills control icons; lucide icons are stroke-only. */}
+            <MapIcon aria-hidden style={{ fill: 'none' }} />
+          </ControlButton>
+        </Controls>
+        {minimapVisible ? (
+          <MiniMap
+            id="board-minimap"
+            position="bottom-right"
+            pannable
+            zoomable
+            ariaLabel="Minimap"
+            nodeColor={(n) => (n.type === 'sdGroup' ? 'rgba(148,163,184,0.25)' : '#0ea5e9')}
+            nodeStrokeColor={(n) => (n.type === 'sdGroup' ? '#94a3b8' : '#0369a1')}
+          />
+        ) : (
+          <Panel position="bottom-right">
+            <button
+              type="button"
+              onClick={(e) => {
+                // The button goes away; keep keyboard focus on the toggle in the controls.
+                const root = e.currentTarget.closest('.react-flow');
+                setMinimapVisible(true);
+                requestAnimationFrame(() =>
+                  root?.querySelector<HTMLElement>('[data-testid="minimap-toggle"]')?.focus(),
+                );
+              }}
+              data-testid="minimap-show"
+              title="Show the minimap (also in the zoom controls, bottom-left)"
+              className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              <MapIcon size={14} aria-hidden />
+              Show minimap
+            </button>
+          </Panel>
+        )}
         <Panel position="top-left">
           <Toolbar
             canUndo={canUndo}

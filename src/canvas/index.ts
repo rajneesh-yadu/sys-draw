@@ -11,6 +11,18 @@ export { computeAutoLayout } from './layout';
 export { shortcutFor, SHORTCUT_HELP, type ShortcutAction } from './shortcuts';
 // S15 — request trace (the app's runner fills the store; the canvas animates and lists it)
 export { TracePanel } from './trace/TracePanel';
+// S24 — request trace width (pure helpers; the app persists the size)
+export {
+  clampTraceWidth,
+  traceWidthCss,
+  resizeTraceByKey,
+  DEFAULT_TRACE_SIZE,
+  TRACE_DEFAULT_WIDTH,
+  TRACE_MIN_WIDTH,
+  TRACE_MAX_WIDTH,
+  TRACE_MAX_SHARE,
+  type TraceSize,
+} from './trace/trace-size';
 export { useTraceStore, useTraceStoreApi } from './trace/context';
 export {
   createTraceStore,

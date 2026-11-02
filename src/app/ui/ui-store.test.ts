@@ -132,3 +132,62 @@ describe('theme (S21)', () => {
     expect(el.dataset.theme).toBe('light');
   });
 });
+
+describe('ui prefs (S24: inspector, minimap, trace width)', () => {
+  it('prefs saved before S24 still load, keeping every choice and defaulting the new fields', () => {
+    const s21 = {
+      schemaVersion: 1,
+      theme: 'dark',
+      projectsCollapsed: true,
+      paletteCollapsed: false,
+      metricsHeightPx: 300,
+      metricsMaximized: false,
+    };
+    expect(parseUiPrefs(JSON.stringify(s21))).toEqual({
+      ...s21,
+      inspectorCollapsed: false,
+      minimapVisible: true,
+      traceWidthPx: 384,
+      traceExpanded: false,
+    });
+  });
+
+  it('rejects out-of-range trace widths like any invalid pref', () => {
+    expect(parseUiPrefs(JSON.stringify({ ...DEFAULT_UI_PREFS, traceWidthPx: 10 }))).toEqual(
+      DEFAULT_UI_PREFS,
+    );
+  });
+
+  it('persists inspector, minimap and trace size; clamps the width', () => {
+    const storage = memoryStorage();
+    const ui = createUiStore({ storage });
+    const st = ui.getState();
+    st.setInspectorCollapsed(true);
+    st.setMinimapVisible(false);
+    st.setTraceWidth(99_999);
+    st.setTraceExpanded(true);
+    expect(ui.getState().prefs).toMatchObject({
+      inspectorCollapsed: true,
+      minimapVisible: false,
+      traceWidthPx: 2000,
+      traceExpanded: true,
+    });
+    ui.getState().setTraceWidth(1);
+    expect(ui.getState().prefs.traceWidthPx).toBe(320);
+    const reloaded = createUiStore({ storage });
+    expect(reloaded.getState().prefs).toMatchObject({
+      inspectorCollapsed: true,
+      minimapVisible: false,
+      traceWidthPx: 320,
+      traceExpanded: true,
+    });
+    expect(JSON.parse(storage.data[UI_PREFS_KEY] ?? '{}').schemaVersion).toBe(1);
+  });
+
+  it('the left-panel toggle leaves the Inspector alone', () => {
+    const ui = createUiStore({ storage: null, initial: { inspectorCollapsed: true } });
+    ui.getState().toggleLeftPanels();
+    ui.getState().toggleLeftPanels();
+    expect(ui.getState().prefs.inspectorCollapsed).toBe(true);
+  });
+});

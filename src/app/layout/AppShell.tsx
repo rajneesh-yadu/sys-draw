@@ -5,11 +5,13 @@ import {
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   Search,
   Shapes,
   Sun,
 } from 'lucide-react';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useStore } from 'zustand';
 import {
   BoardCanvas,
@@ -79,6 +81,8 @@ import { ErrorBoundary } from './ErrorBoundary';
  * S21: theme (top bar), collapsible Projects / Palette (left rail, Ctrl/⌘+B), resizable and
  * maximisable metrics drawer, command palette (Ctrl/⌘+K), shortcut sheet (?), and an error
  * boundary around every region. `uiStore` (optional) is for tests; preferences persist per browser.
+ * S24: collapsible Inspector (right rail), hideable minimap, resizable request trace — all three
+ * persisted with the other view preferences.
  */
 export function AppShell({
   autosave,
@@ -108,6 +112,13 @@ export function AppShell({
   const metricsSize = useMemo(
     () => ({ heightPx: prefs.metricsHeightPx, maximized: prefs.metricsMaximized }),
     [prefs.metricsHeightPx, prefs.metricsMaximized],
+  );
+  const traceSize = useMemo(
+    () => ({ widthPx: prefs.traceWidthPx, expanded: prefs.traceExpanded }),
+    [prefs.traceWidthPx, prefs.traceExpanded],
+  );
+  const { hideRef: inspectorHideRef, showRef: inspectorShowRef } = useCollapseFocus(
+    prefs.inspectorCollapsed,
   );
 
   return (
@@ -177,11 +188,21 @@ export function AppShell({
                       className="relative min-h-0 min-w-0 flex-1"
                     >
                       <ErrorBoundary name="Canvas" resetKey={activeBoardId}>
-                        <BoardCanvas />
+                        <BoardCanvas
+                          minimap={prefs.minimapVisible}
+                          onMinimapChange={(visible) => ui.getState().setMinimapVisible(visible)}
+                        />
                       </ErrorBoundary>
                     </main>
                     <ErrorBoundary name="Side panel" resetKey={activeBoardId} compact>
-                      <TracePanel />
+                      <TracePanel
+                        size={traceSize}
+                        onSizeChange={(next) => {
+                          const st = ui.getState();
+                          st.setTraceWidth(next.widthPx);
+                          st.setTraceExpanded(next.expanded);
+                        }}
+                      />
                       <SecurityPanel />
                       <FindingsPanel />
                       <ModePanelWithNotices />
@@ -207,15 +228,33 @@ export function AppShell({
                 </div>
 
                 <aside
+                  id="region-inspector"
                   aria-label="Inspector"
                   data-testid="region-inspector"
+                  data-collapsed={prefs.inspectorCollapsed ? 'true' : undefined}
+                  hidden={prefs.inspectorCollapsed}
                   className="w-72 shrink-0 overflow-y-auto border-l border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
                 >
-                  <PanelHeader title="Inspector" />
+                  <PanelHeader title="Inspector">
+                    <button
+                      ref={inspectorHideRef}
+                      type="button"
+                      className={headerBtn}
+                      onClick={() => ui.getState().setInspectorCollapsed(true)}
+                      aria-label="Hide Inspector"
+                      aria-expanded
+                      aria-controls="region-inspector"
+                      title="Hide Inspector (gives the canvas more room; bring it back from the right edge)"
+                      data-testid="inspector-hide"
+                    >
+                      <PanelRightClose size={14} aria-hidden />
+                    </button>
+                  </PanelHeader>
                   <ErrorBoundary name="Inspector" resetKey={activeBoardId}>
                     <Inspector />
                   </ErrorBoundary>
                 </aside>
+                {prefs.inspectorCollapsed && <RightRail showRef={inspectorShowRef} />}
               </div>
             </div>
             <Overlays
@@ -367,6 +406,64 @@ function LeftRail() {
           <PanelLeftOpen size={16} aria-hidden />
         </button>
       )}
+    </nav>
+  );
+}
+
+/**
+ * S24: keeps keyboard focus when a panel collapses or expands — the button that was clicked goes
+ * away, so focus moves to the one that undoes it (only if focus was actually lost).
+ */
+function useCollapseFocus(collapsed: boolean) {
+  const hideRef = useRef<HTMLButtonElement>(null);
+  const showRef = useRef<HTMLButtonElement>(null);
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    // Lost = on <body>, detached, or still on something inside a now-hidden region (the button
+    // that was just clicked, in browsers that don't blur hidden elements).
+    const active = document.activeElement;
+    const lost =
+      !active || active === document.body || !active.isConnected || !!active.closest('[hidden]');
+    if (lost) (collapsed ? showRef : hideRef).current?.focus();
+  }, [collapsed]);
+  return { hideRef, showRef };
+}
+
+/**
+ * S24: the rail the Inspector collapses into (right edge, shown only while it is collapsed): one
+ * button that brings it back, labelled so it is easy to spot.
+ */
+function RightRail({ showRef }: { showRef: RefObject<HTMLButtonElement | null> }) {
+  const ui = useUiStoreApi();
+  return (
+    <nav
+      aria-label="Collapsed right panel"
+      data-testid="right-rail"
+      className="flex w-10 shrink-0 flex-col items-center gap-1 border-l border-slate-200 bg-slate-100 py-2 dark:border-slate-800 dark:bg-slate-950"
+    >
+      <button
+        ref={showRef}
+        type="button"
+        className={railBtn}
+        onClick={() => ui.getState().setInspectorCollapsed(false)}
+        aria-label="Show Inspector"
+        aria-expanded={false}
+        aria-controls="region-inspector"
+        title="Show Inspector"
+        data-testid="inspector-show"
+      >
+        <PanelRightOpen size={16} aria-hidden />
+      </button>
+      <span
+        aria-hidden
+        className="mt-1 text-[10px] font-semibold tracking-wide text-slate-500 uppercase [writing-mode:vertical-rl] dark:text-slate-400"
+      >
+        Inspector
+      </span>
     </nav>
   );
 }

@@ -869,3 +869,40 @@ Known gaps:
 Next suggested step: add the follow-up rules above (gateway config, bucket public access/encryption, plaintext DB in-zone) as narrowly scoped registry rules with tests, then let samples carry their own scenario per board.
 
 Files touched: `src/registry/problems/antipattern-patient-portal/{index.ts, NOTES.md, notes.test.ts}` (new), `src/app/problems/antipattern-board.test.ts` (new), `src/app/problems/{references.test.ts, sample-board.test.ts}`, `src/registry/problems/problems.test.ts`, `src/registry/registry.test.ts`, `src/problems/{library.test.ts, ProblemBrowser.test.tsx}`, `e2e/problems.spec.ts`, `src/registry/README.md`, `docs/PROGRESS.md`.
+
+## S24 — Workspace space: collapsible Inspector, hideable minimap, resizable request trace — 2026-11-02
+
+**Scope assessment (given before building): local layout/control changes, no workspace redesign.** S21 already had the patterns: a rail for collapsed panels, a resizable drawer with a keyboard splitter, and versioned UI prefs. So the existing workflow and layout are unchanged unless the user collapses or resizes something.
+
+What changed:
+
+- **Inspector collapse (c)** (app only). "Hide Inspector" button in its header. While collapsed, a 40 px right rail shows "Show Inspector" with a vertical "Inspector" label (`aria-expanded` / `aria-controls`). Keyboard focus moves to the restore button and back (`useCollapseFocus`; only when focus was lost, including browsers that keep focus on a hidden button). There is also a command-palette command, "Collapse / Expand Inspector panel". Ctrl/⌘+B still toggles only the left panels. Collapsing gives the canvas +248 px (measured: 288 → 536 px at 1024 wide; 1184 → 1432 px at 1920 wide).
+- **Minimap hide/show (d)** (canvas). A map button in the React Flow zoom controls (bottom-left) is always present: `aria-pressed`, labelled "Hide minimap" / "Show minimap". While the minimap is hidden, a "Show minimap" button sits where it was (bottom-right). Clicking that button moves focus to the controls toggle. There is also a palette command, "Hide / Show minimap".
+- **Resizable request trace (e)** (canvas). A vertical separator on the panel's left edge works with the pointer (drag, with pointer capture) and the keyboard (←/→ 24 px, Page Up/Down 120 px, Home = minimum, End = expanded, Enter or double-click = toggle expanded), following the WAI-ARIA window-splitter pattern with `aria-valuenow`/`valuetext`. An Expand / Restore button sits in the header. CSS width is `min(stored px, 70%)` of the row beside the canvas, so the canvas keeps ≥ 30 % at any viewport. The minimum is `min(320px, 70%)`; the stored width is clamped to 320–2000. There is also a palette command, "Expand / Restore Request trace", which opens the trace if it is closed. The sequence diagram's lifelines spread with the width.
+- **Persistence**: the app already had an appropriate mechanism (S21 `sysdraw.ui` localStorage prefs, Zod, `schemaVersion` 1), so the four choices persist there: `inspectorCollapsed`, `minimapVisible`, `traceWidthPx`, `traceExpanded`. The new fields are `.default(...)`, so prefs saved before S24 load with every earlier choice kept, and the version stays 1 (additive). None of this is in the workspace/board file, so there is no migration.
+
+Public APIs added (all additive and optional; nothing existing changed):
+
+- `canvas`: `BoardCanvas` optional `minimap?` / `onMinimapChange?`; `TracePanel` optional `size?` / `onSizeChange?`; exports `TraceSize`, `clampTraceWidth`, `traceWidthCss`, `resizeTraceByKey`, `DEFAULT_TRACE_SIZE`, `TRACE_DEFAULT_WIDTH`, `TRACE_MIN_WIDTH`, `TRACE_MAX_WIDTH`, `TRACE_MAX_SHARE`. With no props, both components keep their own state, defaulting to the previous behaviour: minimap shown, 384 px trace.
+- `app` (internal): `UiState.setInspectorCollapsed`, `setMinimapVisible`, `setTraceWidth`, `setTraceExpanded`; `UiPrefs` gains the four fields above.
+
+Tests: 39 added (1161 total), all passing.
+
+- `canvas/trace/trace-size.test.tsx` (3 helper tests; 5 panel tests: separator semantics, keyboard, pointer drag with clamp and drag-end, Expand button and double-click, size kept across close/reopen).
+- `canvas/minimap.test.tsx` (hide → both restore points → show; focus hand-off; controlled mode).
+- `app/ui/ui-store.test.ts` (4: pre-S24 prefs load with defaults; invalid width rejected; persist + clamp; Ctrl+B leaves Inspector alone).
+- `app/layout/AppShell.s24.test.tsx` (4: rail + focus round-trip, restored-collapsed on load, minimap pref, trace size pref).
+- `app/commands/commands.test.ts` (1).
+
+`tsc -b`, `eslint .`, `prettier --check src docs e2e` and `pnpm build` are green (pre-existing chunk-size and dynamic-import warnings only). Checked in headless Chromium on the built app (`?fixture=perf-300`) at 1024×700 and 1920×1080: Inspector hide moves focus to "Show Inspector"; minimap hides and comes back; dragging the trace edge far left stops at 70 % of the row (375 px of 536 at 1024; 1002 of 1432 at 1920); Home → 320 px; all four prefs survive a reload; no page errors. A lucide icon in React Flow's controls rendered as a filled blob, so it now sets `fill: none`.
+
+Known gaps:
+
+- **At narrow viewports with everything open the canvas is still tight.** At 1024 px with Projects, Palette, Inspector and an expanded trace, the canvas keeps 30 % of a 536 px row (≈ 160 px). Collapsing panels is the remedy; there is no automatic collapse by breakpoint.
+- The other right-hand panels (Security, Review, Mode) are still fixed width. They could reuse `trace-size.ts` if wanted.
+- There is no dedicated keyboard shortcut for the Inspector or minimap (command palette only), to avoid browser-reserved combos. The rail and controls buttons are tab-reachable.
+- e2e not added; checks above were a one-off Playwright script. Tests, build and the browser check ran on a Linux copy (macOS-native `node_modules`). `.s24tmp/` (built `dist` tarball) is left at the repo root because deletes are blocked. It is git-ignored and safe to delete.
+
+Next suggested step: an e2e spec for the three controls (including real pointer drag and focus order). Optionally, breakpoint-based auto-collapse of the Inspector below ~1100 px, and the same resize handle for Security/Review panels.
+
+Files touched: `src/canvas/{BoardCanvas.tsx, index.ts, README.md, minimap.test.tsx (new)}`, `src/canvas/trace/{TracePanel.tsx, trace-size.ts (new), trace-size.test.tsx (new)}`, `src/app/layout/{AppShell.tsx, AppShell.s24.test.tsx (new)}`, `src/app/ui/{ui-store.ts, ui-store.test.ts}`, `src/app/commands/{commands.ts, commands.test.ts}`, `src/app/README.md`, `docs/PROGRESS.md`.

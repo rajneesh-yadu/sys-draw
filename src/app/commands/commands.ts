@@ -240,6 +240,32 @@ export function buildCommands(deps: CommandDeps): AppCommand[] {
       keywords: 'expand bigger failures over time chart drawer',
       run: () => ui.getState().setMetricsMaximized(!ui.getState().prefs.metricsMaximized),
     },
+    {
+      id: 'panels.inspector',
+      title: u.prefs.inspectorCollapsed ? 'Expand Inspector panel' : 'Collapse Inspector panel',
+      group: 'Panels',
+      keywords: 'properties config sidebar hide show right',
+      run: () => ui.getState().setInspectorCollapsed(!ui.getState().prefs.inspectorCollapsed),
+    },
+    {
+      id: 'panels.minimap',
+      title: u.prefs.minimapVisible ? 'Hide minimap' : 'Show minimap',
+      group: 'Panels',
+      keywords: 'overview map canvas navigator',
+      run: () => ui.getState().setMinimapVisible(!ui.getState().prefs.minimapVisible),
+    },
+    {
+      id: 'panels.trace-width',
+      title: u.prefs.traceExpanded ? 'Restore Request trace width' : 'Expand Request trace',
+      group: 'Panels',
+      keywords: 'trace wider bigger network sequence resize',
+      run: () => {
+        const expand = !ui.getState().prefs.traceExpanded;
+        ui.getState().setTraceExpanded(expand);
+        // Expanding a closed trace would do nothing visible: open it too.
+        if (expand) deps.trace?.getState().setOpen(true);
+      },
+    },
   );
 
   // Go to board

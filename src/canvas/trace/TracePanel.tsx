@@ -1,11 +1,30 @@
-import { ChevronLeft, ChevronRight, Pause, Play, RotateCcw, X } from 'lucide-react';
-import { useEffect, useMemo } from 'react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Maximize2,
+  Minimize2,
+  Pause,
+  Play,
+  RotateCcw,
+  X,
+} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { USER_REGIONS } from '@/registry';
 import { formatMs, formatPercent, useBoardStore } from '@/store';
 import { traceColor } from './colors';
 import { useTraceStore, useTraceStoreApi } from './context';
 import { breakdownShares, elapsedAt, layerTag, sequenceLayout, STEP_INTERVAL_MS } from './sequence';
 import { currentTraceStep, type TraceView, type TraceWarmth } from './trace-store';
+import {
+  clampTraceWidth,
+  DEFAULT_TRACE_SIZE,
+  resizeTraceByKey,
+  traceMinWidthCss,
+  traceWidthCss,
+  TRACE_MAX_WIDTH,
+  TRACE_MIN_WIDTH,
+  type TraceSize,
+} from './trace-size';
 
 const btn =
   'inline-flex items-center gap-1 rounded px-1.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-transparent focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none dark:text-slate-200 dark:hover:bg-slate-800';
@@ -39,11 +58,32 @@ const warmthValue = (w: TraceWarmth) =>
 /**
  * Request trace side panel (S15): pick a flow, user region and cold/warm connections; step
  * through one request as a sequence diagram while the canvas animates each packet on its edge.
+ *
+ * S24: the panel can be widened to read the network activity in detail — drag its left edge,
+ * or focus that edge and use ←/→, Page Up/Down, Home/End (Enter or double-click toggles
+ * "expanded"), or use the Expand button. It never takes more than 70 % of the row, so the canvas
+ * stays usable. Pass `size` + `onSizeChange` to control (and persist) it; otherwise it keeps its
+ * own size.
  */
-export function TracePanel() {
+export function TracePanel({
+  size,
+  onSizeChange,
+}: {
+  size?: TraceSize;
+  onSizeChange?: (size: TraceSize) => void;
+} = {}) {
   const api = useTraceStoreApi();
   const open = useTraceStore((s) => s.open);
   const playing = useTraceStore((s) => s.playing);
+  const [ownSize, setOwnSize] = useState<TraceSize>(DEFAULT_TRACE_SIZE);
+  const current = size ?? ownSize;
+  const setSize = (next: TraceSize) => {
+    const clamped = { ...next, widthPx: clampTraceWidth(next.widthPx) };
+    if (!size) setOwnSize(clamped);
+    onSizeChange?.(clamped);
+  };
+  const panel = useRef<HTMLElement>(null);
+  const drag = useRef<{ startX: number; startW: number } | null>(null);
 
   useEffect(() => {
     if (!playing) return;
@@ -53,12 +93,66 @@ export function TracePanel() {
   }, [playing, api]);
 
   if (!open) return null;
+
+  // Start from the rendered width, so a capped or expanded panel resizes from what you see.
+  const measured = () => panel.current?.getBoundingClientRect().width || current.widthPx;
+  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    drag.current = { startX: e.clientX, startW: measured() };
+  };
+  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d) return;
+    // The handle is on the left edge: dragging left (smaller clientX) widens the panel.
+    setSize({ widthPx: d.startW + (d.startX - e.clientX), expanded: false });
+  };
+  const onPointerUp = (e: PointerEvent<HTMLDivElement>) => {
+    drag.current = null;
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
+  };
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const next = resizeTraceByKey(e.key, { ...current, widthPx: measured() });
+    if (!next) return;
+    e.preventDefault();
+    setSize(next);
+  };
+  const toggleExpanded = () => setSize({ ...current, expanded: !current.expanded });
+  const widthPx = Math.round(clampTraceWidth(current.widthPx));
+
   return (
     <aside
+      ref={panel}
+      id="trace-panel"
       aria-label="Request trace"
       data-testid="trace-panel"
-      className="flex h-full w-96 flex-col overflow-hidden border-l border-slate-200 bg-white text-slate-800 shadow-lg dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+      data-expanded={current.expanded ? 'true' : undefined}
+      style={{ width: traceWidthCss(current), minWidth: traceMinWidthCss() }}
+      className="relative flex h-full shrink-0 flex-col overflow-hidden border-l border-slate-200 bg-white text-slate-800 shadow-lg dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
     >
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize request trace"
+        aria-controls="trace-panel"
+        aria-valuemin={TRACE_MIN_WIDTH}
+        aria-valuemax={TRACE_MAX_WIDTH}
+        aria-valuenow={widthPx}
+        aria-valuetext={current.expanded ? 'Expanded' : `${widthPx} pixels wide`}
+        tabIndex={0}
+        data-testid="trace-resize"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onDoubleClick={toggleExpanded}
+        onKeyDown={onKeyDown}
+        title="Drag to resize (double-click to expand; ←/→ with the keyboard)"
+        className="group absolute inset-y-0 left-0 z-10 flex w-2 cursor-col-resize touch-none items-center justify-center focus-visible:outline-none"
+      >
+        <span className="h-10 w-1 rounded-full bg-slate-300 group-hover:bg-sky-400 group-focus-visible:bg-sky-500 dark:bg-slate-700" />
+      </div>
       <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-2 dark:border-slate-800">
         <h2 className="text-xs font-semibold tracking-wide text-slate-500 dark:text-slate-400 uppercase">
           Request trace
@@ -66,6 +160,23 @@ export function TracePanel() {
         <button
           type="button"
           className={`${btn} ml-auto`}
+          onClick={toggleExpanded}
+          aria-pressed={current.expanded}
+          aria-label={current.expanded ? 'Restore request trace width' : 'Expand request trace'}
+          title={
+            current.expanded ? 'Restore width' : 'Expand (or drag the left edge to choose a width)'
+          }
+          data-testid="trace-expand"
+        >
+          {current.expanded ? (
+            <Minimize2 aria-hidden className="h-3.5 w-3.5" />
+          ) : (
+            <Maximize2 aria-hidden className="h-3.5 w-3.5" />
+          )}
+        </button>
+        <button
+          type="button"
+          className={btn}
           onClick={() => api.getState().setOpen(false)}
           aria-label="Close request trace"
         >

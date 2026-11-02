@@ -703,6 +703,16 @@ canvas performance pass to 300 nodes at 60 fps, empty states, error boundaries.
 on below points (a,b) first tell user how much change is required, is it just few UI changes or it requires overall redesign
 a. make the PROJECTS and PALLETE section collapsible to left side
 b. make the METRICS section expandable to upper side for better view, since FAILURES OVER TIMES section is below that 
+c. make the INSPECTOR tab collapsible so the main canvas and workflow have more visible space
+d. make the canvas minimap hideable, with a clear way to show it again
+e. make the REQUEST TRACE box adjustable/resizable so users can enlarge it to inspect network activity in more detail
+
+Before implementation, assess whether these are localized layout/control changes or need
+an overall workspace redesign, and tell the user the estimated scope. Preserve the current
+workflow when local changes are sufficient. Make panel states easy to discover and
+restore; keep resizing usable with keyboard and pointer, and constrain dimensions so the
+canvas and trace remain usable at narrow and wide viewports. Persist these view preferences
+only if the existing app already has an appropriate preference mechanism.
 
 Done when: Lighthouse accessibility >= 90; perf test with 300-node fixture passes.
 ```

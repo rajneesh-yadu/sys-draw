@@ -134,6 +134,26 @@ describe('buildCommands (S21)', () => {
     expect(ui.getState().shortcutsOpen).toBe(true);
   });
 
+  it('S24: collapses the Inspector, hides the minimap, expands the trace (opening it)', () => {
+    const { build, ui, trace } = setup();
+    expect(cmd(build(), 'panels.inspector').title).toBe('Collapse Inspector panel');
+    cmd(build(), 'panels.inspector').run();
+    expect(ui.getState().prefs.inspectorCollapsed).toBe(true);
+    expect(cmd(build(), 'panels.inspector').title).toBe('Expand Inspector panel');
+    expect(cmd(build(), 'panels.minimap').title).toBe('Hide minimap');
+    cmd(build(), 'panels.minimap').run();
+    expect(ui.getState().prefs.minimapVisible).toBe(false);
+    expect(cmd(build(), 'panels.minimap').title).toBe('Show minimap');
+    expect(trace.getState().open).toBe(false);
+    cmd(build(), 'panels.trace-width').run();
+    expect(ui.getState().prefs.traceExpanded).toBe(true);
+    expect(trace.getState().open).toBe(true);
+    expect(cmd(build(), 'panels.trace-width').title).toBe('Restore Request trace width');
+    cmd(build(), 'panels.trace-width').run();
+    expect(ui.getState().prefs.traceExpanded).toBe(false);
+    expect(trace.getState().open).toBe(true); // restoring the width doesn't close it
+  });
+
   it('runs the simulation and loads the perf board', () => {
     const { build, simulation, board, notify } = setup();
     const before = simulation.getState().runRequests;

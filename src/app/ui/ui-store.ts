@@ -1,6 +1,9 @@
 /**
  * S21: per-browser UI preferences (theme, collapsed side panels, metrics drawer size) plus the
  * transient open state of the command palette and the shortcut sheet.
+ * S24: collapsed Inspector, minimap visibility and request-trace width. These fields are optional
+ * in stored JSON (`.default`), so prefs saved before S24 still load with every choice kept; the
+ * version stays 1 because the change is additive.
  *
  * Preferences live in localStorage under `sysdraw.ui` as versioned JSON (`schemaVersion` 1,
  * Zod-validated). They are a view setting, not part of the workspace file, so they are never
@@ -14,6 +17,7 @@ import {
   DRAWER_MAX_HEIGHT,
   DRAWER_MIN_HEIGHT,
 } from '@/metrics-ui';
+import { clampTraceWidth, TRACE_DEFAULT_WIDTH, TRACE_MAX_WIDTH, TRACE_MIN_WIDTH } from '@/canvas';
 
 export const UI_PREFS_KEY = 'sysdraw.ui';
 export const UI_PREFS_VERSION = 1;
@@ -32,6 +36,15 @@ export const UiPrefsSchema = z.object({
   paletteCollapsed: z.boolean(),
   metricsHeightPx: z.number().int().min(METRICS_MIN_HEIGHT).max(METRICS_MAX_HEIGHT),
   metricsMaximized: z.boolean(),
+  inspectorCollapsed: z.boolean().default(false),
+  minimapVisible: z.boolean().default(true),
+  traceWidthPx: z
+    .number()
+    .int()
+    .min(TRACE_MIN_WIDTH)
+    .max(TRACE_MAX_WIDTH)
+    .default(TRACE_DEFAULT_WIDTH),
+  traceExpanded: z.boolean().default(false),
 });
 export type UiPrefs = z.infer<typeof UiPrefsSchema>;
 
@@ -42,6 +55,10 @@ export const DEFAULT_UI_PREFS: UiPrefs = {
   paletteCollapsed: false,
   metricsHeightPx: DRAWER_DEFAULT_HEIGHT,
   metricsMaximized: false,
+  inspectorCollapsed: false,
+  minimapVisible: true,
+  traceWidthPx: TRACE_DEFAULT_WIDTH,
+  traceExpanded: false,
 };
 
 /** The subset of `Storage` we use (so tests can pass a fake, and SSR/no-storage still works). */
@@ -87,6 +104,10 @@ export interface UiState {
   toggleLeftPanels(): void;
   setMetricsHeight(px: number): void;
   setMetricsMaximized(maximized: boolean): void;
+  setInspectorCollapsed(collapsed: boolean): void;
+  setMinimapVisible(visible: boolean): void;
+  setTraceWidth(px: number): void;
+  setTraceExpanded(expanded: boolean): void;
   setCommandPaletteOpen(open: boolean): void;
   setShortcutsOpen(open: boolean): void;
 }
@@ -125,6 +146,10 @@ export function createUiStore(
       },
       setMetricsHeight: (px) => patch({ metricsHeightPx: clampDrawerHeight(px) }),
       setMetricsMaximized: (metricsMaximized) => patch({ metricsMaximized }),
+      setInspectorCollapsed: (inspectorCollapsed) => patch({ inspectorCollapsed }),
+      setMinimapVisible: (minimapVisible) => patch({ minimapVisible }),
+      setTraceWidth: (px) => patch({ traceWidthPx: clampTraceWidth(px) }),
+      setTraceExpanded: (traceExpanded) => patch({ traceExpanded }),
       setCommandPaletteOpen: (commandPaletteOpen) =>
         set(
           commandPaletteOpen
