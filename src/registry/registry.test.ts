@@ -95,7 +95,7 @@ const S19_RULES = [
 describe('seeded registry', () => {
   const all = registry.list();
 
-  it('loads the 14 generic + 15 S13 + 7 S16 security + 2 provider-only components, 33 protocols, 4 providers, 8 security + 20 design rules and 10 problems', () => {
+  it('loads the 14 generic + 15 S13 + 7 S16 security + 2 provider-only components, 33 protocols, 4 providers, 8 security + 20 design rules and 11 problems (10 + S22 sample)', () => {
     expect(
       registry
         .list({ kind: 'component' })
@@ -127,8 +127,8 @@ describe('seeded registry', () => {
       'gcp',
       'generic',
     ]);
-    expect(registry.list({ kind: 'problem' })).toHaveLength(10); // S17
-    expect(registry.size).toBe(118);
+    expect(registry.list({ kind: 'problem' })).toHaveLength(11); // S17 + S22 sample board
+    expect(registry.size).toBe(119);
   });
 
   it('has unique ids across all kinds', () => {

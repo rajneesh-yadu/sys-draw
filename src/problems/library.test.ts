@@ -37,7 +37,7 @@ beforeEach(() => {
 
 describe('listing and filtering', () => {
   it('lists every registry problem, easiest first', () => {
-    expect(all).toHaveLength(10);
+    expect(all).toHaveLength(11); // 10 problems + S22 sample board
     expect(all.map((p) => p.level)).toEqual([...all.map((p) => p.level)].sort((a, b) => a - b));
     expect(all[0]?.level).toBe(1);
     expect(findProblem(registry, undefined)).toBeUndefined();
@@ -79,7 +79,7 @@ describe('listing and filtering', () => {
         .sort(),
     ).toEqual(['problem.payment-system', 'problem.rate-limiter']);
     expect(filterProblems(all, { level: 1, tag: 'video' })).toEqual([]);
-    expect(filterProblems(all, {})).toHaveLength(10);
+    expect(filterProblems(all, {})).toHaveLength(11);
   });
 
   it('computes facets with counts', () => {

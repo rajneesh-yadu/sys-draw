@@ -45,6 +45,8 @@ export interface NodeOptions {
   replicas?: number;
   group?: string;
   config?: Record<string, unknown>;
+  /** S22: target-tracking autoscaling (`replicas` stays the starting size). */
+  autoscale?: NonNullable<NodeInstance['scaling']['autoscale']>;
 }
 
 export interface EdgeOptions {
@@ -104,7 +106,11 @@ export function design(): Design {
         position: { x: col * COL_PX, y: row * ROW_PX },
         ...(opts.group !== undefined ? { groupId: groupId(opts.group) } : {}),
         config: { ...(opts.config ?? {}) },
-        scaling: { replicas: opts.replicas ?? 1, instanceType: opts.type },
+        scaling: {
+          replicas: opts.replicas ?? 1,
+          instanceType: opts.type,
+          ...(opts.autoscale !== undefined ? { autoscale: { ...opts.autoscale } } : {}),
+        },
       });
       return api;
     },

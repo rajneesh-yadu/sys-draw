@@ -768,6 +768,44 @@ debugVariant with the expected fix.
 Done when: the reference solution meets its own rubric in the simulator.
 ```
 
+
+**Add a sample reference board**
+
+```markdown
+TASK — Add a sample reference board: <system name>.
+Read: docs/DATA-MODEL.md (Board, Graph, Scenario), docs/ARCHITECTURE.md,
+src/registry/components/ (available component definitions), and one existing board or
+problem reference solution as an example.
+Build: one loadable, clearly named sample board that demonstrates an efficient,
+production-minded design and how its components connect. Use the broadest useful set of
+available components (including network, security, compute, data, messaging and
+observability components where present), while keeping every component on a justified
+request, event, control or monitoring path. Do not add components merely to increase the
+count. Include:
+- A coherent end-to-end user flow plus any asynchronous/background flow needed by the
+  system; connect only compatible ports and use valid protocol stacks.
+- Appropriate region/AZ and security-zone groups, redundancy, caching, queues, and
+  storage choices for the stated workload; avoid unnecessary hops and single points of
+  failure.
+- Sensible component configs, replica/scaling settings, scenario traffic and payloads so
+  the design can be simulated and its bottlenecks are meaningful.
+- Clear node labels and a readable left-to-right layout, with related components grouped
+  together and flows easy to follow.
+- A concise board description or companion notes explaining the main paths, why each
+  component is present, key trade-offs, and practical connection patterns users can adapt.
+Register or seed the board through the existing sample/reference-board mechanism. Reuse
+registry definitions and existing schema/API; do not invent unsupported component
+behavior or change public APIs. If no board catalog exists, use the smallest existing
+data-driven mechanism that makes the sample discoverable and loadable.
+Out of scope: new component types or simulation behavior unless explicitly required for
+validating the sample; broad UI redesign.
+Done when: a user can load the board as a reference, inspect its connections and
+configuration, and run its scenario; the graph validates, the layout is legible, and the
+sample exercises most available component categories without compromising the design's
+efficiency or coherence.
+```
+
+
 **Add a mode or review rule**
 
 ```markdown

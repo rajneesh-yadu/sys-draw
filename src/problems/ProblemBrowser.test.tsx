@@ -40,11 +40,11 @@ const listed = (dlg: HTMLElement) =>
     .map((b) => b.getAttribute('data-testid')?.replace('problem-item-problem.', ''));
 
 describe('problem browser', () => {
-  it('lists all ten problems and filters by level, tag and company style', () => {
+  it('lists all problems (ten + the S22 sample board) and filters by level, tag and company style', () => {
     const dlg = openBrowser();
     expect(dlg).toHaveAttribute('role', 'dialog');
-    expect(listed(dlg)).toHaveLength(10);
-    expect(within(dlg).getByTestId('problem-count')).toHaveTextContent('10 of 10 problems');
+    expect(listed(dlg)).toHaveLength(11);
+    expect(within(dlg).getByTestId('problem-count')).toHaveTextContent('11 of 11 problems');
 
     fireEvent.change(within(dlg).getByLabelText('Level'), { target: { value: '1' } });
     expect(listed(dlg)).toEqual(['rate-limiter', 'url-shortener']);
@@ -55,7 +55,7 @@ describe('problem browser', () => {
 
     fireEvent.change(within(dlg).getByLabelText('Tag'), { target: { value: 'cdn' } });
     expect(listed(dlg)).toEqual(['instagram']);
-    expect(within(dlg).getByTestId('problem-count')).toHaveTextContent('1 of 10 problems');
+    expect(within(dlg).getByTestId('problem-count')).toHaveTextContent('1 of 11 problems');
 
     fireEvent.change(within(dlg).getByLabelText('Tag'), { target: { value: 'video' } });
     expect(within(dlg).getByText('No problem matches these filters.')).toBeInTheDocument();

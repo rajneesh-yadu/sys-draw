@@ -17,10 +17,11 @@ const EXPECTED = [
   'problem.youtube',
   'problem.uber',
   'problem.payment-system',
+  'problem.sample-ecommerce', // S22 sample reference board
 ];
 
 describe('problem library content (S17)', () => {
-  it('ships the ten problems from basic to expert', () => {
+  it('ships the ten problems from basic to expert, plus the S22 sample board', () => {
     expect(problems.map((p) => p.id).sort()).toEqual([...EXPECTED].sort());
     const levels = new Set(problems.map((p) => p.level));
     expect([...levels].sort()).toEqual([1, 2, 3, 4, 5]);
