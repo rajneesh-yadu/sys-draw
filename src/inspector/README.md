@@ -31,5 +31,6 @@ number (unit from `.meta({unit})` or key suffix `Ms`/`Sec`/`Gb`/`Bytes`…, min/
 ## Extension points
 
 - Registry schemas: `.describe('help')`, `.meta({ advanced: true, label, unit, step })`.
+- Scaling field help (S23): `panels/scaling-help.ts` `scalingHelpFor(def)` reads `configSchema.meta().scalingHelp` (`replicas`, `instanceType?`, `autoscale?`) and falls back to `GENERIC_SCALING_HELP`; NodePanel passes it as the Scaling form's help.
 - Schemas a panel doesn't own: pass `FieldOverrides` keyed by dotted path (`'autoscale.min'`, `'firewallRules.*.peer'`), incl. `options` (string → select) and `defaultValue`.
 - New field kind = a case in `buildField` + a widget in `SchemaForm.tsx`.

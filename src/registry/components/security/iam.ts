@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
+import { managedPerRequest, scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'security.iam',
@@ -9,18 +10,20 @@ export default defineComponent({
   icon: 'id-card',
   providerNames: { aws: 'IAM', gcp: 'Cloud IAM', azure: 'Microsoft Entra ID (RBAC)' },
   ports: [{ id: 'in', direction: 'in', protocols: ['http1', 'http2', 'tls13', 'tcp'] }],
-  configSchema: z.object({
-    leastPrivilege: z
-      .boolean()
-      .describe('Each service role can touch only its own tables/buckets (no wildcards)'),
-    mfaForHumans: z
-      .boolean()
-      .describe('People need MFA (and short sessions) for console/CLI access'),
-    accessAnalyzer: z
-      .boolean()
-      .describe('Continuously flag unused or public permissions')
-      .meta({ advanced: true }),
-  }),
+  configSchema: z
+    .object({
+      leastPrivilege: z
+        .boolean()
+        .describe('Each service role can touch only its own tables/buckets (no wildcards)'),
+      mfaForHumans: z
+        .boolean()
+        .describe('People need MFA (and short sessions) for console/CLI access'),
+      accessAnalyzer: z
+        .boolean()
+        .describe('Continuously flag unused or public permissions')
+        .meta({ advanced: true }),
+    })
+    .meta(scalingHelp(managedPerRequest('IAM service'))),
   defaults: { leastPrivilege: true, mfaForHumans: true, accessAnalyzer: true },
   instanceTypes: [{ id: 'managed', vCpu: 2, memGb: 4, netGbps: 10, costUsdPerHour: 0 }],
   perf: {

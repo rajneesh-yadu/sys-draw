@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
 import { GENERAL_PURPOSE_INSTANCES, MEMORY_OPTIMISED_INSTANCES } from '../../presets';
+import { scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'database.sql',
@@ -10,68 +11,81 @@ export default defineComponent({
   icon: 'database',
   providerNames: { aws: 'RDS', gcp: 'Cloud SQL', azure: 'Azure Database for PostgreSQL' },
   ports: [{ id: 'in', direction: 'in', protocols: ['postgres-wire', 'mysql-wire', 'tcp'] }],
-  configSchema: z.object({
-    engine: z.enum(['postgres', 'mysql']).describe('Database engine'),
-    storageGb: z
-      .number()
-      .int()
-      .min(10)
-      .max(65_536)
-      .describe('Provisioned storage (per copy)')
-      .meta({ scaling: 'storageGb' }),
-    readReplicas: z
-      .number()
-      .int()
-      .min(0)
-      .max(15)
-      .describe('Read-only copies that take read traffic (writes still go to the one primary)')
-      .meta({ scaling: 'readReplicas' }),
-    multiAz: z
-      .boolean()
-      .describe(
-        'Synchronous standby in another zone for automatic failover (billed, serves no traffic)',
-      )
-      .meta({ scaling: 'standby' }),
-    shards: z
-      .number()
-      .int()
-      .min(1)
-      .max(1024)
-      .default(1)
-      .describe(
-        'Split rows over N primaries by a shard key; each shard has its own primary and replicas',
-      )
-      .meta({ advanced: true, scaling: 'shards' }),
-    shardKeySkew: z
-      .number()
-      .min(0)
-      .max(1)
-      .default(0)
-      .describe('Share of traffic on the hottest shard (0 = evenly spread)')
-      .meta({ advanced: true, scaling: 'keySkew' }),
-    replication: z
-      .enum(['async', 'semi-sync', 'sync'])
-      .describe('How writes reach replicas (async = fast writes, replicas may lag)')
-      .meta({ advanced: true }),
-    isolation: z
-      .enum(['read-committed', 'repeatable-read', 'serializable'])
-      .describe('Transaction isolation level')
-      .meta({ advanced: true }),
-    maxConnections: z
-      .number()
-      .int()
-      .min(10)
-      .max(10_000)
-      .describe('Connection limit on the primary')
-      .meta({ advanced: true }),
-    backupRetentionDays: z
-      .number()
-      .int()
-      .min(0)
-      .max(35)
-      .describe('Point-in-time recovery window')
-      .meta({ advanced: true }),
-  }),
+  configSchema: z
+    .object({
+      engine: z.enum(['postgres', 'mysql']).describe('Database engine'),
+      storageGb: z
+        .number()
+        .int()
+        .min(10)
+        .max(65_536)
+        .describe('Provisioned storage (per copy)')
+        .meta({ scaling: 'storageGb' }),
+      readReplicas: z
+        .number()
+        .int()
+        .min(0)
+        .max(15)
+        .describe('Read-only copies that take read traffic (writes still go to the one primary)')
+        .meta({ scaling: 'readReplicas' }),
+      multiAz: z
+        .boolean()
+        .describe(
+          'Synchronous standby in another zone for automatic failover (billed, serves no traffic)',
+        )
+        .meta({ scaling: 'standby' }),
+      shards: z
+        .number()
+        .int()
+        .min(1)
+        .max(1024)
+        .default(1)
+        .describe(
+          'Split rows over N primaries by a shard key; each shard has its own primary and replicas',
+        )
+        .meta({ advanced: true, scaling: 'shards' }),
+      shardKeySkew: z
+        .number()
+        .min(0)
+        .max(1)
+        .default(0)
+        .describe('Share of traffic on the hottest shard (0 = evenly spread)')
+        .meta({ advanced: true, scaling: 'keySkew' }),
+      replication: z
+        .enum(['async', 'semi-sync', 'sync'])
+        .describe(
+          'How writes reach replicas (async = fast writes, replicas may lag; sync = commits wait for a replica). Not simulated yet for this component',
+        )
+        .meta({ advanced: true }),
+      isolation: z
+        .enum(['read-committed', 'repeatable-read', 'serializable'])
+        .describe('Transaction isolation level')
+        .meta({ advanced: true }),
+      maxConnections: z
+        .number()
+        .int()
+        .min(10)
+        .max(10_000)
+        .describe('Connection limit on the primary')
+        .meta({ advanced: true }),
+      backupRetentionDays: z
+        .number()
+        .int()
+        .min(0)
+        .max(35)
+        .describe('Point-in-time recovery window')
+        .meta({ advanced: true }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          '1 = one primary per shard. Each extra replica adds one read replica to every shard (takes reads, never writes; billed; stores a full copy), on top of Read replicas. It is not a failover standby (Multi-AZ) or a backup (Backup retention). Prefer Read replicas and leave this at 1.',
+        autoscale:
+          'Adds or removes read replicas per shard; writes still go to one primary per shard.',
+        instanceType:
+          'Size of every primary and replica. A bigger primary adds write capacity; otherwise add Shards.',
+      }),
+    ),
   defaults: {
     engine: 'postgres',
     storageGb: 100,

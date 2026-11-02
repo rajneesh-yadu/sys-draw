@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
+import { scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'security.ddos-shield',
@@ -24,17 +25,25 @@ export default defineComponent({
       protocols: ['http1', 'http2', 'http3', 'grpc', 'websocket', 'tls13', 'quic', 'tcp', 'udp'],
     },
   ],
-  configSchema: z.object({
-    tier: z
-      .enum(['standard', 'advanced'])
-      .describe(
-        'Standard: free network-layer (L3/L4) protection. Advanced: L7 detection, response team, cost protection',
-      ),
-    alwaysOnDetection: z
-      .boolean()
-      .describe('Baseline traffic continuously so floods are detected in seconds')
-      .meta({ advanced: true }),
-  }),
+  configSchema: z
+    .object({
+      tier: z
+        .enum(['standard', 'advanced'])
+        .describe(
+          'Standard: free network-layer (L3/L4) protection. Advanced: L7 detection, response team, cost protection',
+        ),
+      alwaysOnDetection: z
+        .boolean()
+        .describe('Baseline traffic continuously so floods are detected in seconds')
+        .meta({ advanced: true }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          'Keep at 1: protection is one subscription for the account. Each extra replica adds another subscription fee in the cost model without adding protection.',
+        autoscale: 'Leave off: protection does not scale with replicas.',
+      }),
+    ),
   defaults: { tier: 'advanced', alwaysOnDetection: true },
   // Shield Advanced: $3,000/month subscription per organisation (Standard is free).
   instanceTypes: [{ id: 'managed', vCpu: 2, memGb: 4, netGbps: 100, costUsdPerHour: 4.11 }],

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
 import { GENERAL_PURPOSE_INSTANCES } from '../../presets';
+import { scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'security.auth-server',
@@ -21,31 +22,39 @@ export default defineComponent({
       protocols: ['postgres-wire', 'mysql-wire', 'resp', 'http1', 'http2', 'tls13', 'tcp'],
     },
   ],
-  configSchema: z.object({
-    tokenFormat: z
-      .enum(['jwt', 'opaque'])
-      .describe('JWT: services verify tokens locally. Opaque: every check calls the auth server'),
-    accessTokenTtlMin: z
-      .number()
-      .int()
-      .min(1)
-      .max(1440)
-      .describe('Access token lifetime (shorter = faster revocation, more refreshes)'),
-    mfa: z
-      .enum(['off', 'optional', 'required'])
-      .describe('Second factor: stops logins with stolen passwords (credential stuffing)'),
-    passwordHash: z
-      .enum(['bcrypt', 'argon2id', 'scrypt'])
-      .describe('Slow password hashing: each login costs tens of ms of CPU on purpose')
-      .meta({ advanced: true }),
-    lockoutAfterFailures: z
-      .number()
-      .int()
-      .min(0)
-      .max(100)
-      .describe('Lock or challenge an account after N failed logins (0 = off)')
-      .meta({ advanced: true }),
-  }),
+  configSchema: z
+    .object({
+      tokenFormat: z
+        .enum(['jwt', 'opaque'])
+        .describe('JWT: services verify tokens locally. Opaque: every check calls the auth server'),
+      accessTokenTtlMin: z
+        .number()
+        .int()
+        .min(1)
+        .max(1440)
+        .describe('Access token lifetime (shorter = faster revocation, more refreshes)'),
+      mfa: z
+        .enum(['off', 'optional', 'required'])
+        .describe('Second factor: stops logins with stolen passwords (credential stuffing)'),
+      passwordHash: z
+        .enum(['bcrypt', 'argon2id', 'scrypt'])
+        .describe('Slow password hashing: each login costs tens of ms of CPU on purpose')
+        .meta({ advanced: true }),
+      lockoutAfterFailures: z
+        .number()
+        .int()
+        .min(0)
+        .max(100)
+        .describe('Lock or challenge an account after N failed logins (0 = off)')
+        .meta({ advanced: true }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          'Interchangeable copies of the one auth service: logins and token checks are split evenly, so capacity and cost grow with the count. They are not separate identity providers.',
+        autoscale: 'Adds or removes auth-server copies.',
+      }),
+    ),
   defaults: {
     tokenFormat: 'jwt',
     accessTokenTtlMin: 15,

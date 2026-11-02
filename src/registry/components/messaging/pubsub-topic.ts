@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
+import { managedPerRequest, scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'messaging.topic',
@@ -12,25 +13,34 @@ export default defineComponent({
     { id: 'publishers', direction: 'in', protocols: ['http1', 'http2'] },
     { id: 'subscribers', direction: 'out', protocols: ['http1', 'http2', 'amqp'] },
   ],
-  configSchema: z.object({
-    delivery: z
-      .enum(['at-most-once', 'at-least-once'])
-      .describe('Delivery guarantee to each subscription (at-least-once = possible duplicates)'),
-    ordering: z
-      .enum(['none', 'per-key'])
-      .describe('Per-key ordering keeps one key in order, at lower throughput per key'),
-    filtering: z
-      .boolean()
-      .describe('Subscribers receive only messages matching their filter policy')
-      .meta({ advanced: true }),
-    retryAttempts: z
-      .number()
-      .int()
-      .min(0)
-      .max(100)
-      .describe('Delivery retries to a failing subscriber before dead-lettering')
-      .meta({ advanced: true }),
-  }),
+  configSchema: z
+    .object({
+      delivery: z
+        .enum(['at-most-once', 'at-least-once'])
+        .describe('Delivery guarantee to each subscription (at-least-once = possible duplicates)'),
+      ordering: z
+        .enum(['none', 'per-key'])
+        .describe('Per-key ordering keeps one key in order, at lower throughput per key'),
+      filtering: z
+        .boolean()
+        .describe('Subscribers receive only messages matching their filter policy')
+        .meta({ advanced: true }),
+      retryAttempts: z
+        .number()
+        .int()
+        .min(0)
+        .max(100)
+        .describe('Delivery retries to a failing subscriber before dead-lettering')
+        .meta({ advanced: true }),
+    })
+    .meta(
+      scalingHelp(
+        managedPerRequest(
+          'managed topic',
+          'Subscribers are the nodes connected after the topic, not these units.',
+        ),
+      ),
+    ),
   defaults: { delivery: 'at-least-once', ordering: 'none', filtering: false, retryAttempts: 3 },
   instanceTypes: [{ id: 'managed', vCpu: 2, memGb: 4, netGbps: 10, costUsdPerHour: 0 }],
   perf: {

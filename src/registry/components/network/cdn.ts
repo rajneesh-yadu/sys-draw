@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
+import { managedPerRequest, scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'network.cdn',
@@ -12,26 +13,32 @@ export default defineComponent({
     { id: 'in', direction: 'in', protocols: ['http1', 'http2', 'http3'] },
     { id: 'origin', direction: 'out', protocols: ['http1', 'http2'] },
   ],
-  configSchema: z.object({
-    ttlSec: z
-      .number()
-      .int()
-      .min(0)
-      .max(31_536_000)
-      .describe('Default time an object stays cached at the edge'),
-    cacheDynamic: z.boolean().describe('Also cache API responses (needs correct Cache-Control)'),
-    originShield: z
-      .boolean()
-      .describe('Extra cache tier in front of the origin so edges share misses')
-      .meta({ advanced: true }),
-    edgeCacheGb: z
-      .number()
-      .min(1)
-      .max(10_000)
-      .describe('Cache size per edge location')
-      .meta({ advanced: true }),
-    compression: z.boolean().describe('gzip / brotli at the edge').meta({ advanced: true }),
-  }),
+  configSchema: z
+    .object({
+      ttlSec: z
+        .number()
+        .int()
+        .min(0)
+        .max(31_536_000)
+        .describe('Default time an object stays cached at the edge'),
+      cacheDynamic: z.boolean().describe('Also cache API responses (needs correct Cache-Control)'),
+      originShield: z
+        .boolean()
+        .describe('Extra cache tier in front of the origin so edges share misses')
+        .meta({ advanced: true }),
+      edgeCacheGb: z
+        .number()
+        .min(1)
+        .max(10_000)
+        .describe('Cache size per edge location')
+        .meta({ advanced: true }),
+      compression: z.boolean().describe('gzip / brotli at the edge').meta({ advanced: true }),
+    })
+    .meta(
+      scalingHelp(
+        managedPerRequest('CDN', 'Edge locations are worldwide regardless of this value.'),
+      ),
+    ),
   defaults: {
     ttlSec: 86_400,
     cacheDynamic: false,

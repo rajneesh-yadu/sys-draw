@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
 import { GENERAL_PURPOSE_INSTANCES, MEMORY_OPTIMISED_INSTANCES } from '../../presets';
+import { scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'database.mongodb',
@@ -14,62 +15,73 @@ export default defineComponent({
     azure: 'Cosmos DB for MongoDB',
   },
   ports: [{ id: 'in', direction: 'in', protocols: ['mongodb-wire', 'tls13', 'tcp'] }],
-  configSchema: z.object({
-    shards: z
-      .number()
-      .int()
-      .min(1)
-      .max(1000)
-      .describe('Shards (each a replica set); mongos routes by shard key')
-      .meta({ scaling: 'shards' }),
-    secondariesPerShard: z
-      .number()
-      .int()
-      .min(0)
-      .max(49)
-      .describe('Secondaries in each replica set (2 = the usual 3-member set)')
-      .meta({ scaling: 'readReplicas' }),
-    readPreference: z
-      .enum(['primary', 'primaryPreferred', 'secondary', 'secondaryPreferred', 'nearest'])
-      .describe('Which members serve reads (anything but primary may read stale data)'),
-    writeConcern: z
-      .enum(['w1', 'majority'])
-      .describe('Acknowledge after the primary (w:1) or a majority of members (survives failover)')
-      .meta({
-        perfEffect: {
-          majority: {
-            writeAddMs: 1.5,
-            why: 'waits for a majority of the replica set to journal the write',
+  configSchema: z
+    .object({
+      shards: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .describe('Shards (each a replica set); mongos routes by shard key')
+        .meta({ scaling: 'shards' }),
+      secondariesPerShard: z
+        .number()
+        .int()
+        .min(0)
+        .max(49)
+        .describe('Secondaries in each replica set (2 = the usual 3-member set)')
+        .meta({ scaling: 'readReplicas' }),
+      readPreference: z
+        .enum(['primary', 'primaryPreferred', 'secondary', 'secondaryPreferred', 'nearest'])
+        .describe('Which members serve reads (anything but primary may read stale data)'),
+      writeConcern: z
+        .enum(['w1', 'majority'])
+        .describe(
+          'Acknowledge after the primary (w:1) or a majority of members (survives failover)',
+        )
+        .meta({
+          perfEffect: {
+            majority: {
+              writeAddMs: 1.5,
+              why: 'waits for a majority of the replica set to journal the write',
+            },
           },
-        },
-      }),
-    readConcern: z
-      .enum(['local', 'majority', 'linearizable'])
-      .describe(
-        'local = fastest; majority = never rolled back; linearizable = latest, via the primary',
-      )
-      .meta({
-        advanced: true,
-        perfEffect: {
-          linearizable: {
-            readAddMs: 2,
-            why: 'the primary confirms with a majority that it is still primary',
+        }),
+      readConcern: z
+        .enum(['local', 'majority', 'linearizable'])
+        .describe(
+          'local = fastest; majority = never rolled back; linearizable = latest, via the primary',
+        )
+        .meta({
+          advanced: true,
+          perfEffect: {
+            linearizable: {
+              readAddMs: 2,
+              why: 'the primary confirms with a majority that it is still primary',
+            },
           },
-        },
+        }),
+      shardKeySkew: z
+        .number()
+        .min(0)
+        .max(1)
+        .describe('Share of traffic on the hottest shard (monotonic keys like timestamps → 1)')
+        .meta({ advanced: true, scaling: 'keySkew' }),
+      storageGb: z
+        .number()
+        .min(1)
+        .max(1e7)
+        .describe('Data stored (one copy)')
+        .meta({ scaling: 'storageGb' }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          "1 = each shard's replica set as configured. Each extra replica adds one more read-serving secondary to every shard (billed; stores a copy of the shard), on top of Secondaries per shard. Prefer that field and leave this at 1. Writes scale only with Shards.",
+        autoscale:
+          'Adds or removes secondaries per shard; writes still go to one primary per shard.',
       }),
-    shardKeySkew: z
-      .number()
-      .min(0)
-      .max(1)
-      .describe('Share of traffic on the hottest shard (monotonic keys like timestamps → 1)')
-      .meta({ advanced: true, scaling: 'keySkew' }),
-    storageGb: z
-      .number()
-      .min(1)
-      .max(1e7)
-      .describe('Data stored (one copy)')
-      .meta({ scaling: 'storageGb' }),
-  }),
+    ),
   defaults: {
     shards: 1,
     secondariesPerShard: 2,

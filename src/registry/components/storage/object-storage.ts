@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
+import { managedPerRequest, scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'storage.object',
@@ -9,27 +10,36 @@ export default defineComponent({
   icon: 'archive',
   providerNames: { aws: 'S3', gcp: 'Cloud Storage', azure: 'Blob Storage' },
   ports: [{ id: 'in', direction: 'in', protocols: ['http1', 'http2'] }],
-  configSchema: z.object({
-    storageClass: z
-      .enum(['standard', 'infrequent', 'archive'])
-      .describe('Cheaper classes cost more per read and may take hours to retrieve (archive)'),
-    storageGb: z.number().min(1).max(1e9).describe('Data stored').meta({ scaling: 'storageGb' }),
-    publicAccess: z
-      .boolean()
-      .describe('Allow anonymous reads (normally off — serve via CDN instead)'),
-    versioning: z
-      .boolean()
-      .describe('Keep previous versions of overwritten objects')
-      .meta({ advanced: true }),
-    encryptionAtRest: z.boolean().describe('Server-side encryption').meta({ advanced: true }),
-    lifecycleDays: z
-      .number()
-      .int()
-      .min(0)
-      .max(3650)
-      .describe('Move objects to a colder class after N days (0 = never)')
-      .meta({ advanced: true }),
-  }),
+  configSchema: z
+    .object({
+      storageClass: z
+        .enum(['standard', 'infrequent', 'archive'])
+        .describe('Cheaper classes cost more per read and may take hours to retrieve (archive)'),
+      storageGb: z.number().min(1).max(1e9).describe('Data stored').meta({ scaling: 'storageGb' }),
+      publicAccess: z
+        .boolean()
+        .describe('Allow anonymous reads (normally off — serve via CDN instead)'),
+      versioning: z
+        .boolean()
+        .describe('Keep previous versions of overwritten objects')
+        .meta({ advanced: true }),
+      encryptionAtRest: z.boolean().describe('Server-side encryption').meta({ advanced: true }),
+      lifecycleDays: z
+        .number()
+        .int()
+        .min(0)
+        .max(3650)
+        .describe('Move objects to a colder class after N days (0 = never)')
+        .meta({ advanced: true }),
+    })
+    .meta(
+      scalingHelp(
+        managedPerRequest(
+          'object store',
+          'Durable copies of objects are made by the provider and are not set here.',
+        ),
+      ),
+    ),
   defaults: {
     storageClass: 'standard',
     storageGb: 1000,

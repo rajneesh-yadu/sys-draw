@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
+import { scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'database.kv-store',
@@ -13,42 +14,52 @@ export default defineComponent({
     azure: 'Cosmos DB for Table',
   },
   ports: [{ id: 'in', direction: 'in', protocols: ['http1', 'http2', 'tls13'] }],
-  configSchema: z.object({
-    capacityMode: z
-      .enum(['on-demand', 'provisioned'])
-      .describe('Pay per request, or reserve read/write units per second'),
-    readConsistency: z
-      .enum(['eventual', 'strong', 'transactional'])
-      .describe('Eventual reads cost half a unit; strong reads 1; transactional 2'),
-    writeMode: z
-      .enum(['standard', 'transactional'])
-      .describe('Transactional writes (TransactWriteItems) cost 2× units and wait longer'),
-    itemSizeKb: z
-      .number()
-      .min(0.1)
-      .max(400)
-      .describe('Average item size: reads cost per 4 KB, writes per 1 KB'),
-    globalSecondaryIndexes: z
-      .number()
-      .int()
-      .min(0)
-      .max(20)
-      .describe('GSIs: every write is also written to each index'),
-    partitions: z
-      .number()
-      .int()
-      .min(1)
-      .max(100_000)
-      .describe('Minimum partitions (the table also splits every 10 GB)')
-      .meta({ advanced: true, scaling: 'shards' }),
-    storageGb: z.number().min(0).max(1e7).describe('Data stored').meta({ scaling: 'storageGb' }),
-    hotKeySkew: z
-      .number()
-      .min(0)
-      .max(1)
-      .describe('Share of requests on the hottest partition key (0 = even)')
-      .meta({ advanced: true, scaling: 'keySkew' }),
-  }),
+  configSchema: z
+    .object({
+      capacityMode: z
+        .enum(['on-demand', 'provisioned'])
+        .describe('Pay per request, or reserve read/write units per second'),
+      readConsistency: z
+        .enum(['eventual', 'strong', 'transactional'])
+        .describe('Eventual reads cost half a unit; strong reads 1; transactional 2'),
+      writeMode: z
+        .enum(['standard', 'transactional'])
+        .describe('Transactional writes (TransactWriteItems) cost 2× units and wait longer'),
+      itemSizeKb: z
+        .number()
+        .min(0.1)
+        .max(400)
+        .describe('Average item size: reads cost per 4 KB, writes per 1 KB'),
+      globalSecondaryIndexes: z
+        .number()
+        .int()
+        .min(0)
+        .max(20)
+        .describe('GSIs: every write is also written to each index'),
+      partitions: z
+        .number()
+        .int()
+        .min(1)
+        .max(100_000)
+        .describe('Minimum partitions (the table also splits every 10 GB)')
+        .meta({ advanced: true, scaling: 'shards' }),
+      storageGb: z.number().min(0).max(1e7).describe('Data stored').meta({ scaling: 'storageGb' }),
+      hotKeySkew: z
+        .number()
+        .min(0)
+        .max(1)
+        .describe('Share of requests on the hottest partition key (0 = even)')
+        .meta({ advanced: true, scaling: 'keySkew' }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          "Keep at 1. Throughput comes from Partitions (each has a fixed 3 000 read / 1 000 write units per second and is already replicated 3× by the service). Values above 1 multiply every partition's budget in the simulation, which the real service does not allow. Billing is per request either way.",
+        autoscale:
+          'Leave off: the table splits partitions itself; autoscaling here would multiply partition budgets.',
+        instanceType: 'Not a server size: the table is billed per request and storage.',
+      }),
+    ),
   defaults: {
     capacityMode: 'on-demand',
     readConsistency: 'eventual',

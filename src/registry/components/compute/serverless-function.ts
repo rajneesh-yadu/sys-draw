@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
+import { scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'compute.serverless-function',
@@ -30,35 +31,47 @@ export default defineComponent({
       ],
     },
   ],
-  configSchema: z.object({
-    memoryMb: z
-      .number()
-      .int()
-      .min(128)
-      .max(10_240)
-      .describe('Memory per invocation; CPU scales with it'),
-    timeoutSec: z.number().int().min(1).max(900).describe('Maximum run time per invocation'),
-    concurrencyLimit: z
-      .number()
-      .int()
-      .min(1)
-      .max(100_000)
-      .describe('Maximum simultaneous invocations; extra requests are throttled')
-      .meta({ scaling: 'maxInstances' }),
-    provisionedConcurrency: z
-      .number()
-      .int()
-      .min(0)
-      .max(100_000)
-      .describe('Pre-warmed instances that never cold-start (billed while idle)')
-      .meta({ advanced: true, scaling: 'minInstances' }),
-    coldStartMs: z
-      .number()
-      .min(0)
-      .max(30_000)
-      .describe('Extra latency when a new instance starts')
-      .meta({ advanced: true }),
-  }),
+  configSchema: z
+    .object({
+      memoryMb: z
+        .number()
+        .int()
+        .min(128)
+        .max(10_240)
+        .describe(
+          'Memory per invocation, checked against provider limits. Speed and cost come from Scaling → Instance type',
+        ),
+      timeoutSec: z.number().int().min(1).max(900).describe('Maximum run time per invocation'),
+      concurrencyLimit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100_000)
+        .describe('Maximum simultaneous invocations; extra requests are throttled')
+        .meta({ scaling: 'maxInstances' }),
+      provisionedConcurrency: z
+        .number()
+        .int()
+        .min(0)
+        .max(100_000)
+        .describe('Pre-warmed instances that never cold-start (billed while idle)')
+        .meta({ advanced: true, scaling: 'minInstances' }),
+      coldStartMs: z
+        .number()
+        .min(0)
+        .max(30_000)
+        .describe('Extra latency when a new instance starts')
+        .meta({ advanced: true }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          'Ignored: the platform starts instances per request, up to Concurrency limit. Set that (and Provisioned concurrency) instead; cost follows busy instances, not this value.',
+        autoscale: 'Ignored: functions scale per request up to Concurrency limit.',
+        instanceType:
+          'Memory size of each function instance: CPU, speed and the price per busy hour scale with it. Performance and cost use this; Memory per invocation is only checked against provider limits.',
+      }),
+    ),
   defaults: {
     memoryMb: 1024,
     timeoutSec: 30,

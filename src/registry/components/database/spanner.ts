@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
+import { scalingHelp } from '../../scaling-help';
 
 /**
  * GCP-only (provider-only tag): horizontally scaling relational database with external
@@ -22,30 +23,38 @@ export default defineComponent({
   icon: 'globe-lock',
   providerNames: { gcp: 'Spanner' },
   ports: [{ id: 'in', direction: 'in', protocols: ['grpc', 'postgres-wire'] }],
-  configSchema: z.object({
-    nodes: z
-      .number()
-      .int()
-      .min(1)
-      .max(1000)
-      .describe('Compute nodes (1 node = 1000 processing units); data splits spread across them')
-      .meta({ scaling: 'shards' }),
-    configuration: z
-      .enum(['regional', 'multi-region'])
-      .describe('Regional (3 zones) or multi-region (writes wait for a cross-region quorum)'),
-    storageGb: z
-      .number()
-      .min(1)
-      .max(10_000_000)
-      .describe('Data stored (price includes replication)')
-      .meta({ scaling: 'storageGb' }),
-    hotKeySkew: z
-      .number()
-      .min(0)
-      .max(1)
-      .describe('Share of traffic on the hottest key range (monotonic keys make one hot split)')
-      .meta({ advanced: true, scaling: 'keySkew' }),
-  }),
+  configSchema: z
+    .object({
+      nodes: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .describe('Compute nodes (1 node = 1000 processing units); data splits spread across them')
+        .meta({ scaling: 'shards' }),
+      configuration: z
+        .enum(['regional', 'multi-region'])
+        .describe('Regional (3 zones) or multi-region (writes wait for a cross-region quorum)'),
+      storageGb: z
+        .number()
+        .min(1)
+        .max(10_000_000)
+        .describe('Data stored (price includes replication)')
+        .meta({ scaling: 'storageGb' }),
+      hotKeySkew: z
+        .number()
+        .min(0)
+        .max(1)
+        .describe('Share of traffic on the hottest key range (monotonic keys make one hot split)')
+        .meta({ advanced: true, scaling: 'keySkew' }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          'Keep at 1: compute is set by Nodes, and zone (or region) replication is built in and included in the price. Values above 1 multiply the nodes (capacity and cost) in the simulation.',
+        autoscale: 'Leave off and size Nodes instead; autoscaling here multiplies the nodes.',
+      }),
+    ),
   defaults: { nodes: 1, configuration: 'regional', storageGb: 100, hotKeySkew: 0 },
   // Regional node price in us-central1 (approximate, as of 2026-10-01).
   instanceTypes: [{ id: 'node', vCpu: 4, memGb: 16, netGbps: 10, costUsdPerHour: 0.9 }],

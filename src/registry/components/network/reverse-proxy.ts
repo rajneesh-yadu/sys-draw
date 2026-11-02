@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
 import { GENERAL_PURPOSE_INSTANCES } from '../../presets';
+import { scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'network.reverse-proxy',
@@ -20,75 +21,83 @@ export default defineComponent({
       protocols: ['http1', 'http2', 'grpc', 'websocket', 'tcp'],
     },
   ],
-  configSchema: z.object({
-    engine: z
-      .enum(['nginx', 'envoy'])
-      .describe('Nginx (config files) or Envoy (dynamic xDS config, rich telemetry)'),
-    algorithm: z
-      .enum(['round-robin', 'least-connections', 'consistent-hash', 'random'])
-      .describe('How an upstream is picked (Envoy calls least-connections "least request")'),
-    tlsTermination: z
-      .boolean()
-      .describe(
-        'Decrypt TLS here (handshakes cost CPU; upstream traffic is plaintext unless re-encrypted)',
-      )
-      .meta({
-        perfEffect: {
-          true: {
-            read: 1.6,
-            write: 1.6,
-            why: 'TLS record encryption plus amortised handshakes (session resumption helps)',
+  configSchema: z
+    .object({
+      engine: z
+        .enum(['nginx', 'envoy'])
+        .describe('Nginx (config files) or Envoy (dynamic xDS config, rich telemetry)'),
+      algorithm: z
+        .enum(['round-robin', 'least-connections', 'consistent-hash', 'random'])
+        .describe('How an upstream is picked (Envoy calls least-connections "least request")'),
+      tlsTermination: z
+        .boolean()
+        .describe(
+          'Decrypt TLS here (handshakes cost CPU; upstream traffic is plaintext unless re-encrypted)',
+        )
+        .meta({
+          perfEffect: {
+            true: {
+              read: 1.6,
+              write: 1.6,
+              why: 'TLS record encryption plus amortised handshakes (session resumption helps)',
+            },
           },
-        },
-      }),
-    upstreamKeepalive: z
-      .boolean()
-      .describe('Reuse connections to upstreams instead of a new TCP handshake per request')
-      .meta({
-        perfEffect: {
-          false: {
-            read: 1.3,
-            write: 1.3,
-            readAddMs: 0.5,
-            writeAddMs: 0.5,
-            why: 'a new upstream TCP connection per request (handshake RTT, ephemeral ports)',
+        }),
+      upstreamKeepalive: z
+        .boolean()
+        .describe('Reuse connections to upstreams instead of a new TCP handshake per request')
+        .meta({
+          perfEffect: {
+            false: {
+              read: 1.3,
+              write: 1.3,
+              readAddMs: 0.5,
+              writeAddMs: 0.5,
+              why: 'a new upstream TCP connection per request (handshake RTT, ephemeral ports)',
+            },
           },
-        },
+        }),
+      responseCaching: z
+        .boolean()
+        .describe(
+          'Cache upstream responses (proxy_cache): not modelled as hits here — add a cache/CDN node for that',
+        )
+        .meta({ advanced: true }),
+      rateLimitRps: z
+        .number()
+        .min(0)
+        .max(1e7)
+        .describe('Per-client request limit (0 = off)')
+        .meta({ advanced: true }),
+      healthCheckIntervalSec: z
+        .number()
+        .int()
+        .min(1)
+        .max(300)
+        .describe('Time between active health checks')
+        .meta({ advanced: true }),
+      unhealthyThreshold: z
+        .number()
+        .int()
+        .min(1)
+        .max(10)
+        .describe('Failed checks before an upstream is ejected')
+        .meta({ advanced: true }),
+      virtualNodes: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .describe('Consistent hashing: ring points per upstream (Envoy ring_hash / Maglev)')
+        .meta({ advanced: true }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          'Interchangeable proxy instances (Nginx / Envoy) that share the traffic evenly: capacity and cost grow with the count, and 2+ removes the single point of failure. They are not the upstreams it proxies to.',
+        autoscale: 'Adds or removes proxy instances.',
       }),
-    responseCaching: z
-      .boolean()
-      .describe(
-        'Cache upstream responses (proxy_cache): not modelled as hits here — add a cache/CDN node for that',
-      )
-      .meta({ advanced: true }),
-    rateLimitRps: z
-      .number()
-      .min(0)
-      .max(1e7)
-      .describe('Per-client request limit (0 = off)')
-      .meta({ advanced: true }),
-    healthCheckIntervalSec: z
-      .number()
-      .int()
-      .min(1)
-      .max(300)
-      .describe('Time between active health checks')
-      .meta({ advanced: true }),
-    unhealthyThreshold: z
-      .number()
-      .int()
-      .min(1)
-      .max(10)
-      .describe('Failed checks before an upstream is ejected')
-      .meta({ advanced: true }),
-    virtualNodes: z
-      .number()
-      .int()
-      .min(1)
-      .max(1000)
-      .describe('Consistent hashing: ring points per upstream (Envoy ring_hash / Maglev)')
-      .meta({ advanced: true }),
-  }),
+    ),
   defaults: {
     engine: 'nginx',
     algorithm: 'least-connections',

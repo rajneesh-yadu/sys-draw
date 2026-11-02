@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
 import { MEMORY_OPTIMISED_INSTANCES } from '../../presets';
+import { scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'cache.in-memory',
@@ -10,54 +11,65 @@ export default defineComponent({
   icon: 'gauge',
   providerNames: { aws: 'ElastiCache', gcp: 'Memorystore', azure: 'Azure Cache for Redis' },
   ports: [{ id: 'in', direction: 'in', protocols: ['resp', 'tcp'] }],
-  configSchema: z.object({
-    engine: z.enum(['redis', 'memcached']).describe('Cache engine'),
-    ttlSec: z
-      .number()
-      .int()
-      .min(0)
-      .max(2_592_000)
-      .describe('How long an entry lives (0 = until evicted)'),
-    writePolicy: z
-      .enum(['cache-aside', 'write-through', 'write-back'])
-      .describe('How writes keep the cache and the database in step'),
-    shards: z
-      .number()
-      .int()
-      .min(1)
-      .max(500)
-      .describe('Cluster shards (each holds part of the keys)')
-      .meta({ advanced: true, scaling: 'shards' }),
-    replicasPerShard: z
-      .number()
-      .int()
-      .min(0)
-      .max(5)
-      .describe('Read replicas / failover copies per shard')
-      .meta({ advanced: true }),
-    evictionPolicy: z
-      .enum(['lru', 'lfu', 'ttl', 'random'])
-      .describe('What to drop when memory is full')
-      .meta({ advanced: true }),
-    keyCount: z
-      .number()
-      .int()
-      .min(1)
-      .max(1e12)
-      .describe('Distinct keys that get read (the working set the cache could hold)'),
-    avgItemBytes: z
-      .number()
-      .int()
-      .min(1)
-      .max(512 * 2 ** 20)
-      .describe('Average cached value size in bytes'),
-    zipfExponent: z
-      .number()
-      .min(0)
-      .max(2)
-      .describe('Popularity skew s: key i is read ∝ 1/i^s (0 = uniform, ~0.8 typical web)')
-      .meta({ advanced: true }),
-  }),
+  configSchema: z
+    .object({
+      engine: z.enum(['redis', 'memcached']).describe('Cache engine'),
+      ttlSec: z
+        .number()
+        .int()
+        .min(0)
+        .max(2_592_000)
+        .describe('How long an entry lives (0 = until evicted)'),
+      writePolicy: z
+        .enum(['cache-aside', 'write-through', 'write-back'])
+        .describe('How writes keep the cache and the database in step'),
+      shards: z
+        .number()
+        .int()
+        .min(1)
+        .max(500)
+        .describe('Cluster shards (each holds part of the keys)')
+        .meta({ advanced: true, scaling: 'shards' }),
+      replicasPerShard: z
+        .number()
+        .int()
+        .min(0)
+        .max(5)
+        .describe(
+          'Read replicas / failover copies per shard. Not simulated yet: no effect on capacity, cost or failover',
+        )
+        .meta({ advanced: true }),
+      evictionPolicy: z
+        .enum(['lru', 'lfu', 'ttl', 'random'])
+        .describe('What to drop when memory is full')
+        .meta({ advanced: true }),
+      keyCount: z
+        .number()
+        .int()
+        .min(1)
+        .max(1e12)
+        .describe('Distinct keys that get read (the working set the cache could hold)'),
+      avgItemBytes: z
+        .number()
+        .int()
+        .min(1)
+        .max(512 * 2 ** 20)
+        .describe('Average cached value size in bytes'),
+      zipfExponent: z
+        .number()
+        .min(0)
+        .max(2)
+        .describe('Popularity skew s: key i is read ∝ 1/i^s (0 = uniform, ~0.8 typical web)')
+        .meta({ advanced: true }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          'Identical instances per shard that share its reads and writes evenly: more throughput and cost. Each holds the same keys, so memory and hit rate grow only with Shards. Not failover copies (Replicas per shard is not simulated yet).',
+        autoscale:
+          'Adds or removes instances per shard (throughput only; cache memory grows with Shards).',
+      }),
+    ),
   defaults: {
     engine: 'redis',
     ttlSec: 300,

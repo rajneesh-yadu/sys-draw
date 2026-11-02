@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
 import { GENERAL_PURPOSE_INSTANCES, MEMORY_OPTIMISED_INSTANCES } from '../../presets';
+import { scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'database.nosql',
@@ -10,43 +11,57 @@ export default defineComponent({
   icon: 'layers',
   providerNames: { aws: 'DynamoDB', gcp: 'Bigtable', azure: 'Cosmos DB' },
   ports: [{ id: 'in', direction: 'in', protocols: ['http1', 'http2', 'tcp', 'cql'] }],
-  configSchema: z.object({
-    dataModel: z.enum(['key-value', 'document', 'wide-column']).describe('How records are shaped'),
-    partitions: z
-      .number()
-      .int()
-      .min(1)
-      .max(10_000)
-      .describe('Number of shards the key space is split into')
-      .meta({ scaling: 'shards' }),
-    replicationFactor: z
-      .number()
-      .int()
-      .min(1)
-      .max(7)
-      .describe('Copies of each partition (durability; every copy applies every write)')
-      .meta({ scaling: 'storageCopies' }),
-    consistency: z
-      .enum(['eventual', 'quorum', 'strong'])
-      .describe('Read consistency: eventual is fastest, strong always sees the latest write'),
-    storageGb: z
-      .number()
-      .int()
-      .min(1)
-      .max(1_000_000)
-      .describe('Data stored')
-      .meta({ scaling: 'storageGb' }),
-    capacityMode: z
-      .enum(['provisioned', 'on-demand'])
-      .describe('Pre-buy throughput or pay per request')
-      .meta({ advanced: true }),
-    hotKeySkew: z
-      .number()
-      .min(0)
-      .max(1)
-      .describe('Share of traffic hitting the single hottest partition (0 = perfectly even)')
-      .meta({ advanced: true, scaling: 'keySkew' }),
-  }),
+  configSchema: z
+    .object({
+      dataModel: z
+        .enum(['key-value', 'document', 'wide-column'])
+        .describe('How records are shaped'),
+      partitions: z
+        .number()
+        .int()
+        .min(1)
+        .max(10_000)
+        .describe('Number of shards the key space is split into')
+        .meta({ scaling: 'shards' }),
+      replicationFactor: z
+        .number()
+        .int()
+        .min(1)
+        .max(7)
+        .describe(
+          'Copies of each partition kept for durability. Here it multiplies stored data (cost) only; extra write work is not simulated yet',
+        )
+        .meta({ scaling: 'storageCopies' }),
+      consistency: z
+        .enum(['eventual', 'quorum', 'strong'])
+        .describe(
+          'Read consistency: eventual is fastest, strong always sees the latest write. Not simulated yet: latency and cost do not change',
+        ),
+      storageGb: z
+        .number()
+        .int()
+        .min(1)
+        .max(1_000_000)
+        .describe('Data stored')
+        .meta({ scaling: 'storageGb' }),
+      capacityMode: z
+        .enum(['provisioned', 'on-demand'])
+        .describe('Pre-buy throughput or pay per request')
+        .meta({ advanced: true }),
+      hotKeySkew: z
+        .number()
+        .min(0)
+        .max(1)
+        .describe('Share of traffic hitting the single hottest partition (0 = perfectly even)')
+        .meta({ advanced: true, scaling: 'keySkew' }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          'Serving instances per partition that share its reads and writes evenly: more throughput and cost per partition. Copies of the data are Replication factor, which here only sets stored copies. Add Partitions to spread data and hot keys.',
+        autoscale: 'Adds or removes serving instances per partition.',
+      }),
+    ),
   defaults: {
     dataModel: 'key-value',
     partitions: 8,

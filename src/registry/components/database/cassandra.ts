@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
 import { GENERAL_PURPOSE_INSTANCES, MEMORY_OPTIMISED_INSTANCES } from '../../presets';
+import { scalingHelp } from '../../scaling-help';
 
 const LEVELS = ['ONE', 'TWO', 'QUORUM', 'LOCAL_QUORUM', 'ALL'] as const;
 
@@ -20,45 +21,55 @@ export default defineComponent({
   ],
   icon: 'circle-dot',
   ports: [{ id: 'in', direction: 'in', protocols: ['cql', 'tls13', 'tcp'] }],
-  configSchema: z.object({
-    replicationFactor: z
-      .number()
-      .int()
-      .min(1)
-      .max(7)
-      .describe('N: copies of every row, on N consecutive nodes of the token ring')
-      .meta({ scaling: 'storageCopies' }),
-    readConsistency: z
-      .enum(LEVELS)
-      .describe('R: replicas that must answer a read (QUORUM = ⌊N/2⌋ + 1)'),
-    writeConsistency: z.enum(LEVELS).describe('W: replicas that must acknowledge a write'),
-    vnodes: z
-      .number()
-      .int()
-      .min(1)
-      .max(256)
-      .describe('Tokens per node (num_tokens): more = smoother data spread')
-      .meta({ advanced: true }),
-    storageGb: z
-      .number()
-      .min(1)
-      .max(1e7)
-      .describe('Data stored (one copy)')
-      .meta({ scaling: 'storageGb' }),
-    compaction: z
-      .enum(['size-tiered', 'leveled', 'time-window'])
-      .describe('How SSTables are merged: STCS for writes, LCS for reads, TWCS for time series')
-      .meta({
-        advanced: true,
-        perfEffect: {
-          leveled: {
-            read: 0.8,
-            write: 1.3,
-            why: 'reads touch ~1 SSTable, but compaction rewrites data more often (write amplification)',
+  configSchema: z
+    .object({
+      replicationFactor: z
+        .number()
+        .int()
+        .min(1)
+        .max(7)
+        .describe(
+          'N: copies of every row, on N consecutive nodes of the token ring (capped at the node count, Scaling → Replicas)',
+        )
+        .meta({ scaling: 'storageCopies' }),
+      readConsistency: z
+        .enum(LEVELS)
+        .describe('R: replicas that must answer a read (QUORUM = ⌊N/2⌋ + 1)'),
+      writeConsistency: z.enum(LEVELS).describe('W: replicas that must acknowledge a write'),
+      vnodes: z
+        .number()
+        .int()
+        .min(1)
+        .max(256)
+        .describe('Tokens per node (num_tokens): more = smoother data spread')
+        .meta({ advanced: true }),
+      storageGb: z
+        .number()
+        .min(1)
+        .max(1e7)
+        .describe('Data stored (one copy)')
+        .meta({ scaling: 'storageGb' }),
+      compaction: z
+        .enum(['size-tiered', 'leveled', 'time-window'])
+        .describe('How SSTables are merged: STCS for writes, LCS for reads, TWCS for time series')
+        .meta({
+          advanced: true,
+          perfEffect: {
+            leveled: {
+              read: 0.8,
+              write: 1.3,
+              why: 'reads touch ~1 SSTable, but compaction rewrites data more often (write amplification)',
+            },
           },
-        },
+        }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          'Nodes in the cluster (the token ring). Each node owns a share of the data and traffic, so capacity and cost grow with nodes. Copies of each row are Replication factor (N), which is capped at this node count. Not backups.',
+        autoscale: 'Adds or removes cluster nodes.',
       }),
-  }),
+    ),
   defaults: {
     replicationFactor: 3,
     readConsistency: 'LOCAL_QUORUM',

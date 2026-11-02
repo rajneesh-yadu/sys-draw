@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
 import { GENERAL_PURPOSE_INSTANCES } from '../../presets';
+import { scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'network.service-mesh',
@@ -27,62 +28,74 @@ export default defineComponent({
     { id: 'in', direction: 'in', protocols: ['http1', 'http2', 'grpc', 'tcp', 'tls13'] },
     { id: 'services', direction: 'out', protocols: ['http1', 'http2', 'grpc', 'tcp', 'tls13'] },
   ],
-  configSchema: z.object({
-    dataPlane: z
-      .enum(['sidecar', 'ambient'])
-      .describe(
-        'A proxy next to every pod (Envoy sidecar) or a shared per-node proxy (ambient / ztunnel)',
-      )
-      .meta({
-        perfEffect: {
-          sidecar: {
-            read: 1.5,
-            write: 1.5,
-            readAddMs: 0.6,
-            writeAddMs: 0.6,
-            why: 'two Envoy hops per call (client-side and server-side sidecars), each parsing HTTP',
+  configSchema: z
+    .object({
+      dataPlane: z
+        .enum(['sidecar', 'ambient'])
+        .describe(
+          'A proxy next to every pod (Envoy sidecar) or a shared per-node proxy (ambient / ztunnel)',
+        )
+        .meta({
+          perfEffect: {
+            sidecar: {
+              read: 1.5,
+              write: 1.5,
+              readAddMs: 0.6,
+              writeAddMs: 0.6,
+              why: 'two Envoy hops per call (client-side and server-side sidecars), each parsing HTTP',
+            },
+            ambient: {
+              readAddMs: 0.2,
+              writeAddMs: 0.2,
+              why: 'L4 ztunnel per node; L7 features only through optional waypoint proxies',
+            },
           },
-          ambient: {
-            readAddMs: 0.2,
-            writeAddMs: 0.2,
-            why: 'L4 ztunnel per node; L7 features only through optional waypoint proxies',
+        }),
+      mtls: z
+        .enum(['strict', 'permissive', 'off'])
+        .describe('Mutual TLS between services: strict rejects plaintext')
+        .meta({
+          perfEffect: {
+            strict: {
+              read: 1.2,
+              write: 1.2,
+              why: 'encrypting every hop with workload certificates',
+            },
+            permissive: { read: 1.2, write: 1.2, why: 'mTLS where both sides support it' },
           },
-        },
+        }),
+      algorithm: z
+        .enum(['round-robin', 'least-connections', 'consistent-hash', 'random'])
+        .describe('Client-side balancing over the destination pods'),
+      retries: z
+        .number()
+        .int()
+        .min(0)
+        .max(10)
+        .describe('Mesh retry policy (set the edge retries to simulate them)')
+        .meta({ advanced: true }),
+      healthCheckIntervalSec: z
+        .number()
+        .int()
+        .min(1)
+        .max(300)
+        .describe('Outlier detection interval')
+        .meta({ advanced: true }),
+      unhealthyThreshold: z
+        .number()
+        .int()
+        .min(1)
+        .max(10)
+        .describe('Consecutive errors before a pod is ejected')
+        .meta({ advanced: true }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          "Data-plane proxy capacity: the mesh's traffic is split evenly over these instances, so throughput and cost grow with the count. The destination services are separate nodes with their own replicas.",
+        autoscale: 'Adds or removes proxy capacity.',
       }),
-    mtls: z
-      .enum(['strict', 'permissive', 'off'])
-      .describe('Mutual TLS between services: strict rejects plaintext')
-      .meta({
-        perfEffect: {
-          strict: { read: 1.2, write: 1.2, why: 'encrypting every hop with workload certificates' },
-          permissive: { read: 1.2, write: 1.2, why: 'mTLS where both sides support it' },
-        },
-      }),
-    algorithm: z
-      .enum(['round-robin', 'least-connections', 'consistent-hash', 'random'])
-      .describe('Client-side balancing over the destination pods'),
-    retries: z
-      .number()
-      .int()
-      .min(0)
-      .max(10)
-      .describe('Mesh retry policy (set the edge retries to simulate them)')
-      .meta({ advanced: true }),
-    healthCheckIntervalSec: z
-      .number()
-      .int()
-      .min(1)
-      .max(300)
-      .describe('Outlier detection interval')
-      .meta({ advanced: true }),
-    unhealthyThreshold: z
-      .number()
-      .int()
-      .min(1)
-      .max(10)
-      .describe('Consecutive errors before a pod is ejected')
-      .meta({ advanced: true }),
-  }),
+    ),
   defaults: {
     dataPlane: 'sidecar',
     mtls: 'strict',

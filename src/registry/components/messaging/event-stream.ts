@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
 import { GENERAL_PURPOSE_INSTANCES } from '../../presets';
+import { scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'messaging.stream',
@@ -17,47 +18,57 @@ export default defineComponent({
     { id: 'producers', direction: 'in', protocols: ['kafka-wire', 'http2', 'amqp'] },
     { id: 'consumers', direction: 'out', protocols: ['kafka-wire', 'http2', 'amqp'] },
   ],
-  configSchema: z.object({
-    partitions: z
-      .number()
-      .int()
-      .min(1)
-      .max(10_000)
-      .describe('Parallel append-only logs (shards); order holds within one partition')
-      .meta({ scaling: 'shards' }),
-    replicationFactor: z
-      .number()
-      .int()
-      .min(1)
-      .max(5)
-      .describe('Copies of every partition on different brokers / zones')
-      .meta({ scaling: 'storageCopies' }),
-    retentionHours: z
-      .number()
-      .int()
-      .min(1)
-      .max(8760)
-      .describe('How long events are kept for replay, whether consumed or not'),
-    storageGb: z
-      .number()
-      .min(1)
-      .max(1e6)
-      .describe('Data retained (per copy)')
-      .meta({ scaling: 'storageGb' }),
-    consumerGroups: z
-      .number()
-      .int()
-      .min(1)
-      .max(100)
-      .describe('Independent readers that each see every event')
-      .meta({ advanced: true }),
-    keySkew: z
-      .number()
-      .min(0)
-      .max(1)
-      .describe('Share of events on the hottest partition key (0 = evenly spread)')
-      .meta({ advanced: true, scaling: 'keySkew' }),
-  }),
+  configSchema: z
+    .object({
+      partitions: z
+        .number()
+        .int()
+        .min(1)
+        .max(10_000)
+        .describe('Parallel append-only logs (shards); order holds within one partition')
+        .meta({ scaling: 'shards' }),
+      replicationFactor: z
+        .number()
+        .int()
+        .min(1)
+        .max(5)
+        .describe('Copies of every partition on different brokers / zones')
+        .meta({ scaling: 'storageCopies' }),
+      retentionHours: z
+        .number()
+        .int()
+        .min(1)
+        .max(8760)
+        .describe('How long events are kept for replay, whether consumed or not'),
+      storageGb: z
+        .number()
+        .min(1)
+        .max(1e6)
+        .describe('Data retained (per copy)')
+        .meta({ scaling: 'storageGb' }),
+      consumerGroups: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .describe(
+          'Independent readers that each see every event. Not simulated: each consumer node connected after the stream is its own group',
+        )
+        .meta({ advanced: true }),
+      keySkew: z
+        .number()
+        .min(0)
+        .max(1)
+        .describe('Share of events on the hottest partition key (0 = evenly spread)')
+        .meta({ advanced: true, scaling: 'keySkew' }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          'Instances per partition that share its load: more throughput and cost. Copies of the data are Replication factor, not this. Ordering and the hot-key limit are per partition, so add Partitions to scale.',
+        autoscale: 'Adds or removes instances per partition.',
+      }),
+    ),
   defaults: {
     partitions: 6,
     replicationFactor: 3,

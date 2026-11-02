@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
 import { GENERAL_PURPOSE_INSTANCES, MEMORY_OPTIMISED_INSTANCES } from '../../presets';
+import { scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'database.clickhouse',
@@ -9,38 +10,48 @@ export default defineComponent({
   tags: ['database', 'olap', 'analytics', 'columnar', 'clickhouse', 'warehouse', 'self-hosted'],
   icon: 'chart-column',
   ports: [{ id: 'in', direction: 'in', protocols: ['http1', 'tcp', 'tls13'] }],
-  configSchema: z.object({
-    rowsScannedPerQuery: z
-      .number()
-      .min(0)
-      .max(1e13)
-      .describe('Rows a typical query reads after primary-key / partition pruning'),
-    columnsRead: z
-      .number()
-      .int()
-      .min(1)
-      .max(1000)
-      .describe('Columns the query touches (only those are read from disk)'),
-    rowsPerInsert: z
-      .number()
-      .int()
-      .min(1)
-      .max(1e8)
-      .describe('Rows per INSERT (batch big: each insert creates a part to merge)'),
-    storageGb: z
-      .number()
-      .min(1)
-      .max(1e8)
-      .describe('Compressed data stored')
-      .meta({ scaling: 'storageGb' }),
-    replication: z
-      .number()
-      .int()
-      .min(1)
-      .max(3)
-      .describe('Replicas per shard (ReplicatedMergeTree via Keeper)')
-      .meta({ advanced: true, scaling: 'storageCopies' }),
-  }),
+  configSchema: z
+    .object({
+      rowsScannedPerQuery: z
+        .number()
+        .min(0)
+        .max(1e13)
+        .describe('Rows a typical query reads after primary-key / partition pruning'),
+      columnsRead: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .describe('Columns the query touches (only those are read from disk)'),
+      rowsPerInsert: z
+        .number()
+        .int()
+        .min(1)
+        .max(1e8)
+        .describe('Rows per INSERT (batch big: each insert creates a part to merge)'),
+      storageGb: z
+        .number()
+        .min(1)
+        .max(1e8)
+        .describe('Compressed data stored')
+        .meta({ scaling: 'storageGb' }),
+      replication: z
+        .number()
+        .int()
+        .min(1)
+        .max(3)
+        .describe(
+          'Copies of the data (ReplicatedMergeTree via Keeper). Here it multiplies stored data only; query capacity comes from Scaling → Replicas',
+        )
+        .meta({ advanced: true, scaling: 'storageCopies' }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          'Servers that share queries and inserts evenly: more throughput and cost. Copies of the data are Replication, which here only multiplies stored data. Each server receives its share of inserts, so batch them (Rows per insert).',
+        autoscale: 'Adds or removes servers.',
+      }),
+    ),
   defaults: {
     rowsScannedPerQuery: 100_000_000,
     columnsRead: 3,

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
+import { scalingHelp } from '../../scaling-help';
 
 /**
  * AWS-only (provider-only tag): Aurora is MySQL/PostgreSQL compatible but its storage layer is
@@ -13,37 +14,48 @@ export default defineComponent({
   icon: 'database-zap',
   providerNames: { aws: 'Aurora' },
   ports: [{ id: 'in', direction: 'in', protocols: ['postgres-wire', 'mysql-wire', 'tcp'] }],
-  configSchema: z.object({
-    engine: z.enum(['postgres', 'mysql']).describe('Compatible engine'),
-    storageGb: z
-      .number()
-      .int()
-      .min(10)
-      .max(131_072)
-      .describe('Data in the shared cluster volume (grows automatically, up to 128 TiB)')
-      .meta({ scaling: 'storageGb' }),
-    readReplicas: z
-      .number()
-      .int()
-      .min(0)
-      .max(15)
-      .describe('Aurora Replicas: share the cluster volume, take reads, and are failover targets')
-      .meta({ scaling: 'readReplicas' }),
-    clusterVolumes: z
-      .number()
-      .int()
-      .min(1)
-      .max(6)
-      .describe('Billed storage volumes: 1 + secondary regions of an Aurora Global Database')
-      .meta({ advanced: true, scaling: 'storageCopies' }),
-    maxConnections: z
-      .number()
-      .int()
-      .min(10)
-      .max(16_000)
-      .describe('Connection limit on the writer')
-      .meta({ advanced: true }),
-  }),
+  configSchema: z
+    .object({
+      engine: z.enum(['postgres', 'mysql']).describe('Compatible engine'),
+      storageGb: z
+        .number()
+        .int()
+        .min(10)
+        .max(131_072)
+        .describe('Data in the shared cluster volume (grows automatically, up to 128 TiB)')
+        .meta({ scaling: 'storageGb' }),
+      readReplicas: z
+        .number()
+        .int()
+        .min(0)
+        .max(15)
+        .describe('Aurora Replicas: share the cluster volume, take reads, and are failover targets')
+        .meta({ scaling: 'readReplicas' }),
+      clusterVolumes: z
+        .number()
+        .int()
+        .min(1)
+        .max(6)
+        .describe('Billed storage volumes: 1 + secondary regions of an Aurora Global Database')
+        .meta({ advanced: true, scaling: 'storageCopies' }),
+      maxConnections: z
+        .number()
+        .int()
+        .min(10)
+        .max(16_000)
+        .describe('Connection limit on the writer')
+        .meta({ advanced: true }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          '1 = the writer only. Each extra replica adds one Aurora Replica (takes reads, never writes; billed), on top of Read replicas. Replicas share the cluster volume, so storage cost does not grow. Not a backup. Prefer Read replicas and leave this at 1.',
+        autoscale:
+          'Aurora Auto Scaling: adds or removes Aurora Replicas; writes still go to the one writer.',
+        instanceType:
+          'Size of the writer and each replica. A bigger writer is the only way to add write capacity.',
+      }),
+    ),
   defaults: {
     engine: 'postgres',
     storageGb: 100,

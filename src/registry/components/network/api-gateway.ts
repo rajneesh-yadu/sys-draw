@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
+import { managedPerRequest, scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'network.api-gateway',
@@ -20,38 +21,40 @@ export default defineComponent({
     { id: 'in', direction: 'in', protocols: ['http1', 'http2', 'websocket'] },
     { id: 'backends', direction: 'out', protocols: ['http1', 'http2', 'grpc'] },
   ],
-  configSchema: z.object({
-    authMode: z
-      .enum(['none', 'api-key', 'jwt', 'oauth2'])
-      .describe('How callers are authenticated'),
-    rateLimitRps: z
-      .number()
-      .int()
-      .min(1)
-      .max(1_000_000)
-      .describe('Sustained requests per second allowed per client'),
-    burst: z
-      .number()
-      .int()
-      .min(1)
-      .max(1_000_000)
-      .describe('Extra requests allowed in a short burst'),
-    requestValidation: z
-      .boolean()
-      .describe('Reject malformed requests before they reach services')
-      .meta({ advanced: true }),
-    responseCaching: z
-      .boolean()
-      .describe('Cache GET responses at the gateway')
-      .meta({ advanced: true }),
-    timeoutMs: z
-      .number()
-      .int()
-      .min(50)
-      .max(29_000)
-      .describe('Backend timeout')
-      .meta({ advanced: true }),
-  }),
+  configSchema: z
+    .object({
+      authMode: z
+        .enum(['none', 'api-key', 'jwt', 'oauth2'])
+        .describe('How callers are authenticated'),
+      rateLimitRps: z
+        .number()
+        .int()
+        .min(1)
+        .max(1_000_000)
+        .describe('Sustained requests per second allowed per client'),
+      burst: z
+        .number()
+        .int()
+        .min(1)
+        .max(1_000_000)
+        .describe('Extra requests allowed in a short burst'),
+      requestValidation: z
+        .boolean()
+        .describe('Reject malformed requests before they reach services')
+        .meta({ advanced: true }),
+      responseCaching: z
+        .boolean()
+        .describe('Cache GET responses at the gateway')
+        .meta({ advanced: true }),
+      timeoutMs: z
+        .number()
+        .int()
+        .min(50)
+        .max(29_000)
+        .describe('Backend timeout')
+        .meta({ advanced: true }),
+    })
+    .meta(scalingHelp(managedPerRequest('managed API gateway'))),
   defaults: {
     authMode: 'jwt',
     rateLimitRps: 100,

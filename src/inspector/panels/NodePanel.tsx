@@ -9,6 +9,7 @@ import { ComponentDocs } from './DocsView';
 import { PanelTitle, Section, Tabs } from './common';
 import { ProviderInfo } from './ProviderInfo';
 import { ScaleActions } from './ScaleActions';
+import { scalingHelpFor } from './scaling-help';
 import { useDispatch } from './use-dispatch';
 
 const LabelSchema = z.object({
@@ -19,12 +20,14 @@ export function NodePanel({ node, providerId }: { node: NodeInstance; providerId
   const dispatch = useDispatch();
   const def = registry.get(node.defId, 'component');
 
-  const scalingOverrides = useMemo<FieldOverrides>(
-    () => ({
-      replicas: { help: 'Identical instances behind a load balancer (scale out)' },
+  const scalingOverrides = useMemo<FieldOverrides>(() => {
+    // S23: what replicas / size / autoscale mean for THIS component (registry `scalingHelp`).
+    const help = scalingHelpFor(def);
+    return {
+      replicas: { help: help.replicas },
       instanceType: {
         label: 'Instance type',
-        help: 'Size of each instance (scale up)',
+        help: help.instanceType,
         options: (def?.instanceTypes ?? []).map((t) => {
           // S12: the board provider's product and price for this size, when it has one.
           const p = instancePrice(registry.get(providerId, 'provider'), def?.id ?? '', t.id);
@@ -38,7 +41,7 @@ export function NodePanel({ node, providerId }: { node: NodeInstance; providerId
       },
       autoscale: {
         label: 'Autoscale',
-        help: 'Add or remove replicas to hold a target utilisation',
+        help: help.autoscale,
         defaultValue: {
           min: node.scaling.replicas,
           max: node.scaling.replicas * 4,
@@ -55,9 +58,8 @@ export function NodePanel({ node, providerId }: { node: NodeInstance; providerId
         help: 'Scale out above this busy fraction',
       },
       'autoscale.warmupSec': { label: 'Warm-up', help: 'Time before a new replica takes traffic' },
-    }),
-    [def, node.scaling.replicas, providerId],
-  );
+    };
+  }, [def, node.scaling.replicas, providerId]);
 
   if (!def) {
     return (

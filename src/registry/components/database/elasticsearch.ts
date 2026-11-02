@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
 import { GENERAL_PURPOSE_INSTANCES, MEMORY_OPTIMISED_INSTANCES } from '../../presets';
+import { scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'database.elasticsearch',
@@ -22,45 +23,58 @@ export default defineComponent({
     azure: 'Elastic Cloud on Azure',
   },
   ports: [{ id: 'in', direction: 'in', protocols: ['http1', 'http2', 'tls13'] }],
-  configSchema: z.object({
-    primaryShards: z
-      .number()
-      .int()
-      .min(1)
-      .max(1024)
-      .describe(
-        'Primary shards per index: every search runs on all of them (fixed at index creation)',
-      ),
-    replicasPerShard: z
-      .number()
-      .int()
-      .min(0)
-      .max(5)
-      .describe('Copies of each shard: more search throughput and safety, more indexing work'),
-    refreshIntervalSec: z
-      .number()
-      .min(0.1)
-      .max(3600)
-      .describe('How often new documents become searchable (near-real-time)')
-      .meta({
-        advanced: true,
+  configSchema: z
+    .object({
+      primaryShards: z
+        .number()
+        .int()
+        .min(1)
+        .max(1024)
+        .describe(
+          'Primary shards per index: every search runs on all of them (fixed at index creation)',
+        ),
+      replicasPerShard: z
+        .number()
+        .int()
+        .min(0)
+        .max(5)
+        .describe(
+          'Extra copies of each primary shard on other data nodes (failover safety). Every copy indexes every document (more write work and storage); search capacity comes from data nodes (Scaling → Replicas)',
+        ),
+      refreshIntervalSec: z
+        .number()
+        .min(0.1)
+        .max(3600)
+        .describe('How often new documents become searchable (near-real-time)')
+        .meta({
+          advanced: true,
+        }),
+      storageGb: z
+        .number()
+        .min(1)
+        .max(1e7)
+        .describe('Index size (one copy)')
+        .meta({ scaling: 'storageGb' }),
+      queryType: z
+        .enum(['term', 'full-text', 'aggregation'])
+        .describe('Typical query: exact term lookups, scored full-text search, or aggregations')
+        .meta({
+          perfEffect: {
+            term: { read: 0.5, why: 'filter-only queries skip scoring and are cacheable' },
+            aggregation: {
+              read: 3,
+              why: 'aggregations walk doc values for every matching document',
+            },
+          },
+        }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          'Data nodes. Primary and replica shard copies are spread over them, so search and indexing capacity and cost grow with nodes. Copies of the data are Replicas per shard, not this; you need at least 1 + Replicas per shard nodes to place every copy.',
+        autoscale: 'Adds or removes data nodes.',
       }),
-    storageGb: z
-      .number()
-      .min(1)
-      .max(1e7)
-      .describe('Index size (one copy)')
-      .meta({ scaling: 'storageGb' }),
-    queryType: z
-      .enum(['term', 'full-text', 'aggregation'])
-      .describe('Typical query: exact term lookups, scored full-text search, or aggregations')
-      .meta({
-        perfEffect: {
-          term: { read: 0.5, why: 'filter-only queries skip scoring and are cacheable' },
-          aggregation: { read: 3, why: 'aggregations walk doc values for every matching document' },
-        },
-      }),
-  }),
+    ),
   defaults: {
     primaryShards: 3,
     replicasPerShard: 1,

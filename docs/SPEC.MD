@@ -739,6 +739,34 @@ Done when: an authenticated user can open, edit, reload, and delete only their o
 
 This S22 makes cloud persistence the next session. The earlier S22 suggestion in `docs/PROGRESS.md` about command-palette coverage is deferred as a later follow-up and should not be combined with this work.
 
+**S23 · Explain confusing component configuration fields**
+
+```markdown
+TASK S23 — Explain confusing component configuration fields.
+Read: docs/DATA-MODEL.md (ComponentDefinition), docs/ARCHITECTURE.md,
+src/registry/components/ (all component definitions), and the existing inspector/schema
+mechanism used to show config-field help.
+Build: audit the existing component configuration fields and add concise explanations only
+for fields whose meaning or effect is likely to be unclear. Use the existing schema/inspector
+mechanism; do not redesign the UI or document every field. Explain what each selected value
+means for that specific component, its effect on capacity, behavior, cost, or availability,
+and relevant limits.
+Pay particular attention to `replicas`: clarify whether they represent interchangeable
+service instances for horizontal scaling, read copies, failover/standby copies, or another
+role. State explicitly when replicas do not provide backups or run separate services; only
+describe those roles when the component actually supports them. Include other ambiguous
+settings such as replication factor, partitions/shards, consistency, persistence, and
+autoscaling where their component-specific semantics are not self-evident.
+Do not change simulation behavior or public APIs. Keep explanations concise and factual; if a
+setting's semantics are not implemented or cannot be established from the code, record it as
+a follow-up instead of guessing.
+Tests: add or update focused tests for field-help metadata/rendering where practical. Run the
+existing relevant registry/inspector checks, lint, and build.
+Done when: confusing settings are explained consistently in the inspector, replica meanings
+are clear per component, self-evident fields remain uncluttered, and existing behavior is
+unchanged.
+```
+
 ## Templates
 
 Use these for everything after the 21 build sessions; each is a complete session prompt once the blanks are filled.

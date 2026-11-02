@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
+import { managedPerRequest, scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'messaging.queue',
@@ -12,34 +13,50 @@ export default defineComponent({
     { id: 'producers', direction: 'in', protocols: ['http1', 'http2', 'amqp'] },
     { id: 'consumers', direction: 'out', protocols: ['http1', 'http2', 'amqp'] },
   ],
-  configSchema: z.object({
-    delivery: z
-      .enum(['at-most-once', 'at-least-once', 'exactly-once'])
-      .describe('Delivery guarantee (at-least-once means consumers must be idempotent)'),
-    ordering: z.enum(['none', 'fifo', 'per-key']).describe('Ordering guarantee'),
-    consumers: z.number().int().min(1).max(10_000).describe('Parallel consumers pulling messages'),
-    retentionHours: z
-      .number()
-      .int()
-      .min(1)
-      .max(336)
-      .describe('How long unconsumed messages are kept')
-      .meta({ advanced: true }),
-    visibilityTimeoutSec: z
-      .number()
-      .int()
-      .min(0)
-      .max(43_200)
-      .describe('Time a consumer has to finish before the message is redelivered')
-      .meta({ advanced: true }),
-    maxReceiveCount: z
-      .number()
-      .int()
-      .min(1)
-      .max(1000)
-      .describe('Deliveries before a message goes to the dead-letter queue')
-      .meta({ advanced: true }),
-  }),
+  configSchema: z
+    .object({
+      delivery: z
+        .enum(['at-most-once', 'at-least-once', 'exactly-once'])
+        .describe('Delivery guarantee (at-least-once means consumers must be idempotent)'),
+      ordering: z.enum(['none', 'fifo', 'per-key']).describe('Ordering guarantee'),
+      consumers: z
+        .number()
+        .int()
+        .min(1)
+        .max(10_000)
+        .describe(
+          'Parallel consumers pulling messages. Not simulated: drain rate comes from the consumer nodes connected after the queue',
+        ),
+      retentionHours: z
+        .number()
+        .int()
+        .min(1)
+        .max(336)
+        .describe('How long unconsumed messages are kept')
+        .meta({ advanced: true }),
+      visibilityTimeoutSec: z
+        .number()
+        .int()
+        .min(0)
+        .max(43_200)
+        .describe('Time a consumer has to finish before the message is redelivered')
+        .meta({ advanced: true }),
+      maxReceiveCount: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .describe('Deliveries before a message goes to the dead-letter queue')
+        .meta({ advanced: true }),
+    })
+    .meta(
+      scalingHelp(
+        managedPerRequest(
+          'managed queue',
+          'Consumers are the nodes connected after the queue (their replicas), not these units.',
+        ),
+      ),
+    ),
   defaults: {
     delivery: 'at-least-once',
     ordering: 'none',

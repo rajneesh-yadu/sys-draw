@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
 import { MEMORY_OPTIMISED_INSTANCES } from '../../presets';
+import { scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'cache.memcached',
@@ -9,47 +10,55 @@ export default defineComponent({
   tags: ['cache', 'memcached', 'in-memory', 'key-value', 'multi-threaded', 'self-hosted'],
   icon: 'memory-stick',
   ports: [{ id: 'in', direction: 'in', protocols: ['memcache', 'tcp'] }],
-  configSchema: z.object({
-    nodes: z
-      .number()
-      .int()
-      .min(1)
-      .max(500)
-      .describe('Cache nodes; clients consistent-hash keys over them, so memory adds up')
-      .meta({ scaling: 'shards' }),
-    keyCount: z
-      .number()
-      .int()
-      .min(1)
-      .max(1e12)
-      .describe('Distinct keys that get read (the working set)'),
-    avgItemBytes: z
-      .number()
-      .int()
-      .min(1)
-      .max(1024 * 1024)
-      .describe('Average value size in bytes (max item 1 MB by default)'),
-    zipfExponent: z
-      .number()
-      .min(0)
-      .max(2)
-      .describe('Popularity skew s: key i is read ∝ 1/i^s')
-      .meta({ advanced: true }),
-    evictionPolicy: z.enum(['lru']).describe('Segmented LRU per slab class (the only policy)'),
-    usableMemoryFraction: z
-      .number()
-      .min(0.1)
-      .max(0.98)
-      .describe('Share of RAM given to -m (slab overhead wastes some of it)')
-      .meta({ advanced: true }),
-    threads: z
-      .number()
-      .int()
-      .min(1)
-      .max(64)
-      .describe('Worker threads per node (-t)')
-      .meta({ advanced: true }),
-  }),
+  configSchema: z
+    .object({
+      nodes: z
+        .number()
+        .int()
+        .min(1)
+        .max(500)
+        .describe('Cache nodes; clients consistent-hash keys over them, so memory adds up')
+        .meta({ scaling: 'shards' }),
+      keyCount: z
+        .number()
+        .int()
+        .min(1)
+        .max(1e12)
+        .describe('Distinct keys that get read (the working set)'),
+      avgItemBytes: z
+        .number()
+        .int()
+        .min(1)
+        .max(1024 * 1024)
+        .describe('Average value size in bytes (max item 1 MB by default)'),
+      zipfExponent: z
+        .number()
+        .min(0)
+        .max(2)
+        .describe('Popularity skew s: key i is read ∝ 1/i^s')
+        .meta({ advanced: true }),
+      evictionPolicy: z.enum(['lru']).describe('Segmented LRU per slab class (the only policy)'),
+      usableMemoryFraction: z
+        .number()
+        .min(0.1)
+        .max(0.98)
+        .describe('Share of RAM given to -m (slab overhead wastes some of it)')
+        .meta({ advanced: true }),
+      threads: z
+        .number()
+        .int()
+        .min(1)
+        .max(64)
+        .describe('Worker threads per node (-t)')
+        .meta({ advanced: true }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          'Identical copies of every cache node that share its traffic: more throughput and cost. Memcached does not replicate, so memory and hit rate grow only with Nodes, and copies are not backups.',
+        autoscale: 'Adds or removes copies per node (throughput only; memory grows with Nodes).',
+      }),
+    ),
   defaults: {
     nodes: 2,
     keyCount: 50_000_000,

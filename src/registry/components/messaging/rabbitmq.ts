@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
 import { GENERAL_PURPOSE_INSTANCES } from '../../presets';
+import { scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'messaging.rabbitmq',
@@ -12,53 +13,65 @@ export default defineComponent({
     { id: 'publishers', direction: 'in', protocols: ['amqp', 'tls13', 'tcp'] },
     { id: 'consumers', direction: 'out', protocols: ['amqp', 'tls13', 'tcp'] },
   ],
-  configSchema: z.object({
-    queueType: z
-      .enum(['classic', 'quorum', 'stream'])
-      .describe('classic = one node; quorum = Raft-replicated; stream = append-only log')
-      .meta({
-        perfEffect: {
-          quorum: {
-            write: 1.6,
-            writeAddMs: 1,
-            why: 'each message is committed through Raft on a majority of nodes before it is confirmed',
+  configSchema: z
+    .object({
+      queueType: z
+        .enum(['classic', 'quorum', 'stream'])
+        .describe(
+          'classic = one copy on one node; quorum = Raft-replicated on a majority of nodes (writes ~1.6× slower); stream = append-only log (replayable)',
+        )
+        .meta({
+          perfEffect: {
+            quorum: {
+              write: 1.6,
+              writeAddMs: 1,
+              why: 'each message is committed through Raft on a majority of nodes before it is confirmed',
+            },
+            stream: { write: 0.7, why: 'append-only log, no per-message queue bookkeeping' },
           },
-          stream: { write: 0.7, why: 'append-only log, no per-message queue bookkeeping' },
-        },
-      }),
-    persistent: z
-      .boolean()
-      .describe('Persist messages to disk (survive a broker restart)')
-      .meta({
-        perfEffect: {
-          true: { write: 1.5, why: 'messages are written and fsynced to disk' },
-        },
-      }),
-    publisherConfirms: z
-      .boolean()
-      .describe('Broker confirms each publish once it is safely stored')
-      .meta({
-        perfEffect: {
-          true: {
-            writeAddMs: 0.5,
-            why: 'the publisher waits for the confirm (batch them to keep throughput)',
+        }),
+      persistent: z
+        .boolean()
+        .describe(
+          'Write messages to disk so they survive a broker restart (writes ~1.5× slower). Not replication: that is Queue type = quorum',
+        )
+        .meta({
+          perfEffect: {
+            true: { write: 1.5, why: 'messages are written and fsynced to disk' },
           },
-        },
+        }),
+      publisherConfirms: z
+        .boolean()
+        .describe('Broker confirms each publish once it is safely stored')
+        .meta({
+          perfEffect: {
+            true: {
+              writeAddMs: 0.5,
+              why: 'the publisher waits for the confirm (batch them to keep throughput)',
+            },
+          },
+        }),
+      prefetch: z
+        .number()
+        .int()
+        .min(1)
+        .max(10_000)
+        .describe(
+          'Unacknowledged messages a consumer may hold (too low = idle consumers, too high = unfair)',
+        )
+        .meta({ advanced: true }),
+      exchangeType: z
+        .enum(['direct', 'topic', 'fanout', 'headers'])
+        .describe('How the exchange routes messages to queues')
+        .meta({ advanced: true }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          'Broker nodes in the cluster. The simulation splits message traffic evenly across them: more throughput and cost. Consumers are the nodes connected after the broker (their replicas), not these.',
+        autoscale: 'Adds or removes broker nodes.',
       }),
-    prefetch: z
-      .number()
-      .int()
-      .min(1)
-      .max(10_000)
-      .describe(
-        'Unacknowledged messages a consumer may hold (too low = idle consumers, too high = unfair)',
-      )
-      .meta({ advanced: true }),
-    exchangeType: z
-      .enum(['direct', 'topic', 'fanout', 'headers'])
-      .describe('How the exchange routes messages to queues')
-      .meta({ advanced: true }),
-  }),
+    ),
   defaults: {
     queueType: 'quorum',
     persistent: true,

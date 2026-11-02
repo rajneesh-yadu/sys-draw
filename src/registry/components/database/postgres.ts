@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
 import { GENERAL_PURPOSE_INSTANCES, MEMORY_OPTIMISED_INSTANCES } from '../../presets';
+import { scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'database.postgres',
@@ -14,53 +15,68 @@ export default defineComponent({
     azure: 'Azure Database for PostgreSQL',
   },
   ports: [{ id: 'in', direction: 'in', protocols: ['postgres-wire', 'tls13', 'tcp'] }],
-  configSchema: z.object({
-    readReplicas: z
-      .number()
-      .int()
-      .min(0)
-      .max(15)
-      .describe('Streaming replicas that serve reads (writes still all go to the primary)')
-      .meta({ scaling: 'readReplicas' }),
-    replication: z
-      .enum(['async', 'sync'])
-      .describe(
-        'async: replicas lag, commits fast; sync: a commit waits for a standby (no data loss)',
-      ),
-    highAvailability: z
-      .boolean()
-      .describe('Hot standby in another zone for automatic failover (billed, serves no traffic)')
-      .meta({ scaling: 'standby' }),
-    queryUsesIndex: z
-      .boolean()
-      .describe('The hot read query has a matching index (off = sequential scan of the table)'),
-    tableRows: z.number().int().min(1).max(1e11).describe('Rows in the table the hot query reads'),
-    secondaryIndexes: z
-      .number()
-      .int()
-      .min(0)
-      .max(30)
-      .describe('Indexes besides the primary key: faster reads, slower writes'),
-    storageGb: z
-      .number()
-      .min(1)
-      .max(65_536)
-      .describe('Data + indexes stored')
-      .meta({ scaling: 'storageGb' }),
-    connectionPooling: z
-      .boolean()
-      .describe('PgBouncer-style pooling (each Postgres connection is a process)')
-      .meta({
-        advanced: true,
-        perfEffect: {
-          false: {
-            read: 1.15,
-            write: 1.15,
-            why: 'thousands of backend processes waste memory and CPU on context switches',
+  configSchema: z
+    .object({
+      readReplicas: z
+        .number()
+        .int()
+        .min(0)
+        .max(15)
+        .describe('Streaming replicas that serve reads (writes still all go to the primary)')
+        .meta({ scaling: 'readReplicas' }),
+      replication: z
+        .enum(['async', 'sync'])
+        .describe(
+          'async: replicas lag, commits fast; sync: a commit waits for a standby (no data loss)',
+        ),
+      highAvailability: z
+        .boolean()
+        .describe('Hot standby in another zone for automatic failover (billed, serves no traffic)')
+        .meta({ scaling: 'standby' }),
+      queryUsesIndex: z
+        .boolean()
+        .describe('The hot read query has a matching index (off = sequential scan of the table)'),
+      tableRows: z
+        .number()
+        .int()
+        .min(1)
+        .max(1e11)
+        .describe('Rows in the table the hot query reads'),
+      secondaryIndexes: z
+        .number()
+        .int()
+        .min(0)
+        .max(30)
+        .describe('Indexes besides the primary key: faster reads, slower writes'),
+      storageGb: z
+        .number()
+        .min(1)
+        .max(65_536)
+        .describe('Data + indexes stored')
+        .meta({ scaling: 'storageGb' }),
+      connectionPooling: z
+        .boolean()
+        .describe('PgBouncer-style pooling (each Postgres connection is a process)')
+        .meta({
+          advanced: true,
+          perfEffect: {
+            false: {
+              read: 1.15,
+              write: 1.15,
+              why: 'thousands of backend processes waste memory and CPU on context switches',
+            },
           },
-        },
+        }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          '1 = the primary only. Each extra replica adds one streaming read replica (takes reads, never writes; billed; stores a full copy), on top of Read replicas. It is not a failover standby (High availability) or a backup. Prefer Read replicas and leave this at 1.',
+        autoscale: 'Adds or removes read replicas; write capacity stays one primary.',
+        instanceType:
+          'Size of the primary and each replica. A bigger primary is the only way to add write capacity without sharding.',
       }),
-  }),
+    ),
   defaults: {
     readReplicas: 0,
     replication: 'async',

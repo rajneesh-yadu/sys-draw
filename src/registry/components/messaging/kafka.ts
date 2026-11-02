@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
 import { GENERAL_PURPOSE_INSTANCES } from '../../presets';
+import { scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'messaging.kafka',
@@ -27,82 +28,92 @@ export default defineComponent({
     { id: 'producers', direction: 'in', protocols: ['kafka-wire', 'tls13', 'tcp'] },
     { id: 'consumers', direction: 'out', protocols: ['kafka-wire', 'tls13', 'tcp'] },
   ],
-  configSchema: z.object({
-    partitions: z
-      .number()
-      .int()
-      .min(1)
-      .max(10_000)
-      .describe(
-        'Partitions of the topic: ordered logs spread over the brokers. Caps consumer parallelism per group',
-      ),
-    replicationFactor: z
-      .number()
-      .int()
-      .min(1)
-      .max(5)
-      .describe('Copies of every partition on different brokers (followers fetch every write)')
-      .meta({ scaling: 'storageCopies' }),
-    acks: z
-      .enum(['0', '1', 'all'])
-      .describe(
-        'When the producer counts a write as done: never, leader on disk, or all in-sync replicas',
-      )
-      .meta({
-        perfEffect: {
-          '0': {
-            why: 'fire-and-forget: the producer does not wait, and a broker crash loses messages',
+  configSchema: z
+    .object({
+      partitions: z
+        .number()
+        .int()
+        .min(1)
+        .max(10_000)
+        .describe(
+          'Partitions of the topic: ordered logs spread over the brokers. Caps consumer parallelism per group',
+        ),
+      replicationFactor: z
+        .number()
+        .int()
+        .min(1)
+        .max(5)
+        .describe('Copies of every partition on different brokers (followers fetch every write)')
+        .meta({ scaling: 'storageCopies' }),
+      acks: z
+        .enum(['0', '1', 'all'])
+        .describe(
+          'When the producer counts a write as done: never, leader on disk, or all in-sync replicas',
+        )
+        .meta({
+          perfEffect: {
+            '0': {
+              why: 'fire-and-forget: the producer does not wait, and a broker crash loses messages',
+            },
+            all: {
+              writeAddMs: 2,
+              why: 'the leader answers only after every in-sync follower has fetched the record (one more round trip)',
+            },
           },
-          all: {
-            writeAddMs: 2,
-            why: 'the leader answers only after every in-sync follower has fetched the record (one more round trip)',
+        }),
+      minInsyncReplicas: z
+        .number()
+        .int()
+        .min(1)
+        .max(5)
+        .describe(
+          'With acks=all, writes fail if fewer replicas than this are in sync. Not simulated yet',
+        )
+        .meta({ advanced: true }),
+      retentionHours: z
+        .number()
+        .int()
+        .min(1)
+        .max(87_600)
+        .describe('How long events stay on disk for replay, consumed or not'),
+      messageBytes: z
+        .number()
+        .int()
+        .min(1)
+        .max(10_000_000)
+        .describe('Average message size (sizes retention and network)'),
+      storageGb: z
+        .number()
+        .min(1)
+        .max(1e7)
+        .describe('Disk provisioned for retained data (per copy)')
+        .meta({ scaling: 'storageGb' }),
+      keySkew: z
+        .number()
+        .min(0)
+        .max(1)
+        .describe('Share of events on the hottest partition key (0 = spread evenly)')
+        .meta({ advanced: true }),
+      compression: z
+        .enum(['none', 'lz4', 'zstd'])
+        .describe('Producer batch compression: less disk and network for some CPU')
+        .meta({
+          advanced: true,
+          perfEffect: {
+            zstd: {
+              write: 1.15,
+              why: 'compressing batches costs producer/broker CPU but cuts bytes by ~3–5×',
+            },
           },
-        },
+        }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          "Brokers in the cluster. Partitions and their traffic are spread over them, so throughput and cost grow with brokers. Replication factor needs at least that many brokers. Consumer parallelism is set by Partitions and the consumer node's replicas, not by this.",
+        autoscale: 'Adds or removes brokers.',
       }),
-    minInsyncReplicas: z
-      .number()
-      .int()
-      .min(1)
-      .max(5)
-      .describe('With acks=all, writes fail if fewer replicas than this are in sync')
-      .meta({ advanced: true }),
-    retentionHours: z
-      .number()
-      .int()
-      .min(1)
-      .max(87_600)
-      .describe('How long events stay on disk for replay, consumed or not'),
-    messageBytes: z
-      .number()
-      .int()
-      .min(1)
-      .max(10_000_000)
-      .describe('Average message size (sizes retention and network)'),
-    storageGb: z
-      .number()
-      .min(1)
-      .max(1e7)
-      .describe('Disk provisioned for retained data (per copy)')
-      .meta({ scaling: 'storageGb' }),
-    keySkew: z
-      .number()
-      .min(0)
-      .max(1)
-      .describe('Share of events on the hottest partition key (0 = spread evenly)')
-      .meta({ advanced: true }),
-    compression: z
-      .enum(['none', 'lz4', 'zstd'])
-      .describe('Producer batch compression: less disk and network for some CPU')
-      .meta({
-        advanced: true,
-        perfEffect: {
-          zstd: {
-            write: 1.15,
-            why: 'compressing batches costs producer/broker CPU but cuts bytes by ~3–5×',
-          },
-        },
-      }),
-  }),
+    ),
   defaults: {
     partitions: 12,
     replicationFactor: 3,

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
 import { GENERAL_PURPOSE_INSTANCES, MEMORY_OPTIMISED_INSTANCES } from '../../presets';
+import { scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'compute.kubernetes',
@@ -31,40 +32,51 @@ export default defineComponent({
       ],
     },
   ],
-  configSchema: z.object({
-    podCpuRequest: z
-      .number()
-      .min(0.05)
-      .max(64)
-      .describe('vCPU each pod requests (sets how many pods fit per node)'),
-    podMemoryGb: z.number().min(0.05).max(512).describe('Memory each pod requests'),
-    concurrencyPerPod: z
-      .number()
-      .int()
-      .min(1)
-      .max(10_000)
-      .describe('Requests one pod handles at once (threads / event loop)'),
-    maxPodsPerNode: z
-      .number()
-      .int()
-      .min(1)
-      .max(250)
-      .describe('Kubelet / CNI limit on pods per node')
-      .meta({ advanced: true }),
-    serviceRouting: z
-      .enum(['iptables', 'ipvs', 'ebpf'])
-      .describe('How kube-proxy (or Cilium) sends Service traffic to pods')
-      .meta({
-        advanced: true,
-        perfEffect: {
-          iptables: {
-            readAddMs: 0.05,
-            writeAddMs: 0.05,
-            why: 'linear iptables rule chains grow with the number of Services',
+  configSchema: z
+    .object({
+      podCpuRequest: z
+        .number()
+        .min(0.05)
+        .max(64)
+        .describe('vCPU each pod requests (sets how many pods fit per node)'),
+      podMemoryGb: z.number().min(0.05).max(512).describe('Memory each pod requests'),
+      concurrencyPerPod: z
+        .number()
+        .int()
+        .min(1)
+        .max(10_000)
+        .describe('Requests one pod handles at once (threads / event loop)'),
+      maxPodsPerNode: z
+        .number()
+        .int()
+        .min(1)
+        .max(250)
+        .describe('Kubelet / CNI limit on pods per node')
+        .meta({ advanced: true }),
+      serviceRouting: z
+        .enum(['iptables', 'ipvs', 'ebpf'])
+        .describe('How kube-proxy (or Cilium) sends Service traffic to pods')
+        .meta({
+          advanced: true,
+          perfEffect: {
+            iptables: {
+              readAddMs: 0.05,
+              writeAddMs: 0.05,
+              why: 'linear iptables rule chains grow with the number of Services',
+            },
           },
-        },
+        }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          'Worker nodes in the cluster, not pod replicas. Pods are packed onto each node by their CPU and memory requests, so capacity = nodes × pods per node × concurrency per pod, and cost is per node.',
+        autoscale:
+          'Cluster autoscaler: adds or removes worker nodes to hold the target utilisation (the control-plane fee is not in the cost).',
+        instanceType:
+          'Worker node size: a bigger node fits more pods (see pod requests) but does not make each pod faster.',
       }),
-  }),
+    ),
   defaults: {
     podCpuRequest: 0.5,
     podMemoryGb: 1,

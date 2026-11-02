@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
+import { scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'client.app',
@@ -14,21 +15,33 @@ export default defineComponent({
       protocols: ['http1', 'http2', 'http3', 'websocket', 'grpc', 'dns'],
     },
   ],
-  configSchema: z.object({
-    platform: z.enum(['web', 'mobile']).describe('Browser app or native mobile app'),
-    connectionsPerHost: z
-      .number()
-      .int()
-      .min(1)
-      .max(32)
-      .describe('Parallel connections per origin (browsers use about 6 for HTTP/1.1)')
-      .meta({ advanced: true }),
-    keepAlive: z.boolean().describe('Reuse connections between requests').meta({ advanced: true }),
-    localCache: z
-      .boolean()
-      .describe('HTTP cache / on-device cache for static assets')
-      .meta({ advanced: true }),
-  }),
+  configSchema: z
+    .object({
+      platform: z.enum(['web', 'mobile']).describe('Browser app or native mobile app'),
+      connectionsPerHost: z
+        .number()
+        .int()
+        .min(1)
+        .max(32)
+        .describe('Parallel connections per origin (browsers use about 6 for HTTP/1.1)')
+        .meta({ advanced: true }),
+      keepAlive: z
+        .boolean()
+        .describe('Reuse connections between requests')
+        .meta({ advanced: true }),
+      localCache: z
+        .boolean()
+        .describe('HTTP cache / on-device cache for static assets')
+        .meta({ advanced: true }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          'Not used: traffic comes from the scenario (users per region and requests per user), not from replicas.',
+        autoscale: 'Not used for clients.',
+        instanceType: 'Not used for clients (they cost nothing in the simulation).',
+      }),
+    ),
   defaults: { platform: 'web', connectionsPerHost: 6, keepAlive: true, localCache: true },
   instanceTypes: [
     { id: 'browser', vCpu: 4, memGb: 8, netGbps: 0.1, costUsdPerHour: 0 },

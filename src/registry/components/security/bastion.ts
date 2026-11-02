@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
 import { GENERAL_PURPOSE_INSTANCES } from '../../presets';
+import { scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'security.bastion',
@@ -30,18 +31,26 @@ export default defineComponent({
       ],
     },
   ],
-  configSchema: z.object({
-    access: z
-      .enum(['bastion', 'vpn'])
-      .describe(
-        'Bastion: one hardened jump host per session. VPN: an encrypted tunnel into the network',
-      ),
-    requireMfa: z.boolean().describe('Operators authenticate with SSO + MFA before connecting'),
-    sessionRecording: z
-      .boolean()
-      .describe('Record and audit every admin session')
-      .meta({ advanced: true }),
-  }),
+  configSchema: z
+    .object({
+      access: z
+        .enum(['bastion', 'vpn'])
+        .describe(
+          'Bastion: one hardened jump host per session. VPN: an encrypted tunnel into the network',
+        ),
+      requireMfa: z.boolean().describe('Operators authenticate with SSO + MFA before connecting'),
+      sessionRecording: z
+        .boolean()
+        .describe('Record and audit every admin session')
+        .meta({ advanced: true }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          'Jump hosts / VPN gateways that share admin sessions evenly; capacity and cost grow with the count. They are copies of one access point, not separate entry paths.',
+        autoscale: 'Adds or removes jump hosts.',
+      }),
+    ),
   defaults: { access: 'bastion', requireMfa: true, sessionRecording: true },
   instanceTypes: [...GENERAL_PURPOSE_INSTANCES],
   perf: {

@@ -906,3 +906,65 @@ Known gaps:
 Next suggested step: an e2e spec for the three controls (including real pointer drag and focus order). Optionally, breakpoint-based auto-collapse of the Inspector below ~1100 px, and the same resize handle for Security/Review panels.
 
 Files touched: `src/canvas/{BoardCanvas.tsx, index.ts, README.md, minimap.test.tsx (new)}`, `src/canvas/trace/{TracePanel.tsx, trace-size.ts (new), trace-size.test.tsx (new)}`, `src/app/layout/{AppShell.tsx, AppShell.s24.test.tsx (new)}`, `src/app/ui/{ui-store.ts, ui-store.test.ts}`, `src/app/commands/{commands.ts, commands.test.ts}`, `src/app/README.md`, `docs/PROGRESS.md`.
+
+## S23 (field help) — Explain confusing component configuration fields — 2026-11-02
+
+(Task id S23 is also used by the anti-pattern sample above; this entry is the config-field-help task.)
+
+What changed:
+
+- **Per-component help for the shared Scaling fields.** `scaling.replicas`, `instanceType` and `autoscale` come from core's `NodeScalingSchema`, so every component showed the same text ("Identical instances behind a load balancer"), which is wrong for most stores and managed services. Each of the 38 components now declares what they mean for it with `.meta(scalingHelp({ replicas, autoscale?, instanceType? }))` on its `configSchema`. This uses the existing schema-meta convention (like `.meta({ scaling })` and `.meta({ perfEffect })`), so no core schema change. The texts were written from what the engine actually does (`engine/scaling/pools.ts`, `cost.ts`, `queueing/node.ts`, behaviors):
+  - **Interchangeable instances** (app server, reverse proxy, auth server, bastion, service mesh): requests split evenly; not backups or separate services; 2+ clears the SPOF review.
+  - **Read replicas** (Postgres, SQL, Aurora, MongoDB, Redis — single-writer): `1 = primary`; each extra replica adds one read replica per shard _on top of_ the config field. The help also says what replicas are **not**: not a failover standby (High availability / Multi-AZ), not a backup. It advises using the config field.
+  - **Cluster nodes** (Cassandra: RF capped at node count; Elasticsearch data nodes; Kafka brokers; RabbitMQ brokers; ClickHouse servers; Kubernetes worker nodes, not pods).
+  - **Per-shard/partition copies** (in-memory cache, Memcached, NoSQL, event stream): throughput only; memory/data copies come from the shard / replication-factor fields.
+  - **Ignored / keep at 1** (client; serverless function — concurrency limit rules; coordination — ensemble is Members; DynamoDB-style KV and Spanner — capacity is partitions/nodes; DDoS shield — one subscription).
+  - **Managed services**: simulated capacity units. Billing per request means no cost change (API gateway, CDN, queue, topic, IAM, object storage, KV). For services with an hourly fee (LB, DNS, WAF, KMS, secrets manager), each unit adds that fee.
+  - Component-specific autoscale/instance-type text where it differs: e.g. Kubernetes = cluster autoscaler and worker-node size; Postgres = size of the only writer; serverless instance type = memory size.
+- `src/inspector/panels/scaling-help.ts`: `scalingHelpFor(def)` reads the meta key; it falls back to the previous generic text for anything missing or malformed. `NodePanel` uses it for the Scaling form's help, which keeps being rendered under the field with `aria-describedby` as before.
+- **Config field descriptions clarified** (only where ambiguous or misleading):
+  - Redis `replicasPerShard` (reads only with Read preference = replicas, billed either way) and `persistence` (what each mode loses, write cost, "not replication").
+  - Elasticsearch `replicasPerShard`: the old text claimed search throughput, which the engine doesn't model. Search capacity comes from data nodes.
+  - ClickHouse `replication` and NoSQL `replicationFactor` (storage copies only); Cassandra RF (capped at node count).
+  - RabbitMQ `queueType` / `persistent` (durability vs replication, write cost).
+  - Serverless `memoryMb`: limits only; speed and cost come from the instance type.
+  - Marked "not simulated yet": in-memory cache `replicasPerShard`, NoSQL `consistency`, SQL `replication`, queue `consumers`, stream `consumerGroups`, Kafka `minInsyncReplicas`.
+- Self-evident fields were left alone. No engine code, defaults or schema shapes changed, so simulation results are unchanged.
+
+Public APIs added: none. No exported signature changed; `scaling-help.ts` (registry) and `panels/scaling-help.ts` (inspector) are internal. New convention: the `scalingHelp` meta key on a component's `configSchema` (documented in both READMEs).
+
+Tests:
+
+- New `src/registry/scaling-help.test.ts` (7 checks):
+  - every component declares valid help;
+  - single-writer stores say `1 = …`, read, "on top of", and Postgres/SQL say "not a failover standby";
+  - platform-scaled functions say "Ignored";
+  - $0/h services say "per request";
+  - clients say "Not used";
+  - length ≤ 400 chars and ≤ 5 sentences;
+  - helpers validate.
+- New `src/inspector/scaling-help.test.tsx` (7 checks):
+  - fallback and malformed meta;
+  - Postgres, app server, Cassandra and serverless Replicas inputs are `aria-describedby` their own text, and the generic text is gone;
+  - Kubernetes instance-type help.
+- Results: 1175 tests pass. `tsc -b`, `eslint .`, `prettier --check src docs e2e` and `pnpm build` are green (pre-existing chunk-size and dynamic-import warnings only). This ran on a Linux copy (macOS-native `node_modules`). No browser check was done; rendering is covered by the jsdom tests.
+
+Known gaps / follow-ups (engine semantics found during the audit; help describes current behaviour, not these fixes):
+
+- **Two knobs for read replicas** on single-writer stores: `scaling.replicas − 1` is added to the `readReplicas`-role field (`readersPerShard`). With `readPreference = primary` (Redis, MongoDB), the config replicas become standbys, but the extra scaling replicas still serve reads (`replicaReads` only moves `scale.readReplicas`). Consider pinning replicas to 1 for these, or folding it into the field.
+- **Coordination**: `scaling.replicas > 1` adds read-serving copies even with `readMode: linearizable` (consensus sets `readReplicas: 0` but `readersPerShard` still adds replicas − 1).
+- **KV store / Spanner**: replicas multiply each partition's 3 000 RU / 1 000 WU budget, or Spanner nodes.
+- **DDoS shield / LB / DNS / WAF / KMS / secrets manager**: replicas multiply the hourly fee.
+- **Prometheus**: storage is billed once, though each HA replica keeps its own copy. Dashboard reads are split across replicas, while the explain text says "replicas add availability, not capacity".
+- **RabbitMQ**: the perf comment says a queue lives on one node, but the engine splits load evenly over replicas.
+- **Availability**: a `nodeOutage` takes the whole node down regardless of replicas (instance-level failures aren't modelled). Replicas count for availability only in the SPOF design review, so help texts make no failover claims beyond that.
+- **Config fields not simulated**:
+  - in-memory cache `writePolicy`;
+  - NoSQL `capacityMode` and per-copy write work;
+  - SQL `isolation`.
+  - Help says so only where the field is about replicas/consistency.
+- The "+1 replica" quick action on single-writer stores adds a read replica (via `scaling.replicas`); its label could say so.
+
+Next suggested step: decide the engine semantics for the first four follow-ups (most likely: `scaling.replicas` fixed at 1 for single-writer, partitioned-managed and consensus components, with the config field as the only knob — a store/inspector + engine session with a migration for boards that set it), then update the matching help texts and tests.
+
+Files touched: `src/registry/scaling-help.ts` (new), `src/registry/scaling-help.test.ts` (new), all 38 `src/registry/components/*/*.ts`, `src/inspector/panels/scaling-help.ts` (new), `src/inspector/scaling-help.test.tsx` (new), `src/inspector/panels/NodePanel.tsx`, `src/registry/README.md`, `src/inspector/README.md`, `docs/PROGRESS.md`.

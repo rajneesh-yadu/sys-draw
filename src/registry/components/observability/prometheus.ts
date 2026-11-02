@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
 import { MEMORY_OPTIMISED_INSTANCES, GENERAL_PURPOSE_INSTANCES } from '../../presets';
+import { scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'observability.prometheus',
@@ -17,28 +18,41 @@ export default defineComponent({
     { id: 'queries', direction: 'in', protocols: ['http1', 'http2'] },
     { id: 'scrape', direction: 'out', protocols: ['http1'] },
   ],
-  configSchema: z.object({
-    activeSeries: z
-      .number()
-      .int()
-      .min(1)
-      .max(1e9)
-      .describe('Distinct time series (metric × label combinations) currently scraped'),
-    scrapeIntervalSec: z
-      .number()
-      .int()
-      .min(1)
-      .max(600)
-      .describe('How often every target is scraped'),
-    retentionDays: z.number().int().min(1).max(3650).describe('How long samples are kept locally'),
-    dashboards: z
-      .number()
-      .int()
-      .min(0)
-      .max(10_000)
-      .describe('Grafana dashboards (each panel is a PromQL query on refresh)')
-      .meta({ advanced: true }),
-  }),
+  configSchema: z
+    .object({
+      activeSeries: z
+        .number()
+        .int()
+        .min(1)
+        .max(1e9)
+        .describe('Distinct time series (metric × label combinations) currently scraped'),
+      scrapeIntervalSec: z
+        .number()
+        .int()
+        .min(1)
+        .max(600)
+        .describe('How often every target is scraped'),
+      retentionDays: z
+        .number()
+        .int()
+        .min(1)
+        .max(3650)
+        .describe('How long samples are kept locally'),
+      dashboards: z
+        .number()
+        .int()
+        .min(0)
+        .max(10_000)
+        .describe('Grafana dashboards (each panel is a PromQL query on refresh)')
+        .meta({ advanced: true }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          'High-availability copies: each one scrapes every target and keeps its own data, so ingest and memory per copy do not drop. Dashboard queries are split across them. They are not shards.',
+        autoscale: 'Adds or removes HA copies (only dashboard query capacity grows).',
+      }),
+    ),
   defaults: { activeSeries: 1_000_000, scrapeIntervalSec: 15, retentionDays: 15, dashboards: 20 },
   instanceTypes: [...MEMORY_OPTIMISED_INSTANCES, ...GENERAL_PURPOSE_INSTANCES],
   perf: {

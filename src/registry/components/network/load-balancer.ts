@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
+import { managedHourly, scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'network.load-balancer',
@@ -20,46 +21,58 @@ export default defineComponent({
     },
     { id: 'targets', direction: 'out', protocols: ['http1', 'http2', 'grpc', 'websocket', 'tcp'] },
   ],
-  configSchema: z.object({
-    layer: z
-      .enum(['L4', 'L7'])
-      .describe('L4 forwards TCP connections; L7 understands HTTP and can route by path'),
-    algorithm: z
-      .enum(['round-robin', 'least-connections', 'consistent-hash', 'random'])
-      .describe('How a target is picked for each request'),
-    tlsTermination: z.boolean().describe('Decrypt TLS at the LB'),
-    healthCheckIntervalSec: z
-      .number()
-      .int()
-      .min(1)
-      .max(300)
-      .describe('Time between health probes')
-      .meta({ advanced: true }),
-    unhealthyThreshold: z
-      .number()
-      .int()
-      .min(1)
-      .max(10)
-      .describe('Failed probes before a target is removed')
-      .meta({ advanced: true }),
-    idleTimeoutSec: z
-      .number()
-      .int()
-      .min(1)
-      .max(4000)
-      .describe('Close idle connections after')
-      .meta({ advanced: true }),
-    crossZone: z.boolean().describe('Spread traffic evenly across zones').meta({ advanced: true }),
-    stickySessions: z.boolean().describe('Pin a client to one target').meta({ advanced: true }),
-    virtualNodes: z
-      .number()
-      .int()
-      .min(1)
-      .max(1000)
-      .default(100)
-      .describe('Consistent hashing: ring points per target (more = more even spread)')
-      .meta({ advanced: true }),
-  }),
+  configSchema: z
+    .object({
+      layer: z
+        .enum(['L4', 'L7'])
+        .describe('L4 forwards TCP connections; L7 understands HTTP and can route by path'),
+      algorithm: z
+        .enum(['round-robin', 'least-connections', 'consistent-hash', 'random'])
+        .describe('How a target is picked for each request'),
+      tlsTermination: z.boolean().describe('Decrypt TLS at the LB'),
+      healthCheckIntervalSec: z
+        .number()
+        .int()
+        .min(1)
+        .max(300)
+        .describe('Time between health probes')
+        .meta({ advanced: true }),
+      unhealthyThreshold: z
+        .number()
+        .int()
+        .min(1)
+        .max(10)
+        .describe('Failed probes before a target is removed')
+        .meta({ advanced: true }),
+      idleTimeoutSec: z
+        .number()
+        .int()
+        .min(1)
+        .max(4000)
+        .describe('Close idle connections after')
+        .meta({ advanced: true }),
+      crossZone: z
+        .boolean()
+        .describe('Spread traffic evenly across zones')
+        .meta({ advanced: true }),
+      stickySessions: z.boolean().describe('Pin a client to one target').meta({ advanced: true }),
+      virtualNodes: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .default(100)
+        .describe('Consistent hashing: ring points per target (more = more even spread)')
+        .meta({ advanced: true }),
+    })
+    .meta(
+      scalingHelp(
+        managedHourly(
+          'managed load balancer',
+          'These are not the targets it balances across; give those their own replicas.',
+        ),
+      ),
+    ),
   defaults: {
     layer: 'L7',
     algorithm: 'round-robin',

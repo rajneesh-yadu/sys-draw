@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
+import { managedHourly, scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'security.secrets-manager',
@@ -9,21 +10,23 @@ export default defineComponent({
   icon: 'key-round',
   providerNames: { aws: 'Secrets Manager', gcp: 'Secret Manager', azure: 'Key Vault Secrets' },
   ports: [{ id: 'in', direction: 'in', protocols: ['http1', 'http2', 'tls13', 'tcp'] }],
-  configSchema: z.object({
-    rotationDays: z
-      .number()
-      .int()
-      .min(0)
-      .max(365)
-      .describe('Rotate database passwords and keys automatically every N days (0 = never)'),
-    cacheTtlSec: z
-      .number()
-      .int()
-      .min(0)
-      .max(86_400)
-      .describe('Clients cache a secret this long (fewer calls, slower to pick up a rotation)')
-      .meta({ advanced: true }),
-  }),
+  configSchema: z
+    .object({
+      rotationDays: z
+        .number()
+        .int()
+        .min(0)
+        .max(365)
+        .describe('Rotate database passwords and keys automatically every N days (0 = never)'),
+      cacheTtlSec: z
+        .number()
+        .int()
+        .min(0)
+        .max(86_400)
+        .describe('Clients cache a secret this long (fewer calls, slower to pick up a rotation)')
+        .meta({ advanced: true }),
+    })
+    .meta(scalingHelp(managedHourly('secrets manager'))),
   defaults: { rotationDays: 30, cacheTtlSec: 300 },
   // ~$0.40 per secret-month for a handful of secrets; $0.05 per 10k calls not modelled.
   instanceTypes: [{ id: 'managed', vCpu: 2, memGb: 4, netGbps: 10, costUsdPerHour: 0.003 }],

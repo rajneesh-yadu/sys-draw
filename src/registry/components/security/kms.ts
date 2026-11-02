@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
+import { managedHourly, scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'security.kms',
@@ -9,14 +10,18 @@ export default defineComponent({
   icon: 'lock-keyhole',
   providerNames: { aws: 'AWS KMS', gcp: 'Cloud KMS', azure: 'Key Vault Keys' },
   ports: [{ id: 'in', direction: 'in', protocols: ['http1', 'http2', 'tls13', 'tcp'] }],
-  configSchema: z.object({
-    keyType: z
-      .enum(['provider-managed', 'customer-managed', 'hsm'])
-      .describe(
-        'Who controls the key (and its policy, rotation, deletion); HSM = FIPS 140-3 level 3',
-      ),
-    autoRotate: z.boolean().describe('Rotate the key material yearly (old versions still decrypt)'),
-  }),
+  configSchema: z
+    .object({
+      keyType: z
+        .enum(['provider-managed', 'customer-managed', 'hsm'])
+        .describe(
+          'Who controls the key (and its policy, rotation, deletion); HSM = FIPS 140-3 level 3',
+        ),
+      autoRotate: z
+        .boolean()
+        .describe('Rotate the key material yearly (old versions still decrypt)'),
+    })
+    .meta(scalingHelp(managedHourly('key management service'))),
   defaults: { keyType: 'customer-managed', autoRotate: true },
   // $1 per customer-managed key per month; $0.03 per 10k requests not modelled.
   instanceTypes: [{ id: 'managed', vCpu: 2, memGb: 4, netGbps: 10, costUsdPerHour: 0.0014 }],

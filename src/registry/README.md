@@ -15,6 +15,7 @@ Loads, validates and looks up every registry entry (components, protocols, provi
 - Schemas + types for kinds core lacks: `ProviderDefinition`, `RuleDefinition` (+ `RuleContext`, `RuleCheck`), `LessonDefinition`, `RegistryProblemDefinition` (core problem with required `docs`).
 - Geo (S10): `USER_REGIONS` (9 user regions: lat/long, UTC offset, last-mile ms; `geo/user-regions.ts`), `userRegion(id)`, `UserRegionSchema`. Cloud regions live in each provider's `regions` (generic: 26).
 - `presets.ts` (internal): `GENERAL_PURPOSE_INSTANCES`, `MEMORY_OPTIMISED_INSTANCES` for component files.
+- `scaling-help.ts` (internal, S23 field help): every component declares what the shared Scaling fields mean for it with `configSchema: z.object({...}).meta(scalingHelp({ replicas, autoscale?, instanceType? }))` (helpers `managedPerRequest`, `managedHourly`); the inspector reads the `scalingHelp` meta key. Text must match what the engine does with `scaling.replicas` (see `scaling-help.test.ts`).
 
 - Security (S16, `security-tools.ts`): zone/exposure/encryption/security-group helpers used by rules, the engine and `security` (see src/security/README.md). 7 security components (`security.*`: WAF, DDoS shield, secrets manager, KMS, IAM, bastion/VPN, auth server) and 8 security rules (`rules/`); `RuleDefinition.fix?` returns a `FixPlan`; `RuleContext.protocols?`. Controls are `control:<id>` tags (API gateway: rate-limit + auth; service mesh: mtls).
 

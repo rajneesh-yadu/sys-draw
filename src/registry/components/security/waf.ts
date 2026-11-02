@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
+import { managedHourly, scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'security.waf',
@@ -17,25 +18,29 @@ export default defineComponent({
     },
     { id: 'origin', direction: 'out', protocols: ['http1', 'http2', 'grpc', 'websocket', 'tcp'] },
   ],
-  configSchema: z.object({
-    mode: z
-      .enum(['block', 'count'])
-      .describe('Block matching requests, or only count them (rules being tuned: blocks nothing)'),
-    managedRules: z
-      .boolean()
-      .describe('OWASP Top 10 managed rule set (SQL injection, XSS, known bad inputs)'),
-    botControl: z
-      .boolean()
-      .describe(
-        'Detect automated clients (credential stuffing, scraping) by fingerprint and behaviour',
-      ),
-    rateLimitPer5Min: z
-      .number()
-      .int()
-      .min(0)
-      .max(2_000_000_000)
-      .describe('Rate-based rule: requests per client IP per 5 minutes (0 = off)'),
-  }),
+  configSchema: z
+    .object({
+      mode: z
+        .enum(['block', 'count'])
+        .describe(
+          'Block matching requests, or only count them (rules being tuned: blocks nothing)',
+        ),
+      managedRules: z
+        .boolean()
+        .describe('OWASP Top 10 managed rule set (SQL injection, XSS, known bad inputs)'),
+      botControl: z
+        .boolean()
+        .describe(
+          'Detect automated clients (credential stuffing, scraping) by fingerprint and behaviour',
+        ),
+      rateLimitPer5Min: z
+        .number()
+        .int()
+        .min(0)
+        .max(2_000_000_000)
+        .describe('Rate-based rule: requests per client IP per 5 minutes (0 = off)'),
+    })
+    .meta(scalingHelp(managedHourly('managed WAF'))),
   defaults: { mode: 'block', managedRules: true, botControl: true, rateLimitPer5Min: 2000 },
   // ~$5 per web ACL + $1 per rule per month; request fees not modelled.
   instanceTypes: [{ id: 'managed', vCpu: 2, memGb: 4, netGbps: 10, costUsdPerHour: 0.014 }],

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
 import { GENERAL_PURPOSE_INSTANCES } from '../../presets';
+import { scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'database.coordination',
@@ -19,26 +20,35 @@ export default defineComponent({
   ],
   icon: 'network',
   ports: [{ id: 'in', direction: 'in', protocols: ['grpc', 'tcp', 'tls13'] }],
-  configSchema: z.object({
-    engine: z.enum(['etcd', 'zookeeper']).describe('etcd (Raft, gRPC) or ZooKeeper (ZAB)'),
-    members: z
-      .number()
-      .int()
-      .min(1)
-      .max(9)
-      .describe('Voting members (use an odd number: 3 tolerates 1 failure, 5 tolerates 2)'),
-    readMode: z
-      .enum(['linearizable', 'local'])
-      .describe(
-        'linearizable: confirmed by the leader (etcd default); local: any member, may be stale (ZooKeeper default)',
-      ),
-    dataGb: z
-      .number()
-      .min(0.01)
-      .max(8)
-      .describe('Data kept in the store (small: keep it under a few GB)')
-      .meta({ scaling: 'storageGb' }),
-  }),
+  configSchema: z
+    .object({
+      engine: z.enum(['etcd', 'zookeeper']).describe('etcd (Raft, gRPC) or ZooKeeper (ZAB)'),
+      members: z
+        .number()
+        .int()
+        .min(1)
+        .max(9)
+        .describe('Voting members (use an odd number: 3 tolerates 1 failure, 5 tolerates 2)'),
+      readMode: z
+        .enum(['linearizable', 'local'])
+        .describe(
+          'linearizable: confirmed by the leader (etcd default); local: any member, may be stale (ZooKeeper default)',
+        ),
+      dataGb: z
+        .number()
+        .min(0.01)
+        .max(8)
+        .describe('Data kept in the store (small: keep it under a few GB)')
+        .meta({ scaling: 'storageGb' }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          'Leave at 1: the ensemble size is Members. Values above 1 are counted as extra read-serving copies (and billed), which a real etcd / ZooKeeper ensemble does not have.',
+        autoscale:
+          'Leave off: the ensemble is a fixed, odd number of Members; autoscaling would only add extra read copies.',
+      }),
+    ),
   defaults: { engine: 'etcd', members: 3, readMode: 'linearizable', dataGb: 1 },
   instanceTypes: [...GENERAL_PURPOSE_INSTANCES],
   perf: {

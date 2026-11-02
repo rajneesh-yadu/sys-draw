@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
 import { GENERAL_PURPOSE_INSTANCES } from '../../presets';
+import { scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'compute.app-server',
@@ -31,41 +32,50 @@ export default defineComponent({
       ],
     },
   ],
-  configSchema: z.object({
-    runtime: z
-      .enum(['node', 'java', 'go', 'python', 'dotnet'])
-      .describe('Language runtime (affects CPU cost per request)'),
-    stateless: z
-      .boolean()
-      .describe('No session state on the instance, so any instance can serve any request'),
-    workerThreads: z
-      .number()
-      .int()
-      .min(1)
-      .max(4096)
-      .describe('Requests handled concurrently per instance')
-      .meta({ advanced: true }),
-    requestTimeoutMs: z
-      .number()
-      .int()
-      .min(10)
-      .max(300_000)
-      .describe('Give up on a request after')
-      .meta({ advanced: true }),
-    dbPoolSize: z
-      .number()
-      .int()
-      .min(1)
-      .max(1000)
-      .describe('Database connections held per instance')
-      .meta({ advanced: true }),
-    gcPauseMs: z
-      .number()
-      .min(0)
-      .max(5000)
-      .describe('Typical stop-the-world pause (adds to tail latency)')
-      .meta({ advanced: true }),
-  }),
+  configSchema: z
+    .object({
+      runtime: z
+        .enum(['node', 'java', 'go', 'python', 'dotnet'])
+        .describe('Language runtime (affects CPU cost per request)'),
+      stateless: z
+        .boolean()
+        .describe('No session state on the instance, so any instance can serve any request'),
+      workerThreads: z
+        .number()
+        .int()
+        .min(1)
+        .max(4096)
+        .describe('Requests handled concurrently per instance')
+        .meta({ advanced: true }),
+      requestTimeoutMs: z
+        .number()
+        .int()
+        .min(10)
+        .max(300_000)
+        .describe('Give up on a request after')
+        .meta({ advanced: true }),
+      dbPoolSize: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .describe('Database connections held per instance')
+        .meta({ advanced: true }),
+      gcPauseMs: z
+        .number()
+        .min(0)
+        .max(5000)
+        .describe('Typical stop-the-world pause (adds to tail latency)')
+        .meta({ advanced: true }),
+    })
+    .meta(
+      scalingHelp({
+        replicas:
+          'Interchangeable copies of this one service behind a load balancer (horizontal scaling). Requests are split evenly, so capacity and cost grow with the count. They are not backups or different services; 2+ in different zones removes the single point of failure. Keep Stateless on so any copy can serve any request.',
+        autoscale:
+          'Adds or removes these interchangeable copies to hold the target utilisation; a new copy takes traffic after the warm-up.',
+      }),
+    ),
   defaults: {
     runtime: 'node',
     stateless: true,

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineComponent } from '../../define';
+import { managedHourly, scalingHelp } from '../../scaling-help';
 
 export default defineComponent({
   id: 'network.dns',
@@ -9,17 +10,19 @@ export default defineComponent({
   icon: 'globe',
   providerNames: { aws: 'Route 53', gcp: 'Cloud DNS', azure: 'Azure DNS' },
   ports: [{ id: 'in', direction: 'in', protocols: ['dns', 'udp', 'tcp'] }],
-  configSchema: z.object({
-    ttlSec: z.number().int().min(0).max(86_400).describe('How long resolvers cache answers'),
-    routingPolicy: z
-      .enum(['simple', 'latency', 'geo', 'weighted', 'failover'])
-      .describe('How the answer is chosen when several endpoints exist'),
-    healthChecks: z
-      .boolean()
-      .describe('Stop returning unhealthy endpoints')
-      .meta({ advanced: true }),
-    anycast: z.boolean().describe('Serve from many locations on one IP').meta({ advanced: true }),
-  }),
+  configSchema: z
+    .object({
+      ttlSec: z.number().int().min(0).max(86_400).describe('How long resolvers cache answers'),
+      routingPolicy: z
+        .enum(['simple', 'latency', 'geo', 'weighted', 'failover'])
+        .describe('How the answer is chosen when several endpoints exist'),
+      healthChecks: z
+        .boolean()
+        .describe('Stop returning unhealthy endpoints')
+        .meta({ advanced: true }),
+      anycast: z.boolean().describe('Serve from many locations on one IP').meta({ advanced: true }),
+    })
+    .meta(scalingHelp(managedHourly('managed DNS service'))),
   defaults: { ttlSec: 60, routingPolicy: 'latency', healthChecks: true, anycast: true },
   instanceTypes: [{ id: 'managed', vCpu: 1, memGb: 1, netGbps: 10, costUsdPerHour: 0.0007 }],
   perf: {
