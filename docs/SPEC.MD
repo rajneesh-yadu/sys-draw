@@ -61,7 +61,7 @@ SysDraw is a flight simulator for system design: you draw a system, throw realis
 3. **Approximate but honest.** Use established models (queueing theory, speed-of-light latency, published instance specs) and show the formula behind every number. Educational accuracy beats false precision.
 4. **Progressive depth.** Every component works with defaults in 10 seconds, and exposes advanced knobs (partitions, consistency level, TLS version) when the user expands it.
 5. **Explain everything.** Every component, protocol and metric has a "Why / How it works" panel.
-6. **Offline-first, local-first.** Runs fully in the browser; saves to IndexedDB; export/import JSON. A backend is optional later.
+6. **Account-backed persistence.** The deployed app requires sign-in and saves workspaces to the cloud under the signed-in user's account. JSON export/import remains available for portability; browser storage is not an authoritative or fallback workspace store.
 
 **Glossary**
 
@@ -708,6 +708,26 @@ Done when: Lighthouse accessibility >= 90; perf test with 300-node fixture passe
 ```
 
 After S21, add features the same way: write a new prompt with the template in section 11 (new component, protocol, problem or mode) and run it in its own session.
+
+**S22 · Cloud persistence, sign-in and deployment**
+
+```markdown
+TASK S22 — Replace browser-only workspace storage with Supabase cloud storage, add sign-in, and deploy the frontend to Vercel.
+Read: docs/ARCHITECTURE.md, docs/DATA-MODEL.md, docs/PROGRESS.md, src/persistence/README.md, src/persistence/index.ts, src/app/main.tsx, src/app/README.md.
+Before implementation, write a concise design note in the handoff describing the auth/session flow, data ownership model, migration/import path for existing IndexedDB workspaces, and Vercel/Supabase environment configuration. Then implement the design in this session.
+Build:
+- Add Supabase Auth sign-in/sign-out and session restoration. The app's workspace requires an authenticated user; show clear signed-out/loading/error states and never load another user's data.
+- Add a Supabase-backed StorageAdapter (or equivalent persistence boundary) that stores workspace metadata, boards, layouts, and backups with an owner user id. Enforce isolation in the database with Row Level Security policies; client-side filtering alone is not security.
+- Replace the app's default Dexie/IndexedDB workspace adapter with the Supabase adapter. Remove browser-based workspace persistence and silent local fallback. Keep browser memory only for live UI state; preserve versioned JSON import/export for portability and backup.
+- Provide an explicit, one-time migration path that detects an existing local IndexedDB workspace after sign-in, lets the user import it into their account, validates/migrates it with the existing save format, and confirms before any cloud overwrite. Do not silently discard local data. After successful migration, stop reading/writing the local workspace database.
+- Add Vercel deployment configuration for the Vite static build, SPA route fallback if needed, documented environment variables, and safe handling of the Supabase public URL/anon key. Never put a service-role key in frontend code.
+- Document local development, Supabase schema/policies setup, deployment, and free-tier limits. Keep schema migrations and data ownership explicit.
+Tests: auth state transitions, user-scoped reads/writes, RLS policy/schema expectations where practical, adapter behavior, migration/import success and cancellation, and no local fallback. Run the existing persistence, auth, build and lint checks.
+Out of scope: realtime collaboration, multi-user editing/sharing, billing, and changing the board/save-file data model beyond what cloud ownership requires.
+Done when: an authenticated user can open, edit, reload, and delete only their own cloud-saved workspace; a second account cannot read or mutate it; an existing local workspace can be deliberately migrated; signed-out users cannot enter workspace editing; JSON export/import still works; deployment and setup instructions are complete.
+```
+
+This S22 makes cloud persistence the next session. The earlier S22 suggestion in `docs/PROGRESS.md` about command-palette coverage is deferred as a later follow-up and should not be combined with this work.
 
 ## Templates
 
